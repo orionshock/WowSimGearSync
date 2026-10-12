@@ -72,6 +72,21 @@ function Doll:Render(profile, snapshot, comparison, reason)
     if self.hovered and frame:IsShown() then self:ShowSlotTooltip(self.hovered) end
 end
 
+function Doll:UpdateEquipButton()
+    if not self.frame then return end
+    local actions = WSGS.EquipmentActions
+    local labels = { READY="Equip", NEXT="Equip Next", PENDING="Equipping", COOLDOWN="Equipping",
+        CURSOR="Blocked", COMBAT="Blocked", FAULT="Blocked", BLOCKED="Blocked", COMPLETE="Complete" }
+    self.frame.equipButton:SetText(labels[actions.state] or "Blocked")
+    self.frame.equipButton:SetEnabled(actions.state == "READY" or actions.state == "NEXT" or actions.state == "FAULT")
+    local plan = actions.plan
+    local note = actions.state == "CURSOR" and "Place the held cursor item first." or actions.state == "COMBAT" and "Cannot equip in combat." or actions.fault
+        or actions.pending and "Waiting for inventory verification."
+        or plan and (#plan.missing > 0 and ("Missing target items: " .. #plan.missing)
+            or plan.blocked[1]) or ""
+    self.frame.equipNote:SetText(note)
+end
+
 function Doll:CommitBuildName(character)
     local input = self.frame.buildName
     local build, reason = WSGS.ManagedBuilds:Rename(character, input.buildId, input:GetText())
@@ -88,9 +103,14 @@ end
 function Doll:Refresh()
     if not self.frame or not self.frame:IsShown() then return end
     local profile = WSGS:GetActiveSimulationProfile()
-    if not profile then self:Render(nil); return end
+    if not profile then
+        WSGS.EquipmentActions:Refresh(nil)
+        self:Render(nil)
+        return
+    end
     local snapshot = WSGS.EquipmentScanner:Scan()
     local comparison, reason = WSGS.EquipmentComparator:Compare(profile, snapshot)
+    WSGS.EquipmentActions:Refresh(profile, snapshot)
     self:Render(profile, snapshot, comparison, reason)
 end
 
@@ -166,10 +186,18 @@ function Doll:Create()
     equip:SetPoint("TOPRIGHT", -40, -62)
     equip:SetText("Equip")
     equip:Disable()
+    equip:SetScript("OnClick", function() WSGS.EquipmentActions:Click() end)
     frame.equipButton = equip
     local note = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     note:SetPoint("TOPRIGHT", -20, -90)
-    note:SetText("Equip automation is not implemented.")
+    note:SetWidth(440)
+    note:SetJustifyH("RIGHT")
+    frame.equipNote = note
+    local actions = WSGS.EquipmentActions
+    actions.isVisible = function() return frame:IsShown() end
+    actions.queueViewRefresh = function() self:QueueRefresh("PLAYER_EQUIPMENT_CHANGED") end
+    actions.refreshView = function() self:Refresh() end
+    actions.stateChanged = function() self:UpdateEquipButton() end
     frame.slots = {}
     for position, slot in ipairs(WSGS.equipmentSlots) do
         local button = CreateFrame("Button", nil, frame)

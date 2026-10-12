@@ -1,0 +1,107 @@
+TASK 017: GLOBAL EQUIPMENT AUTOMATION
+
+Source evidence (C:\WoWAddons\BlizzardInterfaceCode\Interface\AddOns):
+- Blizzard_FrameXML/Blizzard_FrameXML_Mists.toc loads Wrath/EquipmentManager.lua.
+  EquipmentManager_EquipContainerItem uses C_Container.PickupContainerItem(bag,
+  slot), CursorHasItem(), CursorCanGoInSlot(invSlot), IsInventoryItemLocked and
+  PickupInventoryItem(invSlot). The inventory variant picks up a source slot.
+  WSGS uses these primitives, never Equipment Manager APIs or sets.
+- SecureTemplates.lua SECURE_ACTIONS.item uses C_Item.EquipItemByName after
+  SecureCmdItemParse. ItemDocumentation.lua documents itemInfo and optional dstSlot.
+  Name/ID lookup does not select a particular duplicate bag instance; it is not
+  used here. No secure macro or SecureActionButtonTemplate is introduced.
+- ContainerDocumentation.lua documents GetContainerItemInfo (itemID, hyperlink,
+  isLocked), GetContainerItemID/Link, GetContainerNumSlots/FreeSlots and pickup.
+- ItemDocumentation.lua documents GetItemGUID(ItemLocation), GetItemInfoInstant
+  (equipLoc is return four). Classic ItemLocation supports bag/slot and equipment.
+- SpellBookDocumentation.lua documents C_SpellBook.IsSpellKnown; MoP ShardBar.lua
+  uses it. Local NAG/mists Warrior registrations identify Titans Grip spell46917.
+- Documented events: PLAYER_EQUIPMENT_CHANGED, BAG_UPDATE_DELAYED,
+  ITEM_LOCK_CHANGED, CURSOR_CHANGED, PLAYER_REGEN_DISABLED/ENABLED,
+  UI_ERROR_MESSAGE, GET_ITEM_INFO_RECEIVED, ITEM_DATA_LOAD_RESULT, SPELLS_CHANGED.
+
+Modules and contracts
+EquipmentInventory enriches the scanner snapshot and scans bags 0..NUM_BAG_SLOTS.
+Candidates retain exact location, GUID when available, full decoded link payload,
+lock state, equipLoc and known gem/enchant/reforge observations. Missing/corrupt
+links and uncached metadata block candidates; only empty general bag slots are
+used for an off-hand removal. No bank, item requests or ongoing polling.
+EquipmentPlanner returns operations, missing, blocked and comparator assignments.
+It reserves correctly equipped instances first, including swapped ring/trinket
+assignments. For remaining identical IDs it considers distinct assignments,
+minimizing known gem/enchant/reforge mismatches (unknown observations break ties
+against fully observed matches). Existing correct items are never replaced solely
+to improve modifications. One physical GUID/location cannot serve two targets.
+Without GUID, a unique full payload plus source movement is required; identical
+unidentifiable copies are blocked. Targets are never substituted by another ID.
+Empty targets are left alone except off-hand removal needed by an available
+2H main-hand target. Actual known Titans Grip permits 2H pair planning; native
+CursorCanGoInSlot remains the final authority for class/weapon restrictions.
+A current 2H main hand must be replaced before off-hand work becomes actionable.
+
+Execution and verification
+EquipmentExecution runs synchronously from the Equip button click, out of combat.
+It checks cursor, locks and source identity again, picks up the exact source,
+checks native slot acceptance and places it. A displaced item returns to the
+source location where possible. It never clears a pre-existing cursor item.
+If a displaced item cannot return (for example specialty bag restrictions), the
+cursor remains user-owned and requires manual placement. Native bind confirmations
+and protection rules are not suppressed or bypassed.
+EquipmentActions submits ONE transaction per click. No equipment function runs
+from a timer or event. Source/target changes are verified by GUID, or conservative
+unique-payload/source-movement evidence, on equipment/bag/lock events. A function
+return is not success. Replanning follows observed changes; double clicks are
+blocked while pending and briefly debounced. Four seconds without verification
+produces a fault. The next click rescans only; a subsequent click retries.
+A wrong instance or unexpected destination change stops work. Combat and occupied
+cursor block new operations. Closing the doll still allows pending verification;
+otherwise hidden UI performs no ongoing inventory scans. Refreshes are coalesced.
+
+Hardware/security limitations requiring live validation
+Local source establishes the native cursor transaction, not an unlimited secure
+batch or a universal hardware-event contract for addon Lua. The ordinary button
+issues one transaction from its hardware OnClick; actual MoP protected-action
+behavior must be tested in game. If the client refuses it, that refusal is reported
+and no workaround is attempted. SecureActionButton item/name lookup alone cannot
+guarantee the chosen duplicate instance/destination. Multi-item batching is not
+claimed. Native errors, bind prompts, latency, full/specialty bags and weapon
+restrictions can require manual intervention. A delayed unverified change may
+later become visible on a rescan; it never causes another automatic action.
+No item modification, currency spending or build/name/database writes occur.
+SavedVariables remains disabled. Existing settings/build scopes are unchanged.
+
+Tests and exact manual checks
+/wsgs test equip registers 26 cases: matching gear, bags/missing items, duplicate
+shortages and optimal modification assignments, ambiguous/locked/uncached copies,
+ring/trinket swaps, weapon dependencies, pending verification, wrong instances,
+unexpected changes, timeouts, combat, fingerprint/source movement, off-hand removal,
+missing builds and a live read-only carried-inventory scan. Tests call pure planner
+and state transitions, NEVER Click/Perform or equipment APIs that alter inventory.
+/wsgs test all has 76 registered cases. These are counts, not executed PASS results.
+
+1. /reload; /wsgs test equip; /wsgs test all. Copy actual results/errors.
+2. Import your intended build and open the doll via its launcher. /wsgs debug on
+   enables diagnostics; use the existing debug option to disable them afterward.
+3. Out of combat with empty cursor, put one target item in bags and wear another
+   item in its slot. Click Equip once. Confirm that exact copy equips and the old
+   item returns to bags; expect Attempting then Verified, not presumed success.
+4. With multiple targets, double-click: no second action while pending. After the
+   observed change, Equip Next allows the next transaction. Check remaining counts.
+5. Try duplicate ring IDs with different known modifications, swapped rings and
+   trinkets, missing targets, and unknown data. Verify no substitute/duplicate reuse.
+6. Test 2H/off-hand transitions with free general bag space, then full bags. Off-hand
+   removal and main-hand equip require separate verified clicks. Native restrictions
+   must win. Do not test restricted weapons your character cannot equip.
+7. Enter combat and confirm Blocked. Leave combat and confirm re-arming. Hold an
+   item on cursor and confirm Blocked; place it manually to continue.
+8. If an operation is rejected, wait for the verification timeout; first fault click
+   only rescans. Verify no repeat equipment calls occur without another click.
+9. Confirm slot statuses refresh while gem/enchant/tinker/reforge/upgrade differences
+   remain untouched. Close/reopen and verify the active build/name is unchanged.
+
+Debug examples (illustrative only):
+[WSGS][EQUIP] Planned: 3 operations
+[WSGS][EQUIP] Target found: item 99002 in bag 0 slot 5
+[WSGS][EQUIP] Attempting: inventory slot 10
+[WSGS][EQUIP] Verified: item 99002 equipped
+[WSGS][EQUIP] Remaining: 2 operations

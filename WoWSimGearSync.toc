@@ -31,6 +31,10 @@ EquipmentInspector.lua
 EquipmentScanner.lua
 EquipmentComparator.lua
 EquipmentDiagnostics.lua
+EquipmentInventory.lua
+EquipmentPlanner.lua
+EquipmentExecution.lua
+EquipmentActions.lua
 Window.lua
 SlotPresentation.lua
 PaperDoll.lua
@@ -41,3 +45,4 @@ Tests\Scanner.lua
 Tests\Comparator.lua
 Tests\Importer.lua
 Tests\UI.lua
+Tests\Equip.lua

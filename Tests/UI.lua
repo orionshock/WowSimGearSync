@@ -114,7 +114,6 @@ WSGS.Tests:Register("ui", "UI", {
         withDoll(function(frame)
             local before = {}
             for position, slot in ipairs(WSGS.equipmentSlots) do before[position] = GetInventoryItemID("player", slot.id) end
-            assert(not frame.equipButton:IsEnabled())
             frame:Show(); frame:Hide()
             for position, slot in ipairs(WSGS.equipmentSlots) do
                 assert(before[position] == GetInventoryItemID("player", slot.id), "Equipped item changed")

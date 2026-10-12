@@ -140,3 +140,9 @@ Exact runtime validation:
  non-applicable lines. Verify upgrade text such as 0/2 (2 remaining), small
  center hint, bottom summary and no actions from slot clicks.
  No client test results or visual verification are claimed from static review.
+
+TASK 017 SUPERSEDES DISABLED GLOBAL EQUIP
+The global Equip button is now active when an exact-source item operation is
+actionable. Per-slot UI remains non-actionable; modification differences are not
+resolved automatically. See equip-notes.txt for planning, event verification,
+hardware restrictions and manual validation.

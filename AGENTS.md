@@ -26,7 +26,7 @@ Tests protect runtime code only. Tests are not for layouts, copy text, or deploy
 
 Keep tests focused on behavior, data integrity, and meaningful regressions. Do not assert cosmetic wording, colors, coordinates, frame structure, library packaging, or deployment details. Prefer observable outcomes over assertions that mirror implementation.
 
-In-game Lua suites live in `Tests/`. Run `/wsgs test all` or a specific suite (`scanner`, `comparator`, `importer`, `ui`) inside MoP Classic. Tests must not modify the player's equipment, settings, or managed builds; use temporary in-memory builds. Do not claim in-game passes without executing them in the client.
+In-game Lua suites live in `Tests/`. Run `/wsgs test all` or a specific suite (`scanner`, `comparator`, `importer`, `ui`, `equip`) inside MoP Classic. Tests must not modify the player's equipment, settings, or managed builds; use temporary in-memory builds. Do not claim in-game passes without executing them in the client.
 
 ## Commit & Pull Request Guidelines
 

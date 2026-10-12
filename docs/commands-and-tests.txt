@@ -144,3 +144,12 @@ shape. Runtime import lifecycle, selection/renaming, comparison/scanning,
 data binding, visibility and Escape regressions remain.
 Current counts: scanner 8, comparator 15, importer 14, UI 13 (50 total).
 No in-game execution or PASS result is claimed for this cleanup.
+
+TASK 017 GLOBAL EQUIP
+The doll Equip button now submits one exact-source cursor transaction per click,
+then waits for event-driven instance verification before re-arming. Missing items
+and combat/lock/identity/weapon restrictions remain visible. No modification actions.
+See equip-notes.txt for source evidence, safety boundaries and manual validation.
+/wsgs test equip is a read-only planner/verification suite with 26 cases.
+Current registration counts: scanner 8, comparator 15, importer 14, UI 13, equip 26
+(76 total). No in-game execution or PASS results claimed.
