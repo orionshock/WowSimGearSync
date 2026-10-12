@@ -30,6 +30,7 @@ end
 
 function WSGS:CreateWindow()
     local frame = CreateFrame("Frame", "WSGSMainWindow", UIParent)
+    table.insert(UISpecialFrames, "WSGSMainWindow")
     frame:Hide()
     frame:SetSize(640, 660)
     frame:SetPoint("CENTER")
@@ -71,7 +72,7 @@ function WSGS:CreateWindow()
     nameInput:SetScript("OnTextChanged", function(self, userInput)
         if userInput then self.userEdited = true end
     end)
-    nameInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    nameInput:SetScript("OnEscapePressed", function() frame:Hide() end)
     nameInput:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 
     local inputLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -95,7 +96,7 @@ function WSGS:CreateWindow()
     input:SetMaxBytes(1048576 + 1)
     input:SetTextInsets(5, 5, 5, 5)
     scroll:SetScrollChild(input)
-    input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    input:SetScript("OnEscapePressed", function() frame:Hide() end)
     ScrollingEdit_OnLoad(input)
     input:SetScript("OnCursorChanged", ScrollingEdit_OnCursorChanged)
     local suggestionDelay

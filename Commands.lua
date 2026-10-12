@@ -4,11 +4,8 @@ function WSGS:RegisterCommands()
     self.commandOptions = {
         type = "group", name = "WowSimGearSync", args = {
             import = {
-                type = "execute", name = "Import", desc = "Show the WoW Sims import screen.", order = 0,
-                func = function()
-                    if not self.window then self:CreateWindow() end
-                    self.window:Show()
-                end,
+                type = "execute", name = "Import", desc = "Toggle the WoW Sims import screen.", order = 0,
+                func = function() self:ToggleWindow() end,
             },
             debug = {
                 type = "toggle", name = "Debug", desc = "Toggle diagnostic output.", order = 1,
