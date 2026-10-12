@@ -1,0 +1,100 @@
+Equipment observations — MoP Classic, interface 50504
+
+Read-only implementation: EquipmentScanner.lua, EquipmentComparator.lua.
+Source root: C:\WoWAddons\BlizzardInterfaceCode\Interface\AddOns
+No game-client validation has been performed by the agent.
+
+LOCAL SOURCE EVIDENCE
+- GetInventoryItemID("player", slot): Blizzard_UIPanels_Game/Classic/
+  ContainerFrame_Shared.lua:255,422 and Blizzard_FrameXML/Wrath/
+  EquipmentManager.lua:88,170. Positive ID identifies the equipped item;
+  nil ID plus nil link is an empty slot. Read errors are UNKNOWN.
+- GetInventoryItemLink("player", slot): Blizzard_CharacterFrame/Cata/
+  PaperDollFrame.lua:2629 and Wrath/PaperDollFrame.lua:1478. The scanner
+  retains the complete returned link, without decoding modifications.
+- GetInventorySlotInfo: Classic/DressUpFrames.lua:189 and Cata/
+  PaperDollFrame.lua:2476. Our authoritative 16-position mapping is in
+  EquipmentSlots.lua; inventory constants are in
+  Blizzard_FrameXMLBase/Classic/Constants.lua:173-189.
+- Item-link ID extraction: Blizzard_SharedXML/LinkUtil.lua:120-125.
+  Only the item ID prefix is established here; no enchant/reforge/upgrade
+  or tinker field offsets are assumed.
+- C_Item.GetItemGem(link, index): Blizzard_APIDocumentationGenerated/
+  ItemDocumentation.lua:304-318 documents gem name/link or no result.
+  A positive gem item ID from a returned link is KNOWN. Nil means UNKNOWN,
+  not zero: no socket, no gem, and incomplete cache are not distinguished.
+  Classic Constants.lua:137 declares MAX_NUM_SOCKETS = 3.
+- C_Item.GetItemGUID(ItemLocation): ItemDocumentation.lua:290-302.
+  ItemLocation:CreateFromEquipmentSlot is used by Cata/PaperDollFrame.lua:2625.
+  A returned GUID is retained; nil/error is UNKNOWN. Physical inventory-slot
+  identity is sufficient to enforce one-to-one assignments without a GUID.
+- GetItemInfo/C_Item.GetItemInfo describe cached item metadata and level in
+  ItemDocumentation.lua. Base/effective level is not proof of upgrade step;
+  the scanner does not request metadata or force item-data loading.
+
+UNVERIFIED BEHAVIOR / UNKNOWN FIELDS
+Generated/shared documentation establishes API signatures, not a live MoP
+result. Positive gem and GUID results still need runtime confirmation.
+Nil gem results cannot prove absence. Scanner exceptions remain UNKNOWN.
+No locally verified equipped enchant-ID decoding was found. C_Reforge's
+GetReforgeItemInfo inspects the vendor-selected item (Blizzard_ReforgingUI/
+Classic/Blizzard_ReforgingUI.lua:90), not arbitrary equipped slots.
+ItemUpgradeDocumentation.lua documents the vendor workflow; no reliable
+mapping from arbitrary equipped items to WoW Sims upgrade state was found.
+WowSimsExporter parses links/tooltips for modifications, but third-party
+parsing and locale-specific tinker recognition are not treated as client
+contracts. Enchant, reforge, upgradeStep, and tinker remain UNKNOWN.
+Comparator upgrade enum values come from WoW Sims proto/common.proto:
+Base=0, UpgradeStepOne=1, UpgradeStepTwo=2, UpgradeStepThree=3,
+UpgradeStepFour=4, ChallengeMode=-1. This does not imply scanner observability.
+https://github.com/wowsims/mop/blob/master/proto/common.proto
+
+STRUCTURES AND COUNTING
+Snapshot: {capturedAt, slots[1..16]}. Each slot has position, slotId, slotName,
+id/link when available, and observations[field]={status,value,source,reason}.
+Item observations include present=false for a known empty slot. Gem
+observations contain values[index] with independent status/value records.
+Empty slots have NOT_APPLICABLE modifications; unreadable data has UNKNOWN.
+
+Comparison: {profileId,profileName,slots,assignments,summary}.
+Each slot records target/current positions and inventory IDs, and fields
+item/gems/enchant/reforging/upgradeStep/tinker with state, expected, actual,
+source/reason where applicable. Gem results retain per-socket differences.
+Unknown item identity or wrong item prevents modification MATCH claims.
+Omitted properties are NOT_APPLICABLE, never removal instructions.
+Unmapped mixed scalar representations are UNKNOWN, not mismatches.
+
+For rings (11,12) and trinkets (13,14), score direct and swapped assignments
+by item mismatches. If both assignments match both IDs, known modification
+mismatches break the tie. Exact ties retain direct assignment. Assignments
+are bijective, so duplicate IDs cannot consume the same physical slot twice.
+Summary matched counts item matches (including intended empty slots).
+Configuration mismatches count fields per slot, not operations; gems count
+as one mismatch field. Unknown counts required scalar/item observations and
+individual gem sockets when socket comparisons are available, including
+unknowns alongside known gem mismatches. A blocked gem field counts once. These numbers are diagnostics, not an automation queue.
+
+FUTURE EVENTS (NOT REGISTERED BY SCANNER)
+PLAYER_EQUIPMENT_CHANGED: PaperDollInfoDocumentation.lua:209; also Cata/
+PaperDollFrame.lua:2522. GET_ITEM_INFO_RECEIVED and ITEM_DATA_LOAD_RESULT:
+ItemDocumentation.lua:1119,1130. Future consumers can use Scanner.rescanEvents
+and rescan after equipment changes or data completion. Current scans occur
+only on compare/probe commands, with bounded reads and no OnUpdate polling.
+
+RUNTIME CHECKS
+After /reload, import the real export again (SavedVariables stays disabled).
+/wsgs compare: five-line summary. /wsgs debug then /wsgs compare: slot detail.
+/wsgs probe 1: socketed/upgraded/reforged head from supplied Paladin export.
+/wsgs probe 4: enchanted cloak from supplied export.
+/wsgs probe 7: engineering-tinkered gloves from supplied export.
+Each probe prints only one slot's ID, raw item payload, up to three gem
+observations, and GUID status. Compare these with visible item tooltips.
+Return the raw payloads and observed tooltip enchant, reforge, upgrade, and
+engineering-use text before implementing modification decoding. Do not
+assume colon-field offsets from a single example. Use positions 1..16,
+not inventory IDs, as probe arguments.
+
+Tests: python tests/test_import.py --runtime-path C:\Windows\Temp\wsgs-lua-test
+Requires Python, lupa's Lua 5.1 runtime. Scanner API mocks implement the
+signatures above; comparator KNOWN modification fixtures are synthetic
+normalized inputs, not assertions of unverified client behavior.

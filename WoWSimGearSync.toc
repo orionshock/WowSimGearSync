@@ -2,7 +2,7 @@
 ## Title: WowSimGearSync
 ## Notes: WoW Sims gear synchronization foundation for Mists of Pandaria Classic.
 ## Author: WowSimGearSync Contributors
-## Version: 0.2.0
+## Version: 0.3.0
 # SavedVariables: WSGSDB (temporarily disabled)
 
 Libs\LibStub\LibStub.lua
@@ -14,5 +14,9 @@ Libs\AceTab-3.0\AceTab-3.0.lua
 
 Core.lua
 Specialization.lua
+EquipmentSlots.lua
 Import.lua
+EquipmentScanner.lua
+EquipmentComparator.lua
+EquipmentDiagnostics.lua
 Window.lua

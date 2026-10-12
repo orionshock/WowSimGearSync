@@ -1,6 +1,6 @@
 local addonName, WSGS = ...
 
-WSGS.version = "0.2.0"
+WSGS.version = "0.3.0"
 
 local defaults = {
     global = {
@@ -10,7 +10,8 @@ local defaults = {
 }
 
 function WSGS:Print(message)
-    DEFAULT_CHAT_FRAME:AddMessage("[WSGS] " .. message)
+    local separator = message:sub(1, 1) == "[" and "" or " "
+    DEFAULT_CHAT_FRAME:AddMessage("[WSGS]" .. separator .. message)
 end
 
 function WSGS:Debug(message)
@@ -26,7 +27,7 @@ events:SetScript("OnEvent", function(self, event, loadedAddon)
     if event == "PLAYER_LOGIN" then
         -- Register after Blizzard has created the chat edit boxes.
         LibStub("AceTab-3.0"):RegisterTabCompletion(
-            "WSGS commands", "^/[wW][sS][gG][sS]%s+", { "debug" }, true
+            "WSGS commands", "^/[wW][sS][gG][sS]%s+", { "debug", "compare", "probe" }, true
         )
         self:UnregisterEvent("PLAYER_LOGIN")
         return
@@ -50,7 +51,11 @@ function WSGS:HandleCommand(message)
     elseif command == "debug" then
         WSGS.db.global.settings.debug = not WSGS.db.global.settings.debug
         WSGS:Print("Debug " .. (WSGS.db.global.settings.debug and "enabled." or "disabled."))
+    elseif command == "compare" then
+        self:CompareLatestEquipment()
+    elseif command:match("^probe%s+%d+$") then
+        self:ProbeEquipment(tonumber(command:match("%d+$")))
     else
-        WSGS:Print("Usage: /wsgs or /wsgs debug")
+        WSGS:Print("Usage: /wsgs, /wsgs debug, /wsgs compare, or /wsgs probe <export position>")
     end
 end

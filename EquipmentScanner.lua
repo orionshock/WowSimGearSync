@@ -1,0 +1,67 @@
+local _, WSGS = ...
+local Scanner = {}
+WSGS.EquipmentScanner = Scanner
+
+local function unknown(reason)
+    return { status = "UNKNOWN", reason = reason }
+end
+
+-- Confirmed event names for future consumers. No listeners or polling yet.
+Scanner.rescanEvents = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }
+
+function Scanner:Scan(onlyPosition)
+    local snapshot = { capturedAt = time(), slots = {} }
+    for position = onlyPosition or 1, onlyPosition or 16 do
+        local slot = WSGS.equipmentSlots[position]
+        local current = { position = position, slotId = slot.id, slotName = slot.name, observations = {} }
+        snapshot.slots[position] = current
+        local observations = current.observations
+        local idOK, id = pcall(GetInventoryItemID, "player", slot.id)
+        local linkOK, link = pcall(GetInventoryItemLink, "player", slot.id)
+        if linkOK and type(link) == "string" then current.link = link end
+        observations.link = current.link and { status = "KNOWN", value = current.link, source = "GetInventoryItemLink" }
+            or unknown("Equipped link unavailable")
+        if idOK and type(id) == "number" and id > 0 then
+            current.id = id
+            observations.item = { status = "KNOWN", value = id, present = true, source = "GetInventoryItemID" }
+        elseif idOK and id == nil and linkOK and link == nil then
+            observations.item = { status = "KNOWN", present = false, source = "GetInventoryItemID/GetInventoryItemLink" }
+        else
+            observations.item = unknown("Inventory identity unavailable or inconsistent")
+        end
+        local empty = observations.item.status == "KNOWN" and observations.item.present == false
+        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "tinker", "instance" }) do
+            observations[field] = empty and { status = "NOT_APPLICABLE", reason = "Empty inventory slot" }
+                or unknown("No verified equipped-item observation for this field")
+        end
+        if not empty then
+            local ok, guid = pcall(function()
+                return C_Item.GetItemGUID(ItemLocation:CreateFromEquipmentSlot(slot.id))
+            end)
+            if ok and type(guid) == "string" and guid ~= "" then
+                observations.instance = { status = "KNOWN", value = guid, source = "C_Item.GetItemGUID" }
+            end
+            if current.link then
+                -- Three socket positions are declared by Classic MAX_NUM_SOCKETS.
+                -- A nil result is ambiguous (empty/no socket/uncached), never zero.
+                local gems = observations.gems
+                gems.values = {}
+                local known = 0
+                for index = 1, 3 do
+                    local gemOK, gemName, gemLink = pcall(function()
+                        return C_Item.GetItemGem(current.link, index)
+                    end)
+                    local gemId = gemOK and type(gemLink) == "string" and tonumber(gemLink:match("|Hitem:(%d+).-|h"))
+                    if gemId and gemId > 0 then
+                        gems.values[index] = { status = "KNOWN", value = gemId, source = "C_Item.GetItemGem" }
+                        known = known + 1
+                    else
+                        gems.values[index] = unknown("Gem link unavailable; absence and uncached data are not distinguishable")
+                    end
+                end
+                if known == 3 then gems.status, gems.reason = "KNOWN", nil end
+            end
+        end
+    end
+    return snapshot
+end
