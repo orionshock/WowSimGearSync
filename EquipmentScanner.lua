@@ -30,7 +30,7 @@ function Scanner:Scan(onlyPosition)
             observations.item = unknown("Inventory identity unavailable or inconsistent")
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
-        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "tinker", "instance" }) do
+        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "tinker", "instance" }) do
             observations[field] = empty and { status = "NOT_APPLICABLE", reason = "Empty inventory slot" }
                 or unknown("No verified equipped-item observation for this field")
         end
@@ -41,25 +41,16 @@ function Scanner:Scan(onlyPosition)
             if ok and type(guid) == "string" and guid ~= "" then
                 observations.instance = { status = "KNOWN", value = guid, source = "C_Item.GetItemGUID" }
             end
-            if current.link then
-                -- Three socket positions are declared by Classic MAX_NUM_SOCKETS.
-                -- A nil result is ambiguous (empty/no socket/uncached), never zero.
-                local gems = observations.gems
-                gems.values = {}
-                local known = 0
-                for index = 1, 3 do
-                    local gemOK, gemName, gemLink = pcall(function()
-                        return C_Item.GetItemGem(current.link, index)
-                    end)
-                    local gemId = gemOK and type(gemLink) == "string" and tonumber(gemLink:match("|Hitem:(%d+).-|h"))
-                    if gemId and gemId > 0 then
-                        gems.values[index] = { status = "KNOWN", value = gemId, source = "C_Item.GetItemGem" }
-                        known = known + 1
-                    else
-                        gems.values[index] = unknown("Gem link unavailable; absence and uncached data are not distinguishable")
-                    end
+            local decoded, reason = WSGS.ItemLinkDecoder:Decode(current.link)
+            if decoded and observations.item.status == "KNOWN" and decoded.id == current.id then
+                observations.enchant = decoded.enchant
+                observations.gems = decoded.gems
+                observations.reforging = decoded.reforging
+            else
+                local problem = reason or "Item link and inventory item identity do not agree"
+                for _, field in ipairs({ "enchant", "gems", "reforging" }) do
+                    observations[field] = unknown(problem)
                 end
-                if known == 3 then gems.status, gems.reason = "KNOWN", nil end
             end
         end
     end

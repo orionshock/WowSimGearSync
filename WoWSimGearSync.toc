@@ -16,6 +16,7 @@ Core.lua
 Specialization.lua
 EquipmentSlots.lua
 Import.lua
+ItemLinkDecoder.lua
 EquipmentScanner.lua
 EquipmentComparator.lua
 EquipmentDiagnostics.lua

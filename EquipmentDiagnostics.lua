@@ -38,6 +38,10 @@ function WSGS:ProbeEquipment(position)
     local current = self.EquipmentScanner:Scan(position).slots[position]
     self:Print("[PROBE] " .. current.slotName .. " inventory=" .. current.slotId .. " item=" .. tostring(current.id))
     self:Print("[PROBE] Raw link: " .. (current.link and (current.link:match("|H(item:[^|]+)|h") or current.link) or "unavailable"))
+    for _, field in ipairs({ "enchant", "reforging", "upgradeEligibility", "upgradeStep", "tinker" }) do
+        local observed = current.observations[field]
+        self:Print("[PROBE] " .. (labels[field] or field) .. ": " .. observed.status .. " " .. tostring(observed.value))
+    end
     for index, gem in ipairs(current.observations.gems.values or {}) do
         self:Print("[PROBE] Gem " .. index .. ": " .. gem.status .. " " .. tostring(gem.value))
     end

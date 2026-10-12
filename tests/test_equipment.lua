@@ -13,7 +13,7 @@ local function setup()
     local snapshot = { slots = {} }
     for position, slot in ipairs(WSGS.equipmentSlots) do
         profile.equipment[position] = { id = 1000 + position }
-        snapshot.slots[position] = { id = 1000 + position, observations = { item = known(1000 + position) } }
+        snapshot.slots[position] = { id = 1000 + position, observations = { item = known(1000 + position), upgradeEligibility = known(false) } }
     end
     return profile, snapshot
 end
@@ -51,6 +51,10 @@ check(result.slots[1].fields.gems.state == "MISMATCH" and result.summary.unknown
 for _, field in ipairs({ "enchant", "reforging", "upgradeStep", "tinker" }) do
     profile, snapshot = setup()
     profile.equipment[1][field] = 2
+    if field == "upgradeStep" then
+        snapshot.slots[1].observations.upgradeEligibility = known(true)
+        snapshot.slots[1].observations.upgradeMaximum = known(2)
+    end
     snapshot.slots[1].observations[field] = known(2)
     check(compare(profile, snapshot).slots[1].fields[field].state == "MATCH", field .. " matches")
     snapshot.slots[1].observations[field] = known(3)
@@ -58,12 +62,14 @@ for _, field in ipairs({ "enchant", "reforging", "upgradeStep", "tinker" }) do
     snapshot.slots[1].observations[field] = { status = "UNKNOWN" }
     check(compare(profile, snapshot).slots[1].fields[field].state == "UNKNOWN", field .. " unknown")
     profile.equipment[1][field] = nil
-    check(compare(profile, snapshot).slots[1].fields[field].state == "NOT_APPLICABLE", field .. " omitted")
+    check(compare(profile, snapshot).slots[1].fields[field].state == (field == "upgradeStep" and "UNKNOWN" or "NOT_APPLICABLE"), field .. " omitted")
 end
 profile, snapshot = setup()
 profile.equipment[1].upgradeStep = "UpgradeStepTwo"
+snapshot.slots[1].observations.upgradeEligibility = known(true)
+snapshot.slots[1].observations.upgradeMaximum = known(2)
 snapshot.slots[1].observations.upgradeStep = known(2)
-check(compare(profile, snapshot).slots[1].fields.upgradeStep.state == "MATCH", "schema upgrade enum normalized")
+check(compare(profile, snapshot).slots[1].fields.upgradeStep.state == "MATCH", "maximum upgrade policy ignores export representation")
 profile.equipment[1].tinker = "UnmappedTinker"
 snapshot.slots[1].observations.tinker = known(4898)
 check(compare(profile, snapshot).slots[1].fields.tinker.state == "UNKNOWN", "unmapped representation unknown")
@@ -101,7 +107,7 @@ end
 function GetInventoryItemLink(unit, slot)
     linkCalls[slot] = (linkCalls[slot] or 0) + 1
     if slot == 2 or slot == 5 then return nil end
-    return "|cffffffff|Hitem:" .. (2000 + slot) .. ":0|h[Test]|h|r"
+    return "|cffffffff|Hitem:" .. (2000 + slot) .. ":0:95344:0:::::90:0:66::::::::|h[Test]|h|r"
 end
 C_Item = {}
 ItemLocation = { CreateFromEquipmentSlot = function(self, slot) return { slot = slot } end }
@@ -122,15 +128,15 @@ check(scanned.slots[2].observations.gems.status == "NOT_APPLICABLE", "empty slot
 check(scanned.slots[3].observations.item.status == "UNKNOWN", "read failure does not become empty")
 check(scanned.slots[5].id == 2005 and scanned.slots[5].observations.link.status == "UNKNOWN", "uncached link preserves known ID")
 check(scanned.slots[1].observations.gems.values[1].value == 95344, "positive gem link observed")
-check(scanned.slots[1].observations.gems.values[2].status == "UNKNOWN", "nil gem never assumed zero")
-for _, field in ipairs({ "enchant", "reforging", "upgradeStep", "tinker" }) do
+check(scanned.slots[1].observations.gems.values[2].status == "KNOWN" and scanned.slots[1].observations.gems.values[2].value == 0, "empty link gem is observed absence")
+for _, field in ipairs({ "upgradeStep", "upgradeEligibility", "upgradeMaximum", "tinker" }) do
     check(scanned.slots[1].observations[field].status == "UNKNOWN", "unverified modification stays unknown")
 end
-check(gemCalls == 42, "gem queries bounded and skipped without link")
+check(gemCalls == 0, "link decoder requires no gem queries")
 C_Item.GetItemGem = function() error("uncached") end
 C_Item.GetItemGUID = function() error("unavailable identity") end
 scanned = WSGS.EquipmentScanner:Scan()
-check(scanned.slots[1].observations.gems.values[1].status == "UNKNOWN" and scanned.slots[1].observations.instance.status == "UNKNOWN", "uncached gem/identity errors handled")
+check(scanned.slots[1].observations.gems.values[1].status == "KNOWN" and scanned.slots[1].observations.instance.status == "UNKNOWN", "gem observations independent of gem cache; identity errors handled")
 -- Compare summary is concise by default; detailed slots are debug-only.
 WSGS.db.char.simulationProfiles = {}
 WSGS.db.char.latestSimulationProfileId = nil

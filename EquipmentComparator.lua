@@ -35,7 +35,24 @@ local function compareSlot(target, current, position, currentPosition)
     for _, field in ipairs(fields) do
         local expected = target[field]
         local difference
-        if emptyTarget or expected == nil or field == "gems" and next(expected) == nil then
+        if field == "upgradeStep" and not emptyTarget then
+            local eligibility = observations.upgradeEligibility
+            local maximum = observations.upgradeMaximum
+            difference = { state = "UNKNOWN", policy = "MAXIMUM", normalMaximum = 2,
+                reason = "Upgrade eligibility and maximum are not established" }
+            if result.fields.item.state ~= "MATCH" then
+                difference.reason = "Target item is not confirmed in this slot"
+            elseif eligibility and eligibility.status == "KNOWN" and eligibility.value == false then
+                difference = { state = "NOT_APPLICABLE", policy = "MAXIMUM", reason = "Item is known not to support upgrades" }
+            elseif eligibility and eligibility.status == "KNOWN" and eligibility.value == true then
+                if maximum and maximum.status == "KNOWN" and type(maximum.value) == "number" and maximum.value > 0 then
+                    difference = scalar(maximum.value, observations.upgradeStep)
+                    difference.policy = "MAXIMUM"
+                else
+                    difference.reason = "Upgradeable item maximum is unknown (normally 2)"
+                end
+            end
+        elseif emptyTarget or expected == nil or field == "gems" and next(expected) == nil then
             difference = { state = "NOT_APPLICABLE", reason = "Target does not specify this modification" }
         elseif result.fields.item.state ~= "MATCH" then
             difference = { state = "UNKNOWN", expected = expected, reason = "Target item is not confirmed in this slot" }
@@ -50,12 +67,6 @@ local function compareSlot(target, current, position, currentPosition)
                 elseif socket.state == "UNKNOWN" and difference.state ~= "MISMATCH" then difference.state = "UNKNOWN" end
             end
         else
-            -- WoW Sims proto/common.proto ItemLevelState enum, not link offsets.
-            if field == "upgradeStep" and type(expected) == "string" then
-                local steps = { Base = 0, ChallengeMode = -1, UpgradeStepOne = 1,
-                    UpgradeStepTwo = 2, UpgradeStepThree = 3, UpgradeStepFour = 4 }
-                expected = steps[expected] or expected
-            end
             difference = scalar(expected, observations[field])
         end
         result.fields[field] = difference

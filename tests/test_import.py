@@ -259,4 +259,5 @@ check(wsgs.db.char.latestSimulationProfileId == latest_id, 'settings profile swi
 wsgs.db.SetProfile(wsgs.db, previous_profile)
 check(not wsgs.db.profile.debug, 'previous settings profile retains its own debug value')
 check(wsgs.db.char.simulationProfiles[latest_id] is not None, 'character collection independent of settings profile')
-print(f'PASS: {checks} importer checks and {equipment_checks} equipment checks under {lua.eval("_VERSION")}; all TOC Lua files compile; real AceDB, mocked client APIs')
+link_checks = lua.compile((ROOT/'tests/test_item_links.lua').read_text(encoding='utf-8-sig'), name='tests/test_item_links.lua')(wsgs, to_lua(user_gear))
+print(f'PASS: {checks} importer, {equipment_checks} equipment, and {link_checks} item-link checks under {lua.eval("_VERSION")}; all TOC Lua files compile')
