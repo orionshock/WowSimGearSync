@@ -101,7 +101,7 @@ end
 
 function Doll:CommitBuildName(character)
     local input = self.frame.buildName
-    local build, reason = WSGS.ManagedBuilds:Rename(character, input.buildId, input:GetText())
+    local build, reason = WSGS.Import:RenameBuild(character, input.buildId, input:GetText())
     if build then
         self.profile = build
         input:SetText(build.name)

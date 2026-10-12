@@ -1,17 +1,15 @@
 local _, WSGS = ...
-local Builds = {}
-WSGS.ManagedBuilds = Builds
+local Import = WSGS.Import
 
--- Own specialization identity, replacement and naming policy independently of UI/DB.
-function Builds:Save(character, build)
-    local spec = build.specialization
-    if not spec or not spec.id or spec.class == "Unknown" then
+function Import:SaveBuild(character, build)
+    local specialization = build.specialization
+    if not specialization or not specialization.id or specialization.class == "Unknown" then
         return nil, "Export must contain one recognizable specialization before importing."
     end
-    local id = spec.class .. ":" .. spec.id
+    local id = specialization.class .. ":" .. specialization.id
     local previous = character.simulationProfiles[id]
     build.id = id
-    build.name = previous and previous.customName and previous.name or spec.name
+    build.name = previous and previous.customName and previous.name or specialization.name
     build.customName = previous and previous.customName or false
     build.equipmentSetID = previous and previous.equipmentSetID or nil
     build.equipmentSetName = previous and previous.equipmentSetName or nil
@@ -23,7 +21,7 @@ function Builds:Save(character, build)
     return build
 end
 
-function Builds:Rename(character, id, name)
+function Import:RenameBuild(character, id, name)
     local build = character.simulationProfiles[id]
     if not build then return nil, "Select a build before renaming." end
     name = type(name) == "string" and name:match("^%s*(.-)%s*$") or ""

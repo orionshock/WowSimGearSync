@@ -1,9 +1,8 @@
 local _, WSGS = ...
+local Import = WSGS.Import
 
--- Explicit Player.oneof spec fields from the WoW Sims MoP protobuf schema:
--- https://github.com/wowsims/mop/blob/master/proto/api.proto
--- Class enum values: proto/common.proto. IDs below are Blizzard spec IDs,
--- confirmed in the local WowSimsExporter/Conditional_Mists.lua (not sim enums).
+-- Player oneof fields from the WoW Sims MoP protobuf schema. Numeric IDs are
+-- Blizzard specialization IDs, not simulation enum values.
 local classes = {
     { "Warrior", 1, { { "armsWarrior", "Arms", 71 }, { "furyWarrior", "Fury", 72 }, { "protectionWarrior", "Protection", 73 } } },
     { "Paladin", 2, { { "holyPaladin", "Holy", 65 }, { "protectionPaladin", "Protection", 66 }, { "retributionPaladin", "Retribution", 70 } } },
@@ -18,17 +17,16 @@ local classes = {
     { "Druid", 11, { { "balanceDruid", "Balance", 102 }, { "feralDruid", "Feral", 103 }, { "guardianDruid", "Guardian", 104 }, { "restorationDruid", "Restoration", 105 } } },
 }
 
-function WSGS:DetectSpecialization(player)
+function Import:DetectSpecialization(player)
     local className, match, count, invalid = "Unknown", nil, 0, false
     for _, class in ipairs(classes) do
         local enumName = "Class" .. class[1]:gsub(" ", "")
         local matchesClass = player.class == enumName or player.class == class[2]
         if matchesClass then className = class[1] end
-        for _, spec in ipairs(class[3]) do
-            if player[spec[1]] ~= nil then
+        for _, specialization in ipairs(class[3]) do
+            if player[specialization[1]] ~= nil then
                 count = count + 1
-                -- A spec message is an object, including an empty object.
-                local value = player[spec[1]]
+                local value = player[specialization[1]]
                 if type(value) ~= "table" then
                     invalid = true
                 else
@@ -37,7 +35,12 @@ function WSGS:DetectSpecialization(player)
                     end
                 end
                 if not matchesClass then invalid = true end
-                match = { class = class[1], name = spec[2], id = spec[3], source = "player." .. spec[1] }
+                match = {
+                    class = class[1],
+                    name = specialization[2],
+                    id = specialization[3],
+                    source = "player." .. specialization[1],
+                }
             end
         end
     end

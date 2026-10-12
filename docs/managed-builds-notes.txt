@@ -59,11 +59,11 @@ Subsequent imports replace the same key and preserve a committed custom name.
 Different specs/classes use different keys. No append sequence or migration.
 SavedVariables remains commented; /reload clears builds/settings as before.
 
-ImportInto(character,text) performs native decoding and complete existing gear
-validation before ManagedBuilds:Save. Unknown/ambiguous specs fail before saving
-or selecting. ImportEquipment uses the real db.char and sends the existing
-build-imported message only on success.
-Rename trims whitespace, rejects empty/>80-byte names, marks customName and
+Import:ImportInto(character,text) performs native decoding and complete existing
+gear validation before Import:SaveBuild. Unknown/ambiguous specs fail before
+saving or selecting. Import:ImportEquipment uses the real db.char and sends the
+existing build-imported message only on success.
+Import:RenameBuild trims whitespace, rejects empty/>80-byte names, marks customName and
 does not change class/spec/key. The paper doll name EditBox commits on Enter,
 cancels on Escape/focus loss and avoids overwriting an active edit on refresh.
 
