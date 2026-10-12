@@ -34,6 +34,7 @@ EquipmentDiagnostics.lua
 EquipmentInventory.lua
 EquipmentPlanner.lua
 EquipmentExecution.lua
+EquipmentSetSync.lua
 EquipmentActions.lua
 Window.lua
 SlotPresentation.lua

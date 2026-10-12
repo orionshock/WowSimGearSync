@@ -76,9 +76,9 @@ function Doll:UpdateEquipButton()
     if not self.frame then return end
     local actions = WSGS.EquipmentActions
     local labels = { READY="Equip", PENDING="Equipping",
-        CURSOR="Blocked", COMBAT="Blocked", FAULT="Blocked", BLOCKED="Blocked", COMPLETE="Complete" }
+        CURSOR="Blocked", COMBAT="Blocked", FAULT="Blocked", BLOCKED="Blocked", COMPLETE="Sync Set" }
     self.frame.equipButton:SetText(labels[actions.state] or "Blocked")
-    self.frame.equipButton:SetEnabled(actions.state == "READY" or actions.state == "FAULT")
+    self.frame.equipButton:SetEnabled(actions.state == "READY" or actions.state == "FAULT" or actions.state == "COMPLETE")
     local plan = actions.plan
     local counts = actions.batch and actions:OutcomeCounts()
     local note = actions.state == "CURSOR" and "Place the held cursor item first." or actions.state == "COMBAT" and "Cannot equip in combat." or actions.fault

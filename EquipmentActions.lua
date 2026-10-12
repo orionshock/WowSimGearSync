@@ -204,6 +204,10 @@ function Actions:LogDone(profile, snapshot)
         self.batch.total, attempted, counts.VERIFIED, counts.FAILED, counts.BLOCKED, counts.STILL_PENDING,
         counts.VERIFIED + counts.FAILED + counts.BLOCKED, #unresolved,
         #unresolved > 0 and table.concat(unresolved, ",") or "none"))
+    if not self.batch.setSyncAttempted then
+        self.batch.setSyncAttempted = true
+        WSGS.EquipmentSetSync:Synchronize(profile, snapshot, self.batch)
+    end
 end
 
 function Actions:Refresh(profile, snapshot)
@@ -359,6 +363,10 @@ function Actions:Click()
     local profile = WSGS:GetActiveSimulationProfile()
     self:Refresh(profile)
     if profile then self:LogPlan(profile) end
+    if self.state == "COMPLETE" then
+        WSGS.EquipmentSetSync:Synchronize(profile, self.snapshot)
+        return
+    end
     if self.state ~= "READY" then
         WSGS:Print("[EQUIP] " .. (self.state == "COMBAT" and "Cannot equip in combat." or self.plan.blocked[1] or "No available equipment changes."))
         return

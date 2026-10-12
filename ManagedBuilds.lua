@@ -13,6 +13,8 @@ function Builds:Save(character, build)
     build.id = id
     build.name = previous and previous.customName and previous.name or spec.name
     build.customName = previous and previous.customName or false
+    build.equipmentSetID = previous and previous.equipmentSetID or nil
+    build.equipmentSetName = previous and previous.equipmentSetName or nil
     build.metadata.importedAt = time()
     build.metadata.addonVersion = WSGS.version
     build.metadata.source = "WoW Sims API v3"
