@@ -1,0 +1,9 @@
+## Interface: 50504
+## Title: WowSimGearSync
+## Notes: WoW Sims gear synchronization foundation for Mists of Pandaria Classic.
+## Author: WowSimGearSync Contributors
+## Version: 0.1.0
+## SavedVariables: WSGSDB
+
+Core.lua
+Window.lua
