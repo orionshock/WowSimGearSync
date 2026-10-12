@@ -92,3 +92,12 @@ CreateChatCommand registration, absence of custom dispatch/completion code,
 30 suite cases, and git whitespace. No offline Python harness is present.
 The game client was not launched: command execution, native decoder behavior,
 test outcomes, and physical Tab behavior still require runtime validation.
+
+IMPORT WINDOW PRESENTATION
+The import window uses PortraitFrameTemplate, with a wider profile-name field
+and separate equipment heading/version. FULLSCREEN_DIALOG keeps it above the
+DIALOG paper doll; showing it or clicking its background/editor/controls raises it.
+After /reload, open the paper doll, then /wsgs import. Overlap the windows and
+click each: import must remain above the doll. Paste a full export, scroll/edit,
+import, drag the dialog, then verify its close button and Escape in both inputs.
+Visual appearance and mouse behavior require in-game verification.
