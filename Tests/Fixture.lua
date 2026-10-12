@@ -1,3 +1,7 @@
+local _, WSGS = ...
+-- User-supplied Paladin export reduced to equipment and specialization metadata.
+-- Retained from the original development fixture; not synthetic gear.
+WSGS.Tests.referenceJSON = [=[
 {
   "apiVersion": 3,
   "player": {
@@ -25,3 +29,6 @@
     }
   }
 }
+
+]=]
+

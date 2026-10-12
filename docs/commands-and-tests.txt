@@ -1,0 +1,78 @@
+Ace3 command migration and in-game tests (Task 010)
+
+LIBRARIES
+Source: C:\WoWAddons\Ace3, Release-r1403. Vendored Lua files are unmodified.
+Load order: LibStub -> CallbackHandler -> AceAddon -> AceEvent -> AceConsole
+-> AceDB -> AceConfigRegistry -> AceConfigCmd -> AceConfig -> AceTab.
+AceAddon needs LibStub; AceEvent and AceConfigRegistry need CallbackHandler;
+AceConfigCmd needs Registry and Console; AceConfig wraps Registry and Cmd.
+The local XML manifests were inspected. We load the required Lua files directly:
+AceConfig's aggregate XML additionally includes AceConfigDialog, which needs
+AceGUI and is unnecessary for command-only configuration. Neither is bundled.
+One copy of each library is present. Libs/Ace3-LICENSE.txt retains the source
+BSD license; library headers, including LibStub's public-domain notice, remain.
+
+INITIALIZATION AND COMMANDS
+Core.lua turns the existing WSGS namespace table into an AceAddon instance with
+AceConsole and AceEvent embedded. OnInitialize creates AceDB and registers
+commands. OnEnable installs completion after login. No custom event frame or
+slash-command dispatcher remains. Settings stay db.profile; builds, sequence,
+and latest tracking stay db.char. SavedVariables remains commented out.
+Commands.lua registers a group options table with AceConfig. AceConsole owns
+/wsgs; an empty invocation toggles the window. Nonempty input is normalized and
+passed to AceConfigCmd:HandleCommand. Debug is a toggle, compare an execute,
+probe/test input options with validation. No AceConfigDialog UI was introduced.
+
+TAB COMPLETION
+The local AceConfigCmd:CreateChatCommand comment advertises AceTab completion,
+but its code never calls AceTab. Explicit AceTab:RegisterTabCompletion registers
+real chat EditBox hooks in OnEnable, with commands plus test suite/probe argument
+phrases. Root candidates derive from the registered options table. AceTab handles
+prefix matching and cycling; usage chatter is suppressed. OnDisable unregisters
+the candidate set. Default chat edit boxes present at login are registered;
+custom or later-created edit boxes are not explicitly supported.
+Actual Tab behavior has NOT been verified inside WoW. Check both the default
+chat box and any extra Blizzard chat window you use.
+
+IN-GAME SUITES
+Tests/Runner.lua owns registration, protected case execution, PASS/FAIL/SKIP,
+and summary counts. Each command runs synchronously on demand; no polling.
+Scanner: slot mapping, real inventory snapshots, repeated full/single-slot
+observations, live upgrade comparison, optional item 95757 and glove tinkers.
+Comparator: deterministic synthetic snapshots for maximum upgrades, unknowns,
+wrong items, swapped pairs, duplicate rings, captured links, and empty slots.
+Importer: native C_EncodingUtil.DeserializeJSON, retained user Paladin fixture,
+gear-only validation, optional fields, duplicate IDs, invalid documents,
+specialization ambiguity, unknown item fields, and AceDB/AceConfig initialization.
+Tests never call ImportEquipment (which saves builds), vendor operations, or
+commands that alter settings. The fixture is embedded Lua text because the client
+cannot read a JSON file from disk on demand. It retains the prior reference data.
+No Python, lupa, external test runner, or client API mocks are required.
+
+EXACT RUNTIME CHECKS
+/reload
+/wsgs                       (open; repeat to close; test movement/close button)
+/wsgs debug                 (toggle; repeat to restore the previous value)
+/wsgs test
+/wsgs test all
+/wsgs test scanner
+/wsgs test comparator
+/wsgs test importer
+/wsgs test nonsense         (expect useful validation error)
+/wsgs probe 3
+/wsgs probe 14
+/wsgs probe 0               (expect useful validation error)
+/wsgs compare               (useful message if no build is imported)
+Import your gear through the window, then repeat compare and probe. Reload
+clears session-only builds while SavedVariables is disabled, as before.
+In chat type /wsgs co then press Tab; check compare completion. Type /wsgs test
+sc then Tab; check scanner completion. Type /wsgs probe 1 then Tab to inspect
+numeric candidates. Cancel unsent text with Escape; do not submit it as a test.
+Run all suites twice; imported build count/latest and debug must stay unchanged.
+Scanner SKIPs are expected when optional equipment or cached data is absent.
+
+VALIDATION LIMITS
+Manifest existence/load-order checks, source-copy hashes, registration review,
+and git whitespace checks are static checks. The game client was not launched.
+Initialization, command execution, native decoding, test outcomes, and Tab-key
+behavior require the above runtime checks; no in-game PASS result is claimed.

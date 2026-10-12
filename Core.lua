@@ -1,14 +1,11 @@
 local addonName, WSGS = ...
+LibStub("AceAddon-3.0"):NewAddon(WSGS, addonName, "AceConsole-3.0", "AceEvent-3.0")
 
 WSGS.version = "0.3.0"
 
 local defaults = {
-    profile = {
-        debug = true,
-    },
-    char = {
-        simulationProfiles = {},
-    },
+    profile = { debug = true },
+    char = { simulationProfiles = {} },
 }
 
 function WSGS:Print(message)
@@ -17,47 +14,20 @@ function WSGS:Print(message)
 end
 
 function WSGS:Debug(message)
-    if self.db and self.db.profile.debug then
-        self:Print(message)
-    end
+    if self.db and self.db.profile.debug then self:Print(message) end
 end
 
-local events = CreateFrame("Frame")
-events:RegisterEvent("ADDON_LOADED")
-events:RegisterEvent("PLAYER_LOGIN")
-events:SetScript("OnEvent", function(self, event, loadedAddon)
-    if event == "PLAYER_LOGIN" then
-        -- Register after Blizzard has created the chat edit boxes.
-        LibStub("AceTab-3.0"):RegisterTabCompletion(
-            "WSGS commands", "^/[wW][sS][gG][sS]%s+", { "debug", "compare", "probe" }, true
-        )
-        self:UnregisterEvent("PLAYER_LOGIN")
-        return
-    end
-    if loadedAddon ~= addonName then
-        return
-    end
+function WSGS:OnInitialize()
+    self.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
+    self:RegisterCommands()
+    self:Debug("Loaded version " .. self.version .. ".")
+end
 
-    WSGS.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
-    LibStub("AceConsole-3.0"):RegisterChatCommand("wsgs", function(message)
-        WSGS:HandleCommand(message)
-    end)
-    self:UnregisterEvent("ADDON_LOADED")
-    WSGS:Debug("Loaded version " .. WSGS.version .. ".")
-end)
+function WSGS:OnEnable()
+    -- AceAddon enables at PLAYER_LOGIN, after Blizzard creates chat edit boxes.
+    self:RegisterCommandCompletion()
+end
 
-function WSGS:HandleCommand(message)
-    local command = (message or ""):match("^%s*(.-)%s*$"):lower()
-    if command == "" then
-        WSGS:ToggleWindow()
-    elseif command == "debug" then
-        WSGS.db.profile.debug = not WSGS.db.profile.debug
-        WSGS:Print("Debug " .. (WSGS.db.profile.debug and "enabled." or "disabled."))
-    elseif command == "compare" then
-        self:CompareLatestEquipment()
-    elseif command:match("^probe%s+%d+$") then
-        self:ProbeEquipment(tonumber(command:match("%d+$")))
-    else
-        WSGS:Print("Usage: /wsgs, /wsgs debug, /wsgs compare, or /wsgs probe <export position>")
-    end
+function WSGS:OnDisable()
+    LibStub("AceTab-3.0"):UnregisterTabCompletion("WSGS commands")
 end

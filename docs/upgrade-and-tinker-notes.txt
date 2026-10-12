@@ -102,10 +102,12 @@ meaning to CanUpgradeItem=false or using vendor-selected data in the scanner.
 Also return glove spell ID if it is not one of the three supported mappings.
 
 TESTING
-python tests/test_import.py --runtime-path C:\Windows\Temp\wsgs-lua-test
-Tests exercise real addon code under Lua 5.1 with synthetic tooltip translations
-of the documented format and mocked source-backed APIs. They do not claim live
-API confirmation. Non-upgradeable item 95757 tests exercise the complete inspector/scanner/
-comparator path using runtime-confirmed no-upgrade-line behavior. Positively
-absent-tinker fixtures exercise normalized comparator contracts only.
-No game-client testing was performed by the agent.
+Run /wsgs test scanner, /wsgs test comparator, and /wsgs test importer inside
+MoP Classic, or /wsgs test for all suites. Tests/ contains real-client scanner
+checks and deterministic Lua domain tests. Tests never save simulation builds,
+change equipment, spend resources, or alter character settings. Equipment-
+dependent cases report SKIP when their item or data is unavailable.
+The user-provided Paladin reference is retained in Tests/Fixture.lua.
+The obsolete Python/Lua mock-client harness and its synthetic fixture were
+removed. See docs/commands-and-tests.txt for runtime verification instructions.
+No game-client run was performed by the agent.

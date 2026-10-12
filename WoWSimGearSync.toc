@@ -7,12 +7,17 @@
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
-Libs\AceDB-3.0\AceDB-3.0.lua
-
+Libs\AceAddon-3.0\AceAddon-3.0.lua
+Libs\AceEvent-3.0\AceEvent-3.0.lua
 Libs\AceConsole-3.0\AceConsole-3.0.lua
+Libs\AceDB-3.0\AceDB-3.0.lua
+Libs\AceConfig-3.0\AceConfigRegistry-3.0\AceConfigRegistry-3.0.lua
+Libs\AceConfig-3.0\AceConfigCmd-3.0\AceConfigCmd-3.0.lua
+Libs\AceConfig-3.0\AceConfig-3.0.lua
 Libs\AceTab-3.0\AceTab-3.0.lua
 
 Core.lua
+Commands.lua
 Specialization.lua
 EquipmentSlots.lua
 Import.lua
@@ -22,3 +27,8 @@ EquipmentScanner.lua
 EquipmentComparator.lua
 EquipmentDiagnostics.lua
 Window.lua
+Tests\Runner.lua
+Tests\Fixture.lua
+Tests\Scanner.lua
+Tests\Comparator.lua
+Tests\Importer.lua
