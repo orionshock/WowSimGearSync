@@ -3,6 +3,7 @@ local Registry = {
     handlers = {}
 }
 WSGS.SlotActionHandlers = Registry
+local MaterialCatalog = WSGS.ModificationMaterials
 
 -- Inventory-slot capabilities in execution order. The imported target and the
 -- comparator decide whether work exists; this table only selects its handler.
@@ -75,22 +76,22 @@ function AdditionalSockets:Prepare(context, operation)
         return nil, operation.reason or "Additional socket state is unknown", true
     end
     if operation.type == "BUCKLE" then
-        local material = WSGS.ModificationMaterials:ForBuckle(context.bags)
+        local material, _, definition = MaterialCatalog:ForBuckle(context.bags)
         operation.material = material
-        operation.materialItemID = WSGS.ModificationMaterials.beltBuckleItemID
+        operation.materialItemID = definition.itemID
         operation.spellID = material and material.spellID
         operation.method = "ITEM"
         if not material then
-            return nil, "Living Steel Belt Buckle (item 90046) is not in carried bags"
+            return nil, string.format("Belt buckle item %d is not in carried bags", definition.itemID)
         end
         if material.locked then
             return nil, "Belt buckle is locked"
         end
         return operation
     end
-    local mapping = WSGS.ModificationMaterials.directSockets[context.inventorySlot]
+    local mapping = MaterialCatalog.actions.prerequisites.professionSockets[context.inventorySlot]
     local recipe, reason, recipeName, professionName, professionSpellIndex =
-        WSGS.ModificationMaterials:SocketAvailability(context.bags, context.inventorySlot)
+        MaterialCatalog:SocketAvailability(context.bags, context.inventorySlot)
     operation.spellID = recipe and (recipe.spellID or recipe.spellIDs and recipe.spellIDs[1])
     operation.recipeSpellIDs = recipe and recipe.spellIDs
     operation.spellName, operation.professionName = recipeName, professionName
@@ -150,7 +151,7 @@ function Gems:Prepare(context, operation)
     if context.additionalSocketMissing then
         return nil, "Required additional socket must be applied first"
     end
-    local material, count = WSGS.ModificationMaterials:ForGem(context.bags, operation.expected)
+    local material, count = MaterialCatalog:ForGem(context.bags, operation.expected)
     operation.material, operation.materialItemID, operation.available = material, operation.expected, count
     operation.method = "GEM"
     if not material then
@@ -169,7 +170,7 @@ Gems.Verify = verify
 local ItemEnhancement = {}
 function ItemEnhancement:Check(context)
     local field = context.fields.enchant
-    if not field or WSGS.ModificationMaterials.directEnhancements[field.expected] then
+    if not field or MaterialCatalog.actions.profession[field.expected] then
         return {}
     end
     if field.state ~= "MISMATCH" and field.state ~= "UNKNOWN" then
@@ -189,18 +190,17 @@ function ItemEnhancement:Prepare(context, operation)
     if operation.unresolved then
         return nil, operation.reason or "Enhancement state is unknown", true
     end
-    local material, fixedItemID, spellID = WSGS.ModificationMaterials:ForEnchant(context.bags, operation.expected)
+    local material, fixedItemID, spellID = MaterialCatalog:ForInventoryEnhancement(context.bags, operation.expected)
     operation.material, operation.materialItemID = material, fixedItemID or material and material.itemID
     operation.spellID, operation.method = spellID or material and material.spellID, "ITEM"
-    if not WSGS.ModificationMaterials.enchantItems[operation.expected] and
-        not WSGS.ModificationMaterials.enchantApplications[operation.expected] then
+    if not MaterialCatalog.actions.inventory[operation.expected] then
         return nil, "No confirmed material mapping for enchant " .. valueText(operation.expected)
     end
     if not material then
-        return nil, "Required enchant material is not in carried bags"
+        return nil, "Required enhancement item is not in carried bags"
     end
     if material.locked then
-        return nil, "Enchant material is locked"
+        return nil, "Enhancement item is locked"
     end
     return operation
 end
@@ -212,7 +212,7 @@ ItemEnhancement.Verify = verify
 local ProfessionEnhancement = {}
 function ProfessionEnhancement:Check(context)
     local results, enchant = {}, context.fields.enchant
-    if enchant and WSGS.ModificationMaterials.directEnhancements[enchant.expected] and
+    if enchant and MaterialCatalog.actions.profession[enchant.expected] and
         (enchant.state == "MISMATCH" or enchant.state == "UNKNOWN") then
         results[#results + 1] = {
             handler = self,
@@ -240,24 +240,14 @@ function ProfessionEnhancement:Check(context)
     return results
 end
 function ProfessionEnhancement:Prepare(context, operation)
-    local recipe, reason, recipeName, professionName, professionSpellIndex
-    if operation.type == "TINKER" then
-        if operation.observationUnknown then
-            return nil, operation.reason or "Tinker state is unknown", true
-        end
-        recipe, reason, recipeName, professionName, professionSpellIndex =
-            WSGS.ModificationMaterials:TinkerAvailability(context.bags, operation.expected)
-        operation.professionSkillLine = 202
-    else
-        if operation.unresolved then
-            return nil, operation.reason or "Profession enhancement state is unknown", true
-        end
-        local mapping = WSGS.ModificationMaterials.directEnhancements[operation.expected]
-        recipe, reason, recipeName, professionName, professionSpellIndex =
-            WSGS.ModificationMaterials:DirectEnhancementAvailability(context.bags, operation.expected,
-                context.inventorySlot)
-        operation.professionSkillLine = mapping and mapping.profession
+    if operation.observationUnknown or operation.unresolved then
+        return nil, operation.reason or "Profession enhancement state is unknown", true
     end
+    local mapping = MaterialCatalog.actions.profession[operation.expected]
+    local recipe, reason, recipeName, professionName, professionSpellIndex =
+        MaterialCatalog:ProfessionEnhancementAvailability(context.bags, operation.expected,
+            context.inventorySlot)
+    operation.professionSkillLine = mapping and mapping.profession
     operation.spellID, operation.spellName = recipe and recipe.spellID, recipeName
     operation.professionName, operation.professionSpellIndex = professionName, professionSpellIndex
     operation.nativeProfession, operation.method = true, "PROFESSION"

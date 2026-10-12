@@ -2,9 +2,6 @@ local _, WSGS = ...
 local Materials = {}
 WSGS.ModificationMaterials = Materials
 
--- Item ID for the MoP belt buckle consumed by the bag-item action.
-Materials.beltBuckleItemID = 90046 -- Living Steel Belt Buckle.
-
 -- Blizzard profession skill-line ID -> player-facing profession name.
 Materials.professionNames = {
     [164] = "Blacksmithing",
@@ -14,260 +11,277 @@ Materials.professionNames = {
     [333] = "Enchanting"
 }
 
--- SpellItemEnchantment ID -> the spell cast by the matching MoP scroll.
--- These are the MoP enchanting recipes' Enchant Item effects, not item IDs.
-Materials.enchantApplications = {
-    [4411] = 104338, -- Enchant Bracer - Mastery.
-    [4412] = 104385, -- Enchant Bracer - Major Dodge.
-    [4414] = 104389, -- Enchant Bracer - Super Intellect.
-    [4415] = 104390, -- Enchant Bracer - Exceptional Strength.
-    [4416] = 104391, -- Enchant Bracer - Greater Agility.
-    [4417] = 104392, -- Enchant Chest - Super Resilience.
-    [4418] = 104393, -- Enchant Chest - Mighty Spirit.
-    [4419] = 104395, -- Enchant Chest - Glorious Stats.
-    [4420] = 104397, -- Enchant Chest - Superior Stamina.
-    [4421] = 104398, -- Enchant Cloak - Accuracy.
-    [4422] = 104401, -- Enchant Cloak - Greater Protection.
-    [4423] = 104403, -- Enchant Cloak - Superior Intellect.
-    [4424] = 104404, -- Enchant Cloak - Superior Critical Strike.
-    [4426] = 104407, -- Enchant Boots - Greater Haste.
-    [4427] = 104408, -- Enchant Boots - Greater Precision.
-    [4428] = 104409, -- Enchant Boots - Blurred Speed.
-    [4429] = 104414, -- Enchant Boots - Pandaren's Step.
-    [4430] = 104416, -- Enchant Gloves - Greater Haste.
-    [4431] = 104417, -- Enchant Gloves - Superior Expertise.
-    [4432] = 104419, -- Enchant Gloves - Super Strength.
-    [4433] = 104420, -- Enchant Gloves - Superior Mastery.
-    [4441] = 104425, -- Enchant Weapon - Windsong.
-    [4442] = 104427, -- Enchant Weapon - Jade Spirit.
-    [4443] = 104430, -- Enchant Weapon - Elemental Force.
-    [4434] = 104445, -- Enchant Off-Hand - Major Intellect.
-    [4444] = 104434, -- Enchant Weapon - Dancing Steel.
-    [4445] = 104440, -- Enchant Weapon - Colossus.
-    [4446] = 104442 -- Enchant Weapon - River's Song.
-}
-
--- SpellItemEnchantment ID -> finished enhancement item ID.
--- These mappings bypass GetItemSpell discovery when the usable item is known.
-Materials.enchantItems = {
-    [4803] = 83006, -- Greater Tiger Fang Inscription.
-    [4804] = 83007, -- Greater Tiger Claw Inscription.
-    [4805] = 87560, -- Greater Crane Wing Inscription.
-    [4806] = 87559, -- Greater Ox Horn Inscription.
-    [4822] = 83764, -- Shadowleather Leg Armor.
-    [4823] = 83765, -- Angerhide Leg Armor.
-    [4824] = 83763, -- Ironscale Leg Armor.
-    [4825] = 82445, -- Greater Cerulean Spellthread.
-    [4826] = 82444, -- Greater Pearlescent Spellthread.
-    -- Secret inscriptions are finished BoP items. Their profession recipes
-    -- create these items, so only already-carried copies use the item path.
-    [4912] = 87581, -- Secret Ox Horn Inscription.
-    [4913] = 87585, -- Secret Tiger Fang Inscription.
-    [4914] = 87584, -- Secret Tiger Claw Inscription.
-    [4915] = 87582 -- Secret Crane Wing Inscription.
-}
-
--- SpellItemEnchantment ID -> direct item-targeting profession recipe.
--- Recipe creation of scrolls, kits, spellthreads, inscriptions, or other
--- intermediate items is excluded from this table.
-Materials.directEnhancements = {
-    -- Tailoring: cloak embroideries and tailor-only leg spellthreads.
-    [4892] = { -- Lightweave Embroidery.
-        profession = 197, -- Tailoring skill line.
-        spellID = 125481, -- Lightweave Embroidery recipe.
-        slot = 15, -- Back inventory slot.
-        reagents = {
-            [38426] = 3 -- Eternium Thread.
-        }
-    },
-    [4893] = { -- Darkglow Embroidery.
-        profession = 197, -- Tailoring skill line.
-        spellID = 125482, -- Darkglow Embroidery recipe.
-        slot = 15, -- Back inventory slot.
-        reagents = {
-            [38426] = 3 -- Eternium Thread.
-        }
-    },
-    [4894] = { -- Swordguard Embroidery.
-        profession = 197, -- Tailoring skill line.
-        spellID = 125483, -- Swordguard Embroidery recipe.
-        slot = 15, -- Back inventory slot.
-        reagents = {
-            [38426] = 3 -- Eternium Thread.
-        }
-    },
-    [4895] = { -- Master's Spellthread.
-        profession = 197, -- Tailoring skill line.
-        spellID = 125496, -- Master's Spellthread recipe.
-        slot = 7, -- Legs inventory slot.
-        reagents = {
-            [38426] = 3 -- Eternium Thread.
-        }
-    },
-    [4896] = { -- Sanctified Spellthread.
-        profession = 197, -- Tailoring skill line.
-        spellID = 125497, -- Sanctified Spellthread recipe.
-        slot = 7, -- Legs inventory slot.
-        reagents = {
-            [38426] = 3 -- Eternium Thread.
-        }
-    },
-
-    -- Leatherworking: Fur Linings and leatherworker-only leg reinforcements.
-    [4875] = { -- Fur Lining - Agility.
-        profession = 165, -- Leatherworking skill line.
-        spellID = 124551, -- Fur Lining - Agility recipe.
-        slot = 9, -- Wrist inventory slot.
-        reagents = {
-            [38426] = 1 -- Eternium Thread.
-        }
-    },
-    [4877] = { -- Fur Lining - Intellect.
-        profession = 165, -- Leatherworking skill line.
-        spellID = 124552, -- Fur Lining - Intellect recipe.
-        slot = 9, -- Wrist inventory slot.
-        reagents = {
-            [38426] = 1 -- Eternium Thread.
-        }
-    },
-    [4878] = { -- Fur Lining - Stamina.
-        profession = 165, -- Leatherworking skill line.
-        spellID = 124553, -- Fur Lining - Stamina recipe.
-        slot = 9, -- Wrist inventory slot.
-        reagents = {
-            [38426] = 1 -- Eternium Thread.
-        }
-    },
-    [4879] = { -- Fur Lining - Strength.
-        profession = 165, -- Leatherworking skill line.
-        spellID = 124554, -- Fur Lining - Strength recipe.
-        slot = 9, -- Wrist inventory slot.
-        reagents = {
-            [38426] = 1 -- Eternium Thread.
-        }
-    },
-    [4880] = { -- Primal Leg Reinforcements.
-        profession = 165, -- Leatherworking skill line.
-        spellID = 124559, -- Primal Leg Reinforcements recipe.
-        slot = 7, -- Legs inventory slot.
-        reagents = {
-            [38426] = 1 -- Eternium Thread.
-        }
-    },
-    [4881] = { -- Draconic Leg Reinforcements.
-        profession = 165, -- Leatherworking skill line.
-        spellID = 124561, -- Draconic Leg Reinforcements recipe.
-        slot = 7, -- Legs inventory slot.
-        reagents = {
-            [38426] = 1 -- Eternium Thread.
-        }
-    },
-    [4882] = { -- Heavy Leg Reinforcements.
-        profession = 165, -- Leatherworking skill line.
-        spellID = 124563, -- Heavy Leg Reinforcements recipe.
-        slot = 7, -- Legs inventory slot.
-        reagents = {
-            [38426] = 1 -- Eternium Thread.
-        }
-    },
-
-    -- Enchanting: enchanter-only ring enchants.
-    [4359] = { -- Enchant Ring - Greater Agility.
-        profession = 333, -- Enchanting skill line.
-        spellID = 103461, -- Greater Agility recipe.
-        slots = {
-            [11] = true, -- Finger 1 inventory slot.
-            [12] = true -- Finger 2 inventory slot.
-        },
-        reagents = {
-            [74249] = 2 -- Spirit Dust.
-        }
-    },
-    [4360] = { -- Enchant Ring - Greater Intellect.
-        profession = 333, -- Enchanting skill line.
-        spellID = 103462, -- Greater Intellect recipe.
-        slots = {
-            [11] = true, -- Finger 1 inventory slot.
-            [12] = true -- Finger 2 inventory slot.
-        },
-        reagents = {
-            [74249] = 2 -- Spirit Dust.
-        }
-    },
-    [4361] = { -- Enchant Ring - Greater Stamina.
-        profession = 333, -- Enchanting skill line.
-        spellID = 103463, -- Greater Stamina recipe.
-        slots = {
-            [11] = true, -- Finger 1 inventory slot.
-            [12] = true -- Finger 2 inventory slot.
-        },
-        reagents = {
-            [74249] = 2 -- Spirit Dust.
-        }
-    },
-    [4807] = { -- Enchant Ring - Greater Strength.
-        profession = 333, -- Enchanting skill line.
-        spellID = 103465, -- Greater Strength recipe.
-        slots = {
-            [11] = true, -- Finger 1 inventory slot.
-            [12] = true -- Finger 2 inventory slot.
-        },
-        reagents = {
-            [74249] = 2 -- Spirit Dust.
-        }
-    }
-}
-
--- Equipment inventory slot -> direct Blacksmithing socket recipes.
--- The first spell is the MoP recipe; the second is the legacy recipe accepted
--- for the same slot. Both consume four Strong Flux.
-Materials.directSockets = {
-    [9] = { -- Wrist: adds SpellItemEnchantment 3717.
-        profession = 164, -- Blacksmithing skill line.
-        spellIDs = {113263, 55628}, -- Socket Bracer recipes.
-        reagents = {
-            [3466] = 4 -- Strong Flux.
-        }
-    },
-    [10] = { -- Hands: adds SpellItemEnchantment 3723.
-        profession = 164, -- Blacksmithing skill line.
-        spellIDs = {114112, 55641}, -- Socket Gloves recipes.
-        reagents = {
-            [3466] = 4 -- Strong Flux.
-        }
-    }
-}
-
 -- Reagent requirement shared by every supported direct Engineering tinker.
 local tinkerReagents = {
     [90146] = 1 -- Tinker's Kit.
 }
 
--- SpellItemEnchantment ID -> direct Engineering recipe.
--- spellID is the application recipe, not the use spell observed afterward.
-Materials.tinkerRecipes = {
-    [4223] = { -- Nitro Boosts (waist); equipped use spell 55004.
-        spellID = 55016, -- Nitro Boosts recipe.
-        reagents = tinkerReagents
+-- Modification data follows execution priority:
+--   1. prerequisites create sockets needed by later gem actions;
+--   2. inventory entries resolve finished enhancement items carried in bags;
+--   3. profession entries are applied directly from an open profession window.
+-- Entries within each section are clustered by profession for maintenance.
+Materials.actions = {
+    prerequisites = {
+        -- Blacksmithing-created item; usable by any character from bags.
+        beltBuckle = {
+            itemID = 90046, -- Living Steel Belt Buckle.
+            slot = 6 -- Waist inventory slot.
+        },
+
+        -- Blacksmithing: direct recipes that create an additional socket.
+        professionSockets = {
+            [9] = { -- Wrist: adds SpellItemEnchantment 3717.
+                profession = 164, -- Blacksmithing skill line.
+                spellIDs = {113263, 55628}, -- Socket Bracer recipes.
+                reagents = {
+                    [3466] = 4 -- Strong Flux.
+                }
+            },
+            [10] = { -- Hands: adds SpellItemEnchantment 3723.
+                profession = 164, -- Blacksmithing skill line.
+                spellIDs = {114112, 55641}, -- Socket Gloves recipes.
+                reagents = {
+                    [3466] = 4 -- Strong Flux.
+                }
+            }
+        }
     },
-    [4697] = { -- Phase Fingers (hands); equipped use spell 108788.
-        spellID = 108789, -- Phase Fingers recipe.
-        reagents = tinkerReagents
+
+    -- SpellItemEnchantment ID -> finished bag item or its item-use spell.
+    -- A spellID locates the matching carried scroll through C_Item.GetItemSpell.
+    inventory = {
+        -- Enchanting: conventional enchant scrolls.
+        [4411] = {spellID = 104338}, -- Enchant Bracer - Mastery.
+        [4412] = {spellID = 104385}, -- Enchant Bracer - Major Dodge.
+        [4414] = {spellID = 104389}, -- Enchant Bracer - Super Intellect.
+        [4415] = {spellID = 104390}, -- Enchant Bracer - Exceptional Strength.
+        [4416] = {spellID = 104391}, -- Enchant Bracer - Greater Agility.
+        [4417] = {spellID = 104392}, -- Enchant Chest - Super Resilience.
+        [4418] = {spellID = 104393}, -- Enchant Chest - Mighty Spirit.
+        [4419] = {spellID = 104395}, -- Enchant Chest - Glorious Stats.
+        [4420] = {spellID = 104397}, -- Enchant Chest - Superior Stamina.
+        [4421] = {spellID = 104398}, -- Enchant Cloak - Accuracy.
+        [4422] = {spellID = 104401}, -- Enchant Cloak - Greater Protection.
+        [4423] = {spellID = 104403}, -- Enchant Cloak - Superior Intellect.
+        [4424] = {spellID = 104404}, -- Enchant Cloak - Superior Critical Strike.
+        [4426] = {spellID = 104407}, -- Enchant Boots - Greater Haste.
+        [4427] = {spellID = 104408}, -- Enchant Boots - Greater Precision.
+        [4428] = {spellID = 104409}, -- Enchant Boots - Blurred Speed.
+        [4429] = {spellID = 104414}, -- Enchant Boots - Pandaren's Step.
+        [4430] = {spellID = 104416}, -- Enchant Gloves - Greater Haste.
+        [4431] = {spellID = 104417}, -- Enchant Gloves - Superior Expertise.
+        [4432] = {spellID = 104419}, -- Enchant Gloves - Super Strength.
+        [4433] = {spellID = 104420}, -- Enchant Gloves - Superior Mastery.
+        [4434] = {spellID = 104445}, -- Enchant Off-Hand - Major Intellect.
+        [4441] = {spellID = 104425}, -- Enchant Weapon - Windsong.
+        [4442] = {spellID = 104427}, -- Enchant Weapon - Jade Spirit.
+        [4443] = {spellID = 104430}, -- Enchant Weapon - Elemental Force.
+        [4444] = {spellID = 104434}, -- Enchant Weapon - Dancing Steel.
+        [4445] = {spellID = 104440}, -- Enchant Weapon - Colossus.
+        [4446] = {spellID = 104442}, -- Enchant Weapon - River's Song.
+
+        -- Inscription: finished shoulder inscriptions carried in bags.
+        [4803] = {itemID = 83006}, -- Greater Tiger Fang Inscription.
+        [4804] = {itemID = 83007}, -- Greater Tiger Claw Inscription.
+        [4805] = {itemID = 87560}, -- Greater Crane Wing Inscription.
+        [4806] = {itemID = 87559}, -- Greater Ox Horn Inscription.
+        [4912] = {itemID = 87581}, -- Secret Ox Horn Inscription.
+        [4913] = {itemID = 87585}, -- Secret Tiger Fang Inscription.
+        [4914] = {itemID = 87584}, -- Secret Tiger Claw Inscription.
+        [4915] = {itemID = 87582}, -- Secret Crane Wing Inscription.
+
+        -- Leatherworking: finished leg armor carried in bags.
+        [4822] = {itemID = 83764}, -- Shadowleather Leg Armor.
+        [4823] = {itemID = 83765}, -- Angerhide Leg Armor.
+        [4824] = {itemID = 83763}, -- Ironscale Leg Armor.
+
+        -- Tailoring: finished spellthreads carried in bags.
+        [4825] = {itemID = 82445}, -- Greater Cerulean Spellthread.
+        [4826] = {itemID = 82444} -- Greater Pearlescent Spellthread.
     },
-    [4698] = { -- Incendiary Fireworks Launcher (hands); equipped use spell 109076.
-        spellID = 109077, -- Incendiary Fireworks Launcher recipe.
-        reagents = tinkerReagents
-    },
-    [4897] = { -- Goblin Glider (back); equipped use spell 126389.
-        spellID = 126392, -- Goblin Glider recipe.
-        reagents = tinkerReagents
-    },
-    [4898] = { -- Synapse Springs (hands); equipped use spell 126734.
-        spellID = 126731, -- Synapse Springs recipe.
-        reagents = tinkerReagents
+
+    -- SpellItemEnchantment ID -> recipe applied directly from a profession.
+    profession = {
+        -- Enchanting: enchanter-only ring enchants.
+        [4359] = { -- Enchant Ring - Greater Agility.
+            profession = 333, -- Enchanting skill line.
+            spellID = 103461, -- Greater Agility recipe.
+            slots = {
+                [11] = true, -- Finger 1 inventory slot.
+                [12] = true -- Finger 2 inventory slot.
+            },
+            reagents = {
+                [74249] = 2 -- Spirit Dust.
+            }
+        },
+        [4360] = { -- Enchant Ring - Greater Intellect.
+            profession = 333, -- Enchanting skill line.
+            spellID = 103462, -- Greater Intellect recipe.
+            slots = {
+                [11] = true, -- Finger 1 inventory slot.
+                [12] = true -- Finger 2 inventory slot.
+            },
+            reagents = {
+                [74249] = 2 -- Spirit Dust.
+            }
+        },
+        [4361] = { -- Enchant Ring - Greater Stamina.
+            profession = 333, -- Enchanting skill line.
+            spellID = 103463, -- Greater Stamina recipe.
+            slots = {
+                [11] = true, -- Finger 1 inventory slot.
+                [12] = true -- Finger 2 inventory slot.
+            },
+            reagents = {
+                [74249] = 2 -- Spirit Dust.
+            }
+        },
+        [4807] = { -- Enchant Ring - Greater Strength.
+            profession = 333, -- Enchanting skill line.
+            spellID = 103465, -- Greater Strength recipe.
+            slots = {
+                [11] = true, -- Finger 1 inventory slot.
+                [12] = true -- Finger 2 inventory slot.
+            },
+            reagents = {
+                [74249] = 2 -- Spirit Dust.
+            }
+        },
+
+        -- Engineering: direct tinkers.
+        [4223] = { -- Nitro Boosts (waist); equipped use spell 55004.
+            profession = 202, -- Engineering skill line.
+            spellID = 55016, -- Nitro Boosts recipe.
+            slot = 6, -- Waist inventory slot.
+            reagents = tinkerReagents
+        },
+        [4697] = { -- Phase Fingers (hands); equipped use spell 108788.
+            profession = 202, -- Engineering skill line.
+            spellID = 108789, -- Phase Fingers recipe.
+            slot = 10, -- Hands inventory slot.
+            reagents = tinkerReagents
+        },
+        [4698] = { -- Incendiary Fireworks Launcher (hands); equipped use spell 109076.
+            profession = 202, -- Engineering skill line.
+            spellID = 109077, -- Incendiary Fireworks Launcher recipe.
+            slot = 10, -- Hands inventory slot.
+            reagents = tinkerReagents
+        },
+        [4897] = { -- Goblin Glider (back); equipped use spell 126389.
+            profession = 202, -- Engineering skill line.
+            spellID = 126392, -- Goblin Glider recipe.
+            slot = 15, -- Back inventory slot.
+            reagents = tinkerReagents
+        },
+        [4898] = { -- Synapse Springs (hands); equipped use spell 126734.
+            profession = 202, -- Engineering skill line.
+            spellID = 126731, -- Synapse Springs recipe.
+            slot = 10, -- Hands inventory slot.
+            reagents = tinkerReagents
+        },
+
+        -- Leatherworking: Fur Linings and self-only leg reinforcements.
+        [4875] = { -- Fur Lining - Agility.
+            profession = 165, -- Leatherworking skill line.
+            spellID = 124551, -- Fur Lining - Agility recipe.
+            slot = 9, -- Wrist inventory slot.
+            reagents = {
+                [38426] = 1 -- Eternium Thread.
+            }
+        },
+        [4877] = { -- Fur Lining - Intellect.
+            profession = 165, -- Leatherworking skill line.
+            spellID = 124552, -- Fur Lining - Intellect recipe.
+            slot = 9, -- Wrist inventory slot.
+            reagents = {
+                [38426] = 1 -- Eternium Thread.
+            }
+        },
+        [4878] = { -- Fur Lining - Stamina.
+            profession = 165, -- Leatherworking skill line.
+            spellID = 124553, -- Fur Lining - Stamina recipe.
+            slot = 9, -- Wrist inventory slot.
+            reagents = {
+                [38426] = 1 -- Eternium Thread.
+            }
+        },
+        [4879] = { -- Fur Lining - Strength.
+            profession = 165, -- Leatherworking skill line.
+            spellID = 124554, -- Fur Lining - Strength recipe.
+            slot = 9, -- Wrist inventory slot.
+            reagents = {
+                [38426] = 1 -- Eternium Thread.
+            }
+        },
+        [4880] = { -- Primal Leg Reinforcements.
+            profession = 165, -- Leatherworking skill line.
+            spellID = 124559, -- Primal Leg Reinforcements recipe.
+            slot = 7, -- Legs inventory slot.
+            reagents = {
+                [38426] = 1 -- Eternium Thread.
+            }
+        },
+        [4881] = { -- Draconic Leg Reinforcements.
+            profession = 165, -- Leatherworking skill line.
+            spellID = 124561, -- Draconic Leg Reinforcements recipe.
+            slot = 7, -- Legs inventory slot.
+            reagents = {
+                [38426] = 1 -- Eternium Thread.
+            }
+        },
+        [4882] = { -- Heavy Leg Reinforcements.
+            profession = 165, -- Leatherworking skill line.
+            spellID = 124563, -- Heavy Leg Reinforcements recipe.
+            slot = 7, -- Legs inventory slot.
+            reagents = {
+                [38426] = 1 -- Eternium Thread.
+            }
+        },
+
+        -- Tailoring: cloak embroideries and self-only leg spellthreads.
+        [4892] = { -- Lightweave Embroidery.
+            profession = 197, -- Tailoring skill line.
+            spellID = 125481, -- Lightweave Embroidery recipe.
+            slot = 15, -- Back inventory slot.
+            reagents = {
+                [38426] = 3 -- Eternium Thread.
+            }
+        },
+        [4893] = { -- Darkglow Embroidery.
+            profession = 197, -- Tailoring skill line.
+            spellID = 125482, -- Darkglow Embroidery recipe.
+            slot = 15, -- Back inventory slot.
+            reagents = {
+                [38426] = 3 -- Eternium Thread.
+            }
+        },
+        [4894] = { -- Swordguard Embroidery.
+            profession = 197, -- Tailoring skill line.
+            spellID = 125483, -- Swordguard Embroidery recipe.
+            slot = 15, -- Back inventory slot.
+            reagents = {
+                [38426] = 3 -- Eternium Thread.
+            }
+        },
+        [4895] = { -- Master's Spellthread.
+            profession = 197, -- Tailoring skill line.
+            spellID = 125496, -- Master's Spellthread recipe.
+            slot = 7, -- Legs inventory slot.
+            reagents = {
+                [38426] = 3 -- Eternium Thread.
+            }
+        },
+        [4896] = { -- Sanctified Spellthread.
+            profession = 197, -- Tailoring skill line.
+            spellID = 125497, -- Sanctified Spellthread recipe.
+            slot = 7, -- Legs inventory slot.
+            reagents = {
+                [38426] = 3 -- Eternium Thread.
+            }
+        }
     }
 }
-
 local function guidFor(bag, slot)
     local ok, guid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(bag, slot))
     return ok and guid or nil
@@ -348,49 +362,33 @@ function Materials:ForGem(bags, itemID)
 end
 
 function Materials:ForBuckle(bags)
-    local id = self.beltBuckleItemID
-    return bags.byItem[id], bags.counts[id] or 0
+    local definition = self.actions.prerequisites.beltBuckle
+    return bags.byItem[definition.itemID], bags.counts[definition.itemID] or 0, definition
 end
 
-function Materials:ForEnchant(bags, enchantID)
-    local itemID = self.enchantItems[enchantID]
-    if itemID then
-        return bags.byItem[itemID], itemID, nil
-    end
-    local spellID = self.enchantApplications[enchantID]
-    return spellID and bags.bySpell[spellID] or nil, itemID, spellID
-end
-
-function Materials:DirectEnhancementAvailability(bags, enchantID, inventorySlot)
-    local recipe = self.directEnhancements[enchantID]
-    if not recipe then
+function Materials:ForInventoryEnhancement(bags, enchantID)
+    local definition = self.actions.inventory[enchantID]
+    if not definition then
         return nil
     end
-    return professionAvailability(bags, recipe, inventorySlot)
+    if definition.itemID then
+        return bags.byItem[definition.itemID], definition.itemID, nil
+    end
+    return bags.bySpell[definition.spellID], nil, definition.spellID
 end
 
 function Materials:SocketAvailability(bags, inventorySlot)
-    local recipe = self.directSockets[inventorySlot]
+    local recipe = self.actions.prerequisites.professionSockets[inventorySlot]
     if not recipe then
         return nil, "No confirmed Blacksmithing socket recipe for this slot"
     end
     return professionAvailability(bags, recipe, inventorySlot)
 end
 
-function Materials:TinkerAvailability(bags, enchantID)
-    local recipe = self.tinkerRecipes[enchantID]
+function Materials:ProfessionEnhancementAvailability(bags, enchantID, inventorySlot)
+    local recipe = self.actions.profession[enchantID]
     if not recipe then
-        return nil, "No confirmed MoP tinker recipe mapping"
+        return nil, "No confirmed direct profession enhancement mapping"
     end
-    local recipeName = C_Spell.GetSpellName(recipe.spellID)
-    local profession = self:GetProfession(202)
-    if not profession then
-        return nil, "Engineering profession is unavailable"
-    end
-    for itemID, quantity in pairs(recipe.reagents) do
-        if (bags.counts[itemID] or 0) < quantity then
-            return nil, string.format("Missing item %d (%d required)", itemID, quantity)
-        end
-    end
-    return recipe, nil, recipeName, profession.name, profession.spellBookIndex
+    return professionAvailability(bags, recipe, inventorySlot)
 end
