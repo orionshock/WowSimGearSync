@@ -56,19 +56,19 @@ function UI:OnUIEvent(event, ...)
     self:QueuePaperDollRefresh(event, ...)
 end
 
-function UI:OnBuildImported()
+function UI:WSGS_BUILD_IMPORTED()
     self:RefreshPaperDoll()
 end
 
-function UI:OnActionsChanged()
+function UI:WSGS_ACTIONS_CHANGED()
     self:QueuePaperDollRefresh("PLAYER_EQUIPMENT_CHANGED")
 end
 
-function UI:OnEquipmentStateChanged()
+function UI:WSGS_EQUIPMENT_STATE_CHANGED()
     self:UpdateEquipButton()
 end
 
-function UI:OnEquipmentRefreshRequested()
+function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED()
     self:QueuePaperDollRefresh("PLAYER_EQUIPMENT_CHANGED")
 end
 
@@ -76,10 +76,10 @@ function UI:OnEnable()
     for _, event in ipairs(refreshEvents) do
         self:RegisterEvent(event, "OnUIEvent")
     end
-    self:RegisterMessage("WSGS_BUILD_IMPORTED", "OnBuildImported")
-    self:RegisterMessage("WSGS_ACTIONS_CHANGED", "OnActionsChanged")
-    self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED", "OnEquipmentStateChanged")
-    self:RegisterMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", "OnEquipmentRefreshRequested")
+    self:RegisterMessage("WSGS_BUILD_IMPORTED")
+    self:RegisterMessage("WSGS_ACTIONS_CHANGED")
+    self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED")
+    self:RegisterMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED")
 end
 
 function UI:TogglePaperDoll()

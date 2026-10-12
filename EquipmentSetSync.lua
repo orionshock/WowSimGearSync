@@ -321,7 +321,7 @@ function Sync:Synchronize(profile, snapshot, batch)
     return result, reason
 end
 
-function Sync:OnEquipmentSetsChanged()
+function Sync:EQUIPMENT_SETS_CHANGED()
     if self.active then
         self.active.eventSeen = true
         WSGS:Debug(string.format("[SET][VERIFY] build=%s setID=%s event=EQUIPMENT_SETS_CHANGED action=%s",
@@ -330,5 +330,5 @@ function Sync:OnEquipmentSetsChanged()
 end
 
 function Sync:OnEnable()
-    self:RegisterEvent("EQUIPMENT_SETS_CHANGED", "OnEquipmentSetsChanged")
+    self:RegisterEvent("EQUIPMENT_SETS_CHANGED")
 end
