@@ -21,8 +21,8 @@ Active means db.char.latestSimulationProfileId, as in compare; no build selector
 or persistence has been introduced. Slash registration/dispatch is unchanged.
 
 PAPER DOLL
-PaperDoll.lua owns frame lifecycle and presentation, kept together as one
-cohesive UI module under the repository's 300-line review threshold. No scanner
+PaperDoll.lua owns frame lifecycle and binding. SlotPresentation.lua owns
+compact badges and player-facing tooltip translation. No scanner
 or comparator logic is copied. Opening calls the existing scanner and comparator
 once; Render binds their exact targets, snapshot slots, differences and assignment
 objects. Empty/latest builds share the same 16 reusable buttons. Import sends an
@@ -42,8 +42,9 @@ borders remain intact, with a separate differential badge:
 ! red: target item is missing or wrong.
 ? blue: required observations remain unknown.
 - gray: empty target (tooltip still shows any item mismatch).
-Tooltips show target/current links or IDs, every comparator field, numeric values,
-remaining upgrades, unknown reasons, and per-socket results. Resolved ring and
+Normal tooltips show target/current names and concise applicable-step statuses.
+Upgrade progress includes current/maximum and remaining upgrades. Debug mode
+appends raw states, observation sources/reasons and resolved inventory assignment. Resolved ring and
 trinket physical slots are taken directly from currentPosition/currentSlotId;
 assignment labels distinguish inferred pairing from observed inventory data.
 
@@ -86,14 +87,56 @@ Verify Equip is disabled and slot clicks do nothing.
 /wsgs test importer
 Repeat UI tests with the doll open and closed. UI tests restore the previous
 presentation/visibility, never save builds or change settings/equipment, and
-report SKIP for latest-build selection when none is imported. Eight UI cases
-are added to the existing 22. Summary counts are computed, never hardcoded.
+report SKIP for latest-build selection when none is imported. There are now
+10 UI, 10 comparator, 7 scanner and 8 importer cases (35 total). Summary counts
+are computed, never hardcoded.
 
 KNOWN LIMITATIONS / VALIDATION
 Static checks only: manifests/load order, source-copy hashes, license retention,
-30 registered cases, registration/API/source review, and git whitespace.
+35 registered cases, registration/API/source review, and git whitespace.
 No game-client run, visual inspection, Lua execution or test PASS is claimed.
 Actual frame layout, LDB/minimap clicks, item metadata caching and client events
 require the above runtime validation. Existing scanner UNKNOWN behavior remains;
-no new upgrade/tinker/modification inference was added. No 3D character model,
+upgrade/tinker behavior is preserved. Buckle evidence is described below. No 3D character model,
 automation, Equip queue, Equipment Manager, LDB settings UI, or Tab work is added.
+
+TASK 013: SLOT STATUS AND WAIST BUCKLE
+Mini badges beside each icon use I/G/E/R/U/T/B for item/gems/enchant/reforge/
+upgrade/tinker/buckle. Green + means matched, amber ! means pending, red I!
+means wrong/missing item, and blue ? means unknown. Non-applicable steps are
+omitted; gray icon indicators still identify empty targets. The center contains
+only a small hover hint. Bottom counts, quality borders and disabled Equip remain.
+
+Buckle requirement is implied only by a positive target gems[3] at waist (export
+position 8, inventory 6). A populated third observed gem proves the implied socket
+is present. Otherwise the scanner uses C_Item.GetItemNumAddedSockets(equippedLink)
+only after C_Item.GetItemInfo returns cached item information. Local generated
+ItemDocumentation.lua:572-584 documents itemInfo -> socketCount:number.
+Positive added sockets mean present; zero means missing. API failure/unavailable
+data stays UNKNOWN. An empty third gem alone never proves a missing buckle.
+No hardcoded belt/socket database or tooltip-text guess is used.
+
+The third-gem rule is an addon policy/inference, not identification of a buckle
+enchantment. An empty added socket counts as buckle present but may still need a
+gem. Added socket API runtime availability and equipped-link semantics need
+confirmation on this MoP client; generated shared documentation is source
+evidence, not live verification. If unavailable, empty-third-position belts stay
+UNKNOWN. Wrong items block buckle matches. Gems and buckle are separate steps,
+so both can contribute to configuration differences.
+
+Exact runtime validation:
+ /reload
+ Import your build and open the paper doll with the launcher.
+ Hover waist: verify I/G/R/U/B badges and readable names/statuses.
+ /wsgs probe 8
+ /run local l=GetInventoryItemLink("player",6); print(l and C_Item.GetItemNumAddedSockets(l))
+ Compare that number with the belt's actual added socket, including an empty one.
+ /wsgs compare
+ /wsgs test ui
+ /wsgs test comparator
+ /wsgs test all
+ Toggle /wsgs debug as needed to check normal versus diagnostic tooltips; restore
+ your original debug setting afterward. Normal tooltips omit raw states and
+ non-applicable lines. Verify upgrade text such as 0/2 (2 remaining), small
+ center hint, bottom summary and no actions from slot clicks.
+ No client test results or visual verification are claimed from static review.

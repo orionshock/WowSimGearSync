@@ -1,7 +1,7 @@
 local _, WSGS = ...
 local Comparator = {}
 WSGS.EquipmentComparator = Comparator
-local fields = { "gems", "enchant", "reforging", "upgradeStep", "tinker" }
+local fields = { "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }
 
 local function scalar(expected, observed)
     if not observed or observed.status == "UNKNOWN" then
@@ -34,6 +34,10 @@ local function compareSlot(target, current, position, currentPosition)
     end
     for _, field in ipairs(fields) do
         local expected = target[field]
+        if field == "buckle" then
+            expected = slot.id == 6 and type(target.gems) == "table"
+                and type(target.gems[3]) == "number" and target.gems[3] > 0 or nil
+        end
         local difference
         if field == "upgradeStep" and not emptyTarget then
             local eligibility = observations.upgradeEligibility

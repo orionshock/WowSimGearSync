@@ -30,10 +30,11 @@ function Scanner:Scan(onlyPosition)
             observations.item = unknown("Inventory identity unavailable or inconsistent")
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
-        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "upgradeRemaining", "upgradeState", "tinker", "instance" }) do
+        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "upgradeRemaining", "upgradeState", "tinker", "buckle", "instance" }) do
             observations[field] = empty and { status = "NOT_APPLICABLE", reason = "Empty inventory slot" }
                 or unknown("No verified equipped-item observation for this field")
         end
+        if slot.id ~= 6 then observations.buckle = { status = "NOT_APPLICABLE" } end
         if not empty then
             local ok, guid = pcall(function()
                 return C_Item.GetItemGUID(ItemLocation:CreateFromEquipmentSlot(slot.id))
@@ -46,6 +47,23 @@ function Scanner:Scan(onlyPosition)
                 observations.enchant = decoded.enchant
                 observations.gems = decoded.gems
                 observations.reforging = decoded.reforging
+                if slot.id == 6 then
+                    local third = decoded.gems.values[3]
+                    if third.status == "KNOWN" and third.value > 0 then
+                        observations.buckle = { status = "KNOWN", value = true, source = "Populated third waist gem position" }
+                    else
+                        -- Empty gem fields do not establish whether an empty socket exists.
+                        local ok, added = pcall(function()
+                            if not C_Item.GetItemInfo(current.link) then return nil end
+                            return C_Item.GetItemNumAddedSockets(current.link)
+                        end)
+                        if ok and type(added) == "number" and added >= 0 then
+                            observations.buckle = { status = "KNOWN", value = added > 0, source = "C_Item.GetItemNumAddedSockets" }
+                        else
+                            observations.buckle = unknown("Added waist sockets unavailable; empty gem fields are inconclusive")
+                        end
+                    end
+                end
                 for field, observed in pairs(WSGS.EquipmentInspector:Inspect(slot.id, current.link)) do
                     observations[field] = observed
                 end

@@ -23,7 +23,7 @@ Tests:Register("scanner", "Scanner", {
         for position, slot in ipairs(first.slots) do
             if slot.id then
                 local single = WSGS.EquipmentScanner:Scan(position).slots[position]
-                for _, field in ipairs({ "upgradeEligibility", "upgradeStep", "upgradeMaximum", "upgradeRemaining", "tinker" }) do
+                for _, field in ipairs({ "upgradeEligibility", "upgradeStep", "upgradeMaximum", "upgradeRemaining", "tinker", "buckle" }) do
                     local a, b, c = slot.observations[field], second.slots[position].observations[field], single.observations[field]
                     if a.status ~= "UNKNOWN" and b.status ~= "UNKNOWN" and c.status ~= "UNKNOWN" then
                         assert(a.status == b.status and a.status == c.status and a.value == b.value and a.value == c.value,
@@ -74,5 +74,28 @@ Tests:Register("scanner", "Scanner", {
         assert(slot.observations.tinker.spellId and slot.observations.enchant.status == "KNOWN")
         local _, spell = C_Item.GetItemSpell(slot.link)
         assert(slot.observations.tinker.spellId == spell)
+    end },
+    { name = "Live waist buckle evidence reaches comparator", run = function()
+        local snapshot = WSGS.EquipmentScanner:Scan()
+        for position, slot in ipairs(snapshot.slots) do
+            if position ~= 8 then assert(slot.observations.buckle.status == "NOT_APPLICABLE") end
+        end
+        local waist = snapshot.slots[8]
+        if not waist.id then return "SKIP", "No equipped waist item" end
+        local observed = waist.observations.buckle
+        if observed.status == "UNKNOWN" then return "SKIP", observed.reason end
+        assert(observed.status == "KNOWN" and type(observed.value) == "boolean")
+        local decoded = assert(WSGS.ItemLinkDecoder:Decode(waist.link))
+        if decoded.gems.values[3].value > 0 then
+            assert(observed.value == true)
+        else
+            local added = C_Item.GetItemNumAddedSockets(waist.link)
+            assert(observed.value == (added > 0))
+        end
+        local profile = { equipment = {} }
+        for position, slot in ipairs(snapshot.slots) do profile.equipment[position] = { id = slot.id, empty = not slot.id } end
+        profile.equipment[8].gems = { 10, 20, 30 } -- ephemeral target; never imported/saved
+        local result = assert(WSGS.EquipmentComparator:Compare(profile, snapshot))
+        assert(result.slots[8].fields.buckle.state == (observed.value and "MATCH" or "MISMATCH"))
     end },
 })

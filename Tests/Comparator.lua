@@ -88,4 +88,29 @@ WSGS.Tests:Register("comparator", "Comparator", {
         local result, reason = WSGS.EquipmentComparator:Compare(nil, snapshot)
         assert(not result and reason)
     end },
+    { name = "Required waist buckle matches and missing buckle counts", run = function()
+        for _, present in ipairs({ true, false }) do
+            local profile, snapshot = scenario()
+            profile.equipment[8].gems = { 10, 20, 30 }
+            local decoded = assert(WSGS.ItemLinkDecoder:Decode("item:1008::10:20:30::::90:0"))
+            snapshot.slots[8].observations.gems = decoded.gems
+            snapshot.slots[8].observations.buckle = { status = "KNOWN", value = present }
+            local result = compare(profile, snapshot)
+            assert(result.slots[8].fields.buckle.state == (present and "MATCH" or "MISMATCH"))
+            assert(result.summary.configurationMismatches == (present and 0 or 1))
+        end
+    end },
+    { name = "Buckle is waist-only and third gem must be populated", run = function()
+        local profile, snapshot = scenario()
+        profile.equipment[1].gems = { 10, 20, 30 }
+        profile.equipment[8].gems = { 10, 20, 0 }
+        local result = compare(profile, snapshot)
+        assert(result.slots[1].fields.buckle.state == "NOT_APPLICABLE")
+        assert(result.slots[8].fields.buckle.state == "NOT_APPLICABLE")
+        profile.equipment[8].gems[3] = 30
+        assert(compare(profile, snapshot).slots[8].fields.buckle.state == "UNKNOWN")
+        snapshot.slots[8].observations.item.value = 99999
+        snapshot.slots[8].observations.buckle = { status = "KNOWN", value = true }
+        assert(compare(profile, snapshot).slots[8].fields.buckle.state == "UNKNOWN")
+    end },
 })

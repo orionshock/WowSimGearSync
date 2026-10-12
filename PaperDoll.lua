@@ -1,8 +1,7 @@
 local _, WSGS = ...
 local Doll = { events = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" } }
 WSGS.PaperDoll = Doll
-local fields = { "item", "gems", "enchant", "reforging", "upgradeStep", "tinker" }
-local labels = { item = "Item", gems = "Gems", enchant = "Enchant", reforging = "Reforge", upgradeStep = "Upgrade", tinker = "Tinker" }
+local fields = WSGS.SlotPresentation.fields
 local appearance = {
     MATCH = { "=", 0.3, 1, 0.4 }, CONFIGURATION = { "~", 1, 0.7, 0.15 },
     MISMATCH = { "!", 1, 0.25, 0.25 }, UNKNOWN = { "?", 0.55, 0.7, 1 }, EMPTY = { "-", 0.6, 0.6, 0.6 },
@@ -23,49 +22,10 @@ local function visualState(target, difference)
     return mismatch and "CONFIGURATION" or unknown and "UNKNOWN" or "MATCH", unknown
 end
 
-local function itemText(item)
-    if not item then return "Unavailable" end
-    if item.empty or item.id == 0 then return "Empty" end
-    if not item.id then
-        return item.observations and item.observations.item.present == false and "Empty" or "Unknown"
-    end
-    local name, link = C_Item.GetItemInfo(item.link or item.id)
-    return link or name or ("Item " .. item.id .. " (not cached)")
-end
-
-local function valueText(value)
-    if type(value) ~= "table" then return value == nil and "unavailable" or tostring(value) end
-    local values = {}
-    for index, item in ipairs(value) do values[index] = tostring(item) end
-    return table.concat(values, ", ")
-end
-
 function Doll:ShowSlotTooltip(button)
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(WSGS.equipmentSlots[button.position].name)
-    if not button.target then
-        GameTooltip:AddLine("Import a WoW Sims build to choose target equipment.", 1, 1, 1, true)
-    else
-        GameTooltip:AddLine("Target: " .. itemText(button.target), 1, 1, 1, true)
-        GameTooltip:AddLine("Equipped: " .. itemText(button.current), 1, 1, 1, true)
-        if button.difference then
-            local difference = button.difference
-            GameTooltip:AddLine("Compared inventory slot: " .. difference.currentSlotId ..
-                (difference.currentPosition ~= button.position and " (resolved pair assignment)" or ""), 0.8, 0.8, 0.8, true)
-            for _, field in ipairs(fields) do
-                local value = difference.fields[field]
-                local detail = ""
-                if value.expected ~= nil then detail = detail .. " target=" .. valueText(value.expected) end
-                if value.actual ~= nil then detail = detail .. " observed=" .. valueText(value.actual) end
-                if value.remaining ~= nil then detail = detail .. " remaining=" .. value.remaining end
-                GameTooltip:AddLine(labels[field] .. ": " .. value.state .. detail, 1, 1, 1, true)
-                if value.reason then GameTooltip:AddLine(value.reason, 0.7, 0.7, 0.7, true) end
-                for socket, gem in ipairs(value.sockets or {}) do
-                    GameTooltip:AddLine("  Socket " .. socket .. ": " .. gem.state .. " target=" .. valueText(gem.expected)
-                        .. " observed=" .. valueText(gem.actual), 0.8, 0.8, 0.8, true)
-                end
-            end
-        else GameTooltip:AddLine(self.error or "Comparison unavailable", 0.7, 0.7, 1, true) end
+    for _, line in ipairs(WSGS.SlotPresentation:TooltipLines(button, WSGS.db.profile.debug)) do
+        GameTooltip:AddLine(line, 1, 1, 1, true)
     end
     GameTooltip:Show()
 end
@@ -111,6 +71,7 @@ function Doll:Render(profile, snapshot, comparison, reason)
         local style = appearance[state]
         button.indicator:SetText(style[1] .. (unknown and state == "CONFIGURATION" and "?" or ""))
         button.indicator:SetTextColor(style[2], style[3], style[4])
+        button.miniState:SetText(WSGS.SlotPresentation:MiniStates(button.difference))
     end
     if self.hovered and frame:IsShown() then self:ShowSlotTooltip(self.hovered) end
 end
@@ -189,7 +150,7 @@ function Doll:Create()
         button:SetSize(44, 44)
         if position <= 6 then button:SetPoint("TOPLEFT", 18, -112 - (position - 1) * 54)
         elseif position <= 14 then button:SetPoint("TOPRIGHT", -18, -112 - (position - 7) * 54)
-        else button:SetPoint("TOP", (position == 15 and -65 or 65), -558) end
+        else button:SetPoint("TOP", (position == 15 and -100 or 100), -558) end
         button.icon = button:CreateTexture(nil, "ARTWORK")
         button.icon:SetAllPoints()
         button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -204,18 +165,23 @@ function Doll:Create()
         button.indicator:SetPoint("BOTTOMRIGHT", -1, 1)
         local label = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         label:SetWidth(140)
-        if position <= 6 then label:SetPoint("LEFT", button, "RIGHT", 8, 0); label:SetJustifyH("LEFT")
-        elseif position <= 14 then label:SetPoint("RIGHT", button, "LEFT", -8, 0); label:SetJustifyH("RIGHT")
+        if position <= 6 then label:SetPoint("LEFT", button, "RIGHT", 8, 10); label:SetJustifyH("LEFT")
+        elseif position <= 14 then label:SetPoint("RIGHT", button, "LEFT", -8, 10); label:SetJustifyH("RIGHT")
         else label:SetPoint("TOP", button, "BOTTOM", 0, -4) end
         label:SetText(slot.name)
+        button.miniState = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        if position <= 6 then button.miniState:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -4)
+        elseif position <= 14 then button.miniState:SetPoint("TOPRIGHT", label, "BOTTOMRIGHT", 0, -4)
+        else button.miniState:SetPoint("TOP", label, "BOTTOM", 0, -4) end
         button:SetScript("OnEnter", function(b) self.hovered = b; self:ShowSlotTooltip(b) end)
         button:SetScript("OnLeave", function() self.hovered = nil; GameTooltip:Hide() end)
         -- Deliberately no OnClick/drag/item-use handlers or secure equipment template.
     end
     local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     legend:SetPoint("CENTER", 0, 20)
-    legend:SetWidth(210)
-    legend:SetText("|cff4dff66= Configured|r\n\n|cffffb326~ Configuration differs|r\n\n|cffff4040! Wrong or missing item|r\n\n|cff8cb3ff? Unknown|r\n\n|cff999999- Empty target|r\n\nHover a slot for details.")
+    legend:SetWidth(150)
+    legend:SetText("Hover a slot for details.")
+    frame.helpHint = legend
     frame.summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.summary:SetPoint("BOTTOM", 0, 30)
     frame.summary:SetWidth(610)

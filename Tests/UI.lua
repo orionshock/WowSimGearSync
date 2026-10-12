@@ -126,4 +126,49 @@ WSGS.Tests:Register("ui", "UI", {
             assert(WSGS.launcher.type == "launcher" and LibStub("LibDBIcon-1.0"):IsRegistered("WowSimGearSync"))
         end)
     end },
+    { name = "Mini states bind comparator results beside every slot", run = function()
+        withDoll(function(frame)
+            local profile, snapshot = scenario()
+            profile.equipment[8].gems = { 10, 20, 30 }
+            snapshot.slots[8].observations.buckle = { status = "KNOWN", value = false }
+            local result = assert(WSGS.EquipmentComparator:Compare(profile, snapshot))
+            Doll:Render(profile, snapshot, result)
+            for _, button in ipairs(frame.slots) do
+                assert(button.miniState:GetText() == WSGS.SlotPresentation:MiniStates(button.difference))
+                assert(button.miniState:GetText():find("I+", 1, true))
+            end
+            assert(frame.slots[8].miniState:GetText():find("B!", 1, true))
+            assert(not frame.slots[1].miniState:GetText():find("B", 1, true))
+            local text = WSGS.SlotPresentation:MiniStates({ fields = {
+                item = { state = "MISMATCH" }, gems = { state = "UNKNOWN" },
+                enchant = { state = "NOT_APPLICABLE" },
+            } })
+            assert(text:find("|cffff4040I!", 1, true) and text:find("G?", 1, true))
+            assert(not text:find("E-", 1, true))
+            assert(frame.helpHint:GetText() == "Hover a slot for details.")
+        end)
+    end },
+    { name = "Normal tooltips are concise with upgrade progress and buckle", run = function()
+        withDoll(function(frame)
+            local profile, snapshot = scenario()
+            profile.equipment[8].gems = { 10, 20, 30 }
+            local o = snapshot.slots[8].observations
+            o.buckle = { status = "KNOWN", value = false }
+            o.upgradeEligibility = { status = "KNOWN", value = true }
+            o.upgradeStep, o.upgradeMaximum = { status = "KNOWN", value = 0 }, { status = "KNOWN", value = 2 }
+            Doll:Render(profile, snapshot, assert(WSGS.EquipmentComparator:Compare(profile, snapshot)))
+            local text = table.concat(WSGS.SlotPresentation:TooltipLines(frame.slots[8], false), "\n")
+            assert(text:find("Item: Matched", 1, true) and text:find("Buckle: Missing", 1, true))
+            assert(text:find("Upgrade: 0/2 (2 remaining)", 1, true))
+            for _, raw in ipairs({ "NOT_APPLICABLE", "UNKNOWN", "MISMATCH", "target=", "observed=", "Diagnostics:" }) do
+                assert(not text:find(raw, 1, true))
+            end
+            local debug = table.concat(WSGS.SlotPresentation:TooltipLines(frame.slots[8], true), "\n")
+            assert(debug:find("Diagnostics:", 1, true) and debug:find("Buckle: MISMATCH", 1, true))
+            o.buckle.value = true
+            Doll:Render(profile, snapshot, assert(WSGS.EquipmentComparator:Compare(profile, snapshot)))
+            text = table.concat(WSGS.SlotPresentation:TooltipLines(frame.slots[8], false), "\n")
+            assert(text:find("Buckle: Matched", 1, true))
+        end)
+    end },
 })

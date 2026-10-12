@@ -30,6 +30,7 @@ EquipmentScanner.lua
 EquipmentComparator.lua
 EquipmentDiagnostics.lua
 Window.lua
+SlotPresentation.lua
 PaperDoll.lua
 Launcher.lua
 Tests\Runner.lua
