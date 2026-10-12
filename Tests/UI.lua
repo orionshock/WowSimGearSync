@@ -204,14 +204,34 @@ WSGS.Tests:Register("ui", "UI", {
     { name = "Failed import retains JSON and clears error on reopen", run = function()
         withImportWindow(function(frame)
             local character = { simulationProfiles = {} }
+            local previous = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+            local builds, selected = character.simulationProfiles, character.latestSimulationProfileId
+            local function unchangedBuild()
+                assert(character.simulationProfiles == builds and builds[previous.id] == previous,
+                    "Failed import replaced the existing managed build")
+                assert(character.latestSimulationProfileId == selected,
+                    "Failed import changed the selected managed build")
+                local count = 0
+                for _ in pairs(builds) do count = count + 1 end
+                assert(count == 1, "Failed import added a managed build")
+            end
             frame:Show()
             frame.importInput:SetText("{broken")
             local build = WSGS:SubmitImport(frame, function(text) return WSGS:ImportInto(character, text) end)
-            assert(not build and frame:IsShown() and frame.importInput:GetText() == "{broken")
-            assert(frame.importStatus:GetText():find("Import failed:", 1, true))
-            assert(next(character.simulationProfiles) == nil)
+            assert(not build, "Malformed JSON imported successfully")
+            assert(frame:IsShown(), "Failed import closed the dialog")
+            assert(frame.importInput:GetText() == "{broken", "Failed import altered the pasted JSON")
+            local errorText = frame.importStatus:GetText()
+            assert(errorText and errorText:find("Import failed:", 1, true),
+                "Failed import did not display a readable error: " .. tostring(errorText))
+            unchangedBuild()
             frame:Hide(); frame:Show()
-            assert(frame.importStatus:GetText() == "" and frame.importInput:GetText() == "{broken")
+            assert(frame:IsShown(), "Import dialog did not reopen")
+            -- A cleared FontString may return nil rather than an empty string.
+            errorText = frame.importStatus:GetText()
+            assert((errorText or "") == "", "Reopening retained an error: " .. tostring(errorText))
+            assert(frame.importInput:GetText() == "{broken", "Reopening altered the pasted JSON")
+            unchangedBuild()
         end)
     end },
     { name = "Editable build name commits once and preserves identity", run = function()
