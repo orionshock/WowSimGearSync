@@ -23,6 +23,7 @@ function WSGS:OnInitialize()
     self:InitializeLauncher()
     self.EquipmentSetSync:Initialize()
     self.EquipmentActions:Initialize()
+    self.SlotActions:Initialize()
     self:RegisterMessage("WSGS_BUILD_IMPORTED", function() self.PaperDoll:Refresh() end)
     self:Debug("Loaded version " .. self.version .. ".")
 end

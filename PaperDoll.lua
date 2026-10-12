@@ -22,12 +22,16 @@ function Doll:ShowSlotTooltip(button)
     for _, line in ipairs(WSGS.SlotPresentation:TooltipLines(button, WSGS.db.profile.debug)) do
         GameTooltip:AddLine(line, 1, 1, 1, true)
     end
+    for _, line in ipairs(WSGS.SlotActions:TooltipLines(button.position)) do
+        GameTooltip:AddLine(line, 1, 1, 1, true)
+    end
     GameTooltip:Show()
 end
 
 function Doll:Render(profile, snapshot, comparison, reason)
     local frame = self:Create()
     self.profile, self.snapshot, self.comparison, self.error = profile, snapshot, comparison, reason
+    WSGS.SlotActions:Refresh(profile, snapshot, comparison)
     if not frame.buildName:HasFocus() or frame.buildName.buildId ~= (profile and profile.id) then
         frame.buildName:SetText(profile and profile.name or "No active build")
     end
@@ -68,6 +72,11 @@ function Doll:Render(profile, snapshot, comparison, reason)
         local state = visualState(target, button.difference)
         button.visualState = state
         button.miniState:SetText(WSGS.SlotPresentation:MiniStates(button.difference))
+        local action = WSGS.SlotActions.controllers[position]
+        local pending = action and action.state == "PENDING"
+        button.icon:SetDesaturated(pending == true)
+        button:SetEnabled(action ~= nil and not pending and (action.state == "READY"
+            or action.state == "BLOCKED" and action.lastFailed ~= nil))
     end
     if self.hovered and frame:IsShown() then self:ShowSlotTooltip(self.hovered) end
 end
@@ -200,6 +209,8 @@ function Doll:Create()
     actions.queueViewRefresh = function() self:QueueRefresh("PLAYER_EQUIPMENT_CHANGED") end
     actions.refreshView = function() self:Refresh() end
     actions.stateChanged = function() self:UpdateEquipButton() end
+    WSGS.SlotActions.refreshView = function() self:Refresh() end
+    WSGS.SlotActions.isVisible = function() return frame:IsShown() end
     frame.slots = {}
     for position, slot in ipairs(WSGS.equipmentSlots) do
         local button = CreateFrame("Button", nil, frame)
@@ -230,7 +241,8 @@ function Doll:Create()
         end
         button:SetScript("OnEnter", function(b) self.hovered = b; self:ShowSlotTooltip(b) end)
         button:SetScript("OnLeave", function() self.hovered = nil; GameTooltip:Hide() end)
-        -- Deliberately no OnClick/drag/item-use handlers or secure equipment template.
+        button:RegisterForClicks("LeftButtonUp")
+        button:SetScript("OnClick", function(b) WSGS.SlotActions:Click(b.position) end)
     end
     local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     legend:SetPoint("CENTER", 0, 20)

@@ -36,6 +36,9 @@ EquipmentPlanner.lua
 EquipmentExecution.lua
 EquipmentSetSync.lua
 EquipmentActions.lua
+ModificationMaterials.lua
+SlotActionPlanner.lua
+SlotActions.lua
 Window.lua
 SlotPresentation.lua
 PaperDoll.lua
