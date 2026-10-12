@@ -2,6 +2,7 @@
   "apiVersion": 3,
   "player": {
     "class": "ClassPaladin",
+    "protectionPaladin": {"options":{"classOptions":{"seal":"Insight"}}},
     "equipment": {
       "items": [
         {"id":99029,"gems":[95344,76667],"reforging":130,"upgradeStep":"UpgradeStepTwo"},

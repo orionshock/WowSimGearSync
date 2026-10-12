@@ -13,5 +13,6 @@ Libs\AceConsole-3.0\AceConsole-3.0.lua
 Libs\AceTab-3.0\AceTab-3.0.lua
 
 Core.lua
+Specialization.lua
 Import.lua
 Window.lua

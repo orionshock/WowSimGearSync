@@ -168,9 +168,78 @@ for text in [json.dumps(full_export, indent=2), json.dumps(full_export, separato
             if isinstance(value, list):
                 actual = [actual[i] for i in range(1, len(actual)+1)]
             check(actual == value, 'user gear modifications and order retained')
-    check(set(imported) == {'id', 'name', 'class', 'apiVersion', 'equipment', 'metadata'}, 'only gear and import identity retained')
+    check(set(imported) == {'id', 'name', 'class', 'apiVersion', 'equipment', 'metadata', 'specialization'}, 'only gear and import identity retained')
     for field in ['rotation', 'talentsString', 'glyphs', 'itemSwap', 'raidBuffs', 'encounter', 'consumables']:
         check(imported[field] is None, 'non-equipment settings excluded')
+# Specialization metadata and naming are independent of equipped items.
+protected, _ = import_doc(user_gear)
+check(protected.name == 'Paladin - Protection', 'detected spec supplies default name')
+check(dict(protected.specialization) == {'class': 'Paladin', 'name': 'Protection', 'id': 66, 'source': 'player.protectionPaladin'}, 'normalized Protection identification only')
+manual, _ = import_doc(user_gear, 'My Tank Set')
+check(manual.name == 'My Tank Set', 'manual import name retained')
+repeated, _ = import_doc(user_gear)
+check(repeated.id != protected.id and repeated.name == protected.name, 'repeated detected imports remain distinct')
+for field, expected_name, expected_id in [('holyPaladin', 'Holy', 65), ('retributionPaladin', 'Retribution', 70)]:
+    doc = copy.deepcopy(user_gear)
+    del doc['player']['protectionPaladin']
+    doc['player'][field] = {}
+    detected, _ = import_doc(doc)
+    check(detected.specialization.name == expected_name and detected.specialization.id == expected_id, 'other Paladin specialization')
+for change, source in [({'retributionPaladin': {}}, 'ambiguous'),
+                       ({'protectionPaladin': False}, 'invalid'),
+                       ({'class': 'ClassMage'}, 'invalid')]:
+    doc = copy.deepcopy(user_gear)
+    doc['player'].update(change)
+    detected, _ = import_doc(doc)
+    check(detected.specialization.name == 'Unspecified' and detected.specialization.id is None and detected.specialization.source == source, 'ambiguous or invalid spec is unspecified')
+missing, _ = import_doc(fixture)
+check(missing.specialization.name == 'Unspecified' and missing.specialization.source == 'missing', 'gear alone never establishes specialization')
+numeric = copy.deepcopy(user_gear)
+numeric['player']['class'] = 2
+numeric_profile, _ = import_doc(numeric)
+check(numeric_profile.specialization.id == 66, 'numeric schema class enum accepted')
+# Cover each remaining class with an authoritative explicit field.
+for class_name, field, name, spec_id in [
+    ('ClassWarrior', 'protectionWarrior', 'Protection', 73),
+    ('ClassHunter', 'beastMasteryHunter', 'Beast Mastery', 253),
+    ('ClassRogue', 'combatRogue', 'Combat', 260),
+    ('ClassPriest', 'disciplinePriest', 'Discipline', 256),
+    ('ClassDeathKnight', 'frostDeathKnight', 'Frost', 251),
+    ('ClassShaman', 'restorationShaman', 'Restoration', 264),
+    ('ClassMage', 'frostMage', 'Frost', 64),
+    ('ClassWarlock', 'afflictionWarlock', 'Affliction', 265),
+    ('ClassMonk', 'mistweaverMonk', 'Mistweaver', 270),
+    ('ClassDruid', 'guardianDruid', 'Guardian', 104),
+]:
+    doc = copy.deepcopy(fixture)
+    doc['player']['class'] = class_name
+    doc['player'][field] = {}
+    detected, _ = import_doc(doc)
+    check(detected.specialization.name == name and detected.specialization.id == spec_id and detected.specialization.source == 'player.' + field, 'explicit schema field for other class')
+# Exercise the real name-suggestion method with a minimal EditBox test double.
+name_input = lua.eval("function() local box = {text = ''}; function box:GetText() return self.text end; function box:SetText(text) self.text = text end; return box end")()
+wsgs.UpdateSuggestedProfileName(wsgs, name_input, json.dumps(user_gear))
+check(name_input.text == 'Paladin - Protection', 'UI populates name from pasted export')
+retribution = copy.deepcopy(user_gear)
+del retribution['player']['protectionPaladin']
+retribution['player']['retributionPaladin'] = {}
+wsgs.UpdateSuggestedProfileName(wsgs, name_input, json.dumps(retribution))
+check(name_input.text == 'Paladin - Retribution', 'automatic name follows a new export')
+name_input.text = 'Manually entered name'
+wsgs.UpdateSuggestedProfileName(wsgs, name_input, json.dumps(user_gear))
+check(name_input.text == 'Manually entered name', 'nonempty manually entered name never overwritten')
+name_input.text = name_input.suggestedName
+name_input.userEdited = True
+wsgs.UpdateSuggestedProfileName(wsgs, name_input, json.dumps(user_gear))
+check(name_input.text == 'Paladin - Retribution', 'user-owned name equal to old suggestion is preserved')
+name_input.userEdited = False
+wsgs.UpdateSuggestedProfileName(wsgs, name_input, json.dumps(fixture))
+check(name_input.text == '', 'missing spec clears a stale automatic suggestion')
+wsgs.UpdateSuggestedProfileName(wsgs, name_input, json.dumps(user_gear))
+wsgs.UpdateSuggestedProfileName(wsgs, name_input, '{')
+check(name_input.text == '', 'malformed paste clears automatic suggestion safely')
+check(set(protected.specialization) == {'class', 'name', 'id', 'source'}, 'only essential specialization metadata retained')
+check(protected.protectionPaladin is None and protected.rotation is None and protected.talentsString is None, 'spec options and talents not stored')
 # Disabled SavedVariables means a reload starts with a new session database.
 lua.execute('WSGSDB = nil')
 core_frame.scripts.OnEvent(core_frame, 'ADDON_LOADED', 'WoWSimGearSync')

@@ -103,7 +103,7 @@ function WSGS:ValidateEquipment(document)
         end
     end
     if entryCount < 16 then warnings[#warnings + 1] = "Missing trailing positions were padded as empty." end
-    return { class = player.class, apiVersion = document.apiVersion, equipment = equipment,
+    return { class = player.class, specialization = self:DetectSpecialization(player), apiVersion = document.apiVersion, equipment = equipment,
         metadata = { entryCount = entryCount, equippedCount = equipped, warnings = warnings, schemaVersion = 1 } }
 end
 
@@ -140,7 +140,9 @@ function WSGS:ImportEquipment(text, requestedName)
     local sequence = global.nextSimulationProfileId or 1
     while global.simulationProfiles["import-" .. sequence] do sequence = sequence + 1 end
     profile.id = "import-" .. sequence
-    profile.name = name ~= "" and name or "Imported Build " .. sequence
+    local spec = profile.specialization
+    local suggestion = spec.id and (spec.class .. " - " .. spec.name)
+    profile.name = name ~= "" and name or suggestion or "Imported Build " .. sequence
     profile.metadata.importedAt = time()
     profile.metadata.addonVersion = self.version
     profile.metadata.source = "WoW Sims API v3"

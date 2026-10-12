@@ -11,6 +11,23 @@ function WSGS:ToggleWindow()
     end
 end
 
+-- Own only automatically generated names; any user edit gives control to them.
+function WSGS:UpdateSuggestedProfileName(nameInput, text)
+    if nameInput.userEdited or (nameInput:GetText() ~= "" and nameInput:GetText() ~= nameInput.suggestedName) then
+        return
+    end
+    local suggestion = ""
+    if #text <= 1048576 then
+        local ok, document = pcall(C_EncodingUtil.DeserializeJSON, text)
+        if ok and type(document) == "table" and document.apiVersion == 3 and type(document.player) == "table" then
+            local spec = self:DetectSpecialization(document.player)
+            if spec.id then suggestion = spec.class .. " - " .. spec.name end
+        end
+    end
+    nameInput.suggestedName = suggestion
+    if nameInput:GetText() ~= suggestion then nameInput:SetText(suggestion) end
+end
+
 function WSGS:CreateWindow()
     local frame = CreateFrame("Frame", "WSGSMainWindow", UIParent)
     frame:Hide()
@@ -51,6 +68,9 @@ function WSGS:CreateWindow()
     nameInput:SetPoint("TOPLEFT", 25, -80)
     nameInput:SetAutoFocus(false)
     nameInput:SetMaxBytes(80)
+    nameInput:SetScript("OnTextChanged", function(self, userInput)
+        if userInput then self.userEdited = true end
+    end)
     nameInput:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     nameInput:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 
@@ -78,8 +98,19 @@ function WSGS:CreateWindow()
     input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     ScrollingEdit_OnLoad(input)
     input:SetScript("OnCursorChanged", ScrollingEdit_OnCursorChanged)
-    input:SetScript("OnUpdate", ScrollingEdit_OnUpdate)
+    local suggestionDelay
+    input:SetScript("OnUpdate", function(self, elapsed)
+        ScrollingEdit_OnUpdate(self, elapsed)
+        if suggestionDelay then
+            suggestionDelay = suggestionDelay - elapsed
+            if suggestionDelay <= 0 then
+                suggestionDelay = nil
+                WSGS:UpdateSuggestedProfileName(nameInput, self:GetText())
+            end
+        end
+    end)
     input:SetScript("OnTextChanged", function(self)
+        suggestionDelay = 0.25
         scroll:UpdateScrollChildRect()
         local range = scroll:GetVerticalScrollRange()
         if scroll:GetVerticalScroll() > range then
@@ -112,6 +143,7 @@ function WSGS:CreateWindow()
     importButton:SetScript("OnClick", function()
         input:ClearFocus()
         nameInput:ClearFocus()
+        WSGS:UpdateSuggestedProfileName(nameInput, input:GetText())
         local profile, reason = WSGS:ImportEquipment(input:GetText(), nameInput:GetText())
         if not profile then
             status:SetTextColor(1, 0.35, 0.35)
@@ -121,7 +153,7 @@ function WSGS:CreateWindow()
         status:SetTextColor(0.4, 1, 0.4)
         local metadata = profile.metadata
         local message = string.format("Imported %s (%s): %d entries, %d equipped, %d warnings.",
-            profile.name, tostring(profile.class), metadata.entryCount, metadata.equippedCount, #metadata.warnings)
+            profile.name, profile.specialization.class .. " - " .. profile.specialization.name, metadata.entryCount, metadata.equippedCount, #metadata.warnings)
         if #metadata.warnings > 0 then message = message .. "\n" .. metadata.warnings[1]:sub(1, 180) end
         status:SetText(message)
         local lines = {}
