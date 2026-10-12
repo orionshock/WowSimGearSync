@@ -7,7 +7,14 @@ Engineering.defaults = { [10] = 4898, [15] = 4897, [6] = 4223 }
 Engineering.effects = {
     [10] = { [126734] = 4898, [108788] = 4697, [109076] = 4698 },
     [15] = { [126389] = 4897 },
-    [6] = { [55004] = 4223 },
+    [6] = { [55004] = 4223, [131459] = 5000 },
+}
+
+-- Some use spells establish that a different engineering effect is present
+-- without uniquely identifying its SpellItemEnchantment row. Keep that
+-- distinction explicit instead of guessing an enchant effect ID.
+Engineering.knownDifferentEffects = {
+    [15] = { [55001] = "Parachute" },
 }
 
 function Engineering:CharacterContext()

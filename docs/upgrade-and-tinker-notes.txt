@@ -109,3 +109,10 @@ tooltip and no GetItemSpell return establish a missing use tinker (value 0).
 Unmapped effects and unavailable item data remain UNKNOWN. This extends the
 older glove-only behavior above; it does not parse unverified item-link fields.
 See managed-builds-notes.txt for source evidence and live validation.
+
+LIVE EFFECT OBSERVATIONS
+MoP SpellItemEnchantment data maps waist use spell 131459 to enchant 5000
+(Watergliding Jets). Cloak use spell 55001 identifies Parachute but is shared by
+enchant rows 3605 and 3859, so it establishes a known non-target effect without
+guessing which enchant row is present. Both observations are mismatches when the
+managed target requests the recommended Goblin Glider or Nitro Boosts.

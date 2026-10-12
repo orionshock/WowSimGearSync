@@ -116,8 +116,13 @@ function Inspector:Inspect(slotId, link)
     if effects then
         local ok, name, spellId = pcall(C_Item.GetItemSpell, link)
         local requestedItemData = false
+        local knownDifferent = WSGS.Engineering.knownDifferentEffects[slotId]
+            and WSGS.Engineering.knownDifferentEffects[slotId][spellId]
         if ok and effects[spellId] then
             result.tinker = known(effects[spellId], "C_Item.GetItemSpell / MoP SpellItemEnchantment mapping")
+        elseif ok and knownDifferent then
+            result.tinker = { status = "KNOWN", different = true, spellId = spellId, spellName = name,
+                source = "C_Item.GetItemSpell / known alternate engineering effect" }
         else
             result.tinker = unknown(not ok and "C_Item.GetItemSpell failed"
                 or not spellId and "C_Item.GetItemSpell returned nil"
@@ -135,7 +140,7 @@ function Inspector:Inspect(slotId, link)
         end
         local rawLink = type(link) == "string" and (link:match("|H(item:[^|]+)|h") or link) or tostring(link)
         local signature = table.concat({ rawLink, tostring(ok), tostring(spellId), tostring(name),
-            tostring(effects[spellId]), tostring(requestedItemData), result.tinker.status,
+            tostring(effects[spellId] or knownDifferent), tostring(requestedItemData), result.tinker.status,
             tostring(result.tinker.value) }, ":")
         self.tinkerDiagnostics = self.tinkerDiagnostics or {}
         if self.tinkerDiagnostics[slotId] ~= signature then
@@ -143,7 +148,8 @@ function Inspector:Inspect(slotId, link)
             WSGS:Debug(string.format(
                 "[ACTION][VERIFY] slot=%d type=TINKER item=%s getItemSpell=%s spellID=%s spellName=%s mapped=%s itemDataRequested=%s result=%s observed=%s reason=%s",
                 slotId, rawLink, ok and "ok" or "error", tostring(spellId), tostring(name),
-                tostring(effects[spellId]), tostring(requestedItemData), result.tinker.status, tostring(result.tinker.value),
+                tostring(effects[spellId] or knownDifferent), tostring(requestedItemData), result.tinker.status,
+                tostring(result.tinker.value or result.tinker.spellId),
                 result.tinker.reason or "none"))
         end
     else
