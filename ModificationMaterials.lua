@@ -39,11 +39,13 @@ local function guidFor(bag, slot)
     return ok and guid or nil
 end
 
-local function engineeringProfessionName()
+local function engineeringProfession()
     local first, second = GetProfessions()
     for _, professionIndex in pairs({ first, second }) do
-        local name, _, _, _, _, _, skillLine = GetProfessionInfo(professionIndex)
-        if skillLine == 202 then return name end
+        local name, _, _, _, numSpells, spellOffset, skillLine = GetProfessionInfo(professionIndex)
+        if skillLine == 202 then
+            return name, numSpells > 0 and spellOffset + 1 or nil
+        end
     end
 end
 
@@ -89,25 +91,21 @@ function Materials:ForEnchant(bags, enchantID)
     return spellID and bags.bySpell[spellID] or nil, itemID, spellID
 end
 
-function Materials:FindRecipeActionSlot(spellID)
-    for _, actionSlot in ipairs(C_ActionBar.FindSpellActionButtons(spellID) or {}) do
-        local actionType, actionID = GetActionInfo(actionSlot)
-        if actionType == "spell" and actionID == spellID then return actionSlot end
-    end
-end
-
 function Materials:TinkerAvailability(bags, enchantID)
     local recipe = self.tinkerRecipes[enchantID]
     if not recipe then return nil, "No confirmed MoP tinker recipe mapping" end
     local recipeName = C_Spell.GetSpellName(recipe.spellID)
-    local professionName = engineeringProfessionName()
+    local professionName, professionSpellIndex = engineeringProfession()
     if not professionName then
         return nil, "Engineering profession is unavailable"
+    end
+    if not professionSpellIndex then
+        return nil, "Engineering profession spellbook action is unavailable"
     end
     for itemID, quantity in pairs(recipe.reagents) do
         if (bags.counts[itemID] or 0) < quantity then
             return nil, string.format("Missing item %d (%d required)", itemID, quantity)
         end
     end
-    return recipe, nil, recipeName, professionName
+    return recipe, nil, recipeName, professionName, professionSpellIndex
 end
