@@ -140,9 +140,13 @@ function Doll:Create()
         frame.slots[position] = button
         button.position = position
         button:SetSize(44, 44)
-        if position <= 6 then button:SetPoint("TOPLEFT", 18, -112 - (position - 1) * 54)
-        elseif position <= 14 then button:SetPoint("TOPRIGHT", -18, -112 - (position - 7) * 54)
-        else button:SetPoint("TOP", (position == 15 and -100 or 100), -548) end
+        local leftColumn = position <= 6 or position >= 15
+        if leftColumn then
+            local row = position <= 6 and position or position - 8
+            button:SetPoint("TOPLEFT", 18, -112 - (row - 1) * 54)
+        else
+            button:SetPoint("TOPRIGHT", -18, -112 - (position - 7) * 54)
+        end
         button.icon = button:CreateTexture(nil, "ARTWORK")
         button.icon:SetAllPoints()
         button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -150,16 +154,13 @@ function Doll:Create()
         button.quality:SetTexture("Interface\\Common\\WhiteIconFrame")
         button.quality:SetAllPoints()
         button.miniState = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        button.miniState:SetWidth(position <= 14 and 240 or 180)
-        if position <= 6 then
+        button.miniState:SetWidth(240)
+        if leftColumn then
             button.miniState:SetPoint("LEFT", button, "RIGHT", 8, 0)
             button.miniState:SetJustifyH("LEFT")
-        elseif position <= 14 then
+        else
             button.miniState:SetPoint("RIGHT", button, "LEFT", -8, 0)
             button.miniState:SetJustifyH("RIGHT")
-        else
-            button.miniState:SetPoint("TOP", button, "BOTTOM", 0, -4)
-            button.miniState:SetJustifyH("CENTER")
         end
         button:SetScript("OnEnter", function(b) self.hovered = b; self:ShowSlotTooltip(b) end)
         button:SetScript("OnLeave", function() self.hovered = nil; GameTooltip:Hide() end)

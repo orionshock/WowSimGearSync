@@ -27,7 +27,8 @@ or comparator logic is copied. Opening calls the existing scanner and comparator
 once; Render binds their exact targets, snapshot slots, differences and assignment
 objects. Empty/latest builds share the same 16 reusable buttons. Import sends an
 AceEvent message after saving; visible paper dolls refresh immediately.
-Two equipment columns and bottom main/off-hand slots use the authoritative
+Two equipment columns, with Main Hand then Off Hand below Wrist on the left,
+use the authoritative
 EquipmentSlots tokens with GetInventorySlotInfo for empty-slot textures.
 The existing portrait, close, and panel-button templates supply the frame shell.
 Escape closes it; background dragging moves it. Import shows the existing editor.
