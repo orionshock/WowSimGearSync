@@ -8,7 +8,7 @@ local tooltip = {}
 function tooltip:SetOwner() end
 function tooltip:ClearLines() end
 function tooltip:Hide() end
-function tooltip:SetInventoryItem(unit, slot) assert(unit == "player" and slot == 10); return available end
+function tooltip:SetInventoryItem(unit, slot) assert(unit == "player" and (slot == 10 or slot == 3)); return available end
 function tooltip:GetItem() return "Gloves", tooltipLink end
 function tooltip:GetRegions()
     local regions = {}
@@ -19,7 +19,7 @@ function tooltip:GetRegions()
     return unpack(regions)
 end
 WSGS.EquipmentInspector.tooltip = tooltip
-ITEM_UPGRADE_TOOLTIP_FORMAT = "Upgrade Level: %d/%d" -- Synthetic translation of the client's format contract.
+ITEM_UPGRADE_TOOLTIP_FORMAT = "Upgrade Level: %d/%d" -- Confirmed MoP Classic runtime format.
 C_Item.GetItemSpell = function(link)
     assert(link == currentLink)
     if spellId then return "Synthetic spell name", spellId end
@@ -32,13 +32,29 @@ local function scanCompare()
     return snapshot.slots[7].observations, assert(WSGS.EquipmentComparator:Compare(profile, snapshot)).slots[7].fields
 end
 for _, data in ipairs({ {2, 2, "FULLY_UPGRADED", "MATCH"}, {1, 2, "PARTIALLY_UPGRADED", "MISMATCH"},
-    {0, 2, "UNUPGRADED", "MISMATCH"}, {3, 4, "PARTIALLY_UPGRADED", "MISMATCH"}, {4, 4, "FULLY_UPGRADED", "MATCH"} }) do
+    {0, 2, "UNUPGRADED", "MISMATCH"}, {1, 4, "PARTIALLY_UPGRADED", "MISMATCH"}, {4, 4, "FULLY_UPGRADED", "MATCH"} }) do
     tooltipLines = { "Gloves", string.format(ITEM_UPGRADE_TOOLTIP_FORMAT, data[1], data[2]) }
     local observations, differences = scanCompare()
     check(observations.upgradeStep.value == data[1] and observations.upgradeMaximum.value == data[2], "actual tooltip current/maximum")
     check(observations.upgradeRemaining.value == data[2] - data[1] and observations.upgradeState.value == data[3], "remaining and progress classification")
     check(differences.upgradeStep.state == data[4] and differences.upgradeStep.expected == data[2], "maximum policy from observed tooltip")
 end
+-- Actual shoulder tooltip supplied by live MoP Classic testing.
+local gloveLink = currentLink
+currentLink = "item:99027:4803:76699:76699:::::90:160:66::::::::"
+tooltipLink = currentLink
+tooltipLines = { "Shoulderguards of Winged Triumph", "Celestial", "Item Level 536", "Upgrade Level: 2/2" }
+local shoulders = WSGS.EquipmentInspector:Inspect(3, currentLink)
+check(shoulders.upgradeStep.value == 2 and shoulders.upgradeMaximum.value == 2
+    and shoulders.upgradeRemaining.value == 0, "actual shoulder tooltip parses fully upgraded progress")
+local shoulderSnapshot = WSGS.EquipmentScanner:Scan()
+shoulderSnapshot.slots[3].id = 99027
+shoulders.item = { status = "KNOWN", value = 99027 }
+shoulderSnapshot.slots[3].observations = shoulders
+local shoulderResult = assert(WSGS.EquipmentComparator:Compare(profile, shoulderSnapshot))
+check(shoulderResult.slots[3].fields.upgradeStep.state == "MATCH", "actual shoulder maximum upgrade matches")
+currentLink, tooltipLink = gloveLink, gloveLink
+tooltipLines = { "Upgrade Level: 4/4" }
 local observations, differences = scanCompare()
 check(observations.enchant.value == 4430 and observations.tinker.value == 4898, "conventional enchant and tinker coexist")
 check(differences.enchant.state == "MATCH" and differences.tinker.state == "MATCH", "fixture enchant/tinker compare separately")

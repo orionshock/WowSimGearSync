@@ -20,28 +20,30 @@ end
 -- fallback. Positional %1$d/%2$d placeholders may reorder current/maximum.
 local function upgradePattern(format)
     if type(format) ~= "string" then return nil end
-    local pattern, order, position = {}, {}, 1
+    local pattern, order, position, valid = {}, {}, 1, true
     format = clean(format)
-    while position <= #format do
-        local tail = format:sub(position)
-        local ordinal = tail:match("^%%([12])%$d")
-        if ordinal then
-            order[#order + 1] = tonumber(ordinal)
-            pattern[#pattern + 1] = "(%d+)"
-            position = position + 4
-        elseif tail:sub(1, 2) == "%d" then
-            order[#order + 1] = #order + 1
-            pattern[#pattern + 1] = "(%d+)"
-            position = position + 2
-        elseif tail:sub(1, 2) == "%%" then
-            pattern[#pattern + 1] = "%%"
-            position = position + 2
-        else
-            if tail:sub(1, 1) == "%" then return nil end
-            pattern[#pattern + 1] = tail:sub(1, 1):gsub("(%W)", "%%%1")
-            position = position + 1
-        end
+    local function literal(text)
+        if text:find("%", 1, true) then valid = false end
+        return (text:gsub("(%W)", function(character) return "%" .. character end))
     end
+    -- Function replacements return captures literally, without gsub interpreting
+    -- the percent sign in (%d+) as a replacement escape.
+    format:gsub("()%%([12]?)(%$?)([%%d])()", function(first, ordinal, dollar, kind, after)
+        pattern[#pattern + 1] = literal(format:sub(position, first - 1))
+        if kind == "%" and ordinal == "" and dollar == "" then
+            pattern[#pattern + 1] = "%%"
+        elseif kind == "d" and ((ordinal == "" and dollar == "")
+            or (ordinal ~= "" and dollar == "$")) then
+            order[#order + 1] = tonumber(ordinal) or (#order + 1)
+            pattern[#pattern + 1] = "(%d+)"
+        else
+            valid = false
+        end
+        position = after
+        return ""
+    end)
+    pattern[#pattern + 1] = literal(format:sub(position))
+    if not valid then return nil end
     if #order ~= 2 or order[1] == order[2] then return nil end
     return "^" .. table.concat(pattern) .. "$", order
 end
