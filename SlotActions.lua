@@ -248,6 +248,18 @@ function Actions:TooltipLines(position)
     return lines
 end
 
+function Actions:ClickText(position)
+    local controller = self.controllers[position]
+    if not controller or controller.state == "WAITING_FOR_ITEM" then return nil end
+    local operation = controller.prepared or controller.pending or controller.lastFailed or controller.blocked[1]
+    local action = operation and labels[operation.type]
+    if controller.state == "READY" and action then return "Click to apply " .. action end
+    if controller.state == "PENDING" and action then return "Applying " .. action .. "..." end
+    if controller.state == "BLOCKED" and controller.lastFailed and action then return "Click to retry " .. action end
+    if controller.state == "BLOCKED" and action then return "Cannot apply " .. action end
+    return "No action needed"
+end
+
 function Actions:OnEvent(event, ...)
     local active, submitting
     for _, controller in pairs(self.controllers) do

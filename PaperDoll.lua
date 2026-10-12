@@ -71,14 +71,12 @@ function Doll:Render(profile, snapshot, comparison, reason)
         button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
         local state = visualState(target, button.difference)
         button.visualState = state
-        button.miniState:SetText(WSGS.SlotPresentation:MiniStates(button.difference))
+        button.miniState:SetText(WSGS.SlotPresentation:MiniStates(button.difference,
+            WSGS.SlotActions:ClickText(button.position)))
         local action = WSGS.SlotActions.controllers[position]
         local pending = action and action.state == "PENDING"
         button.icon:SetDesaturated(pending == true)
-        if not InCombatLockdown() then
-            button:SetEnabled(action ~= nil and not pending and (action.state == "READY"
-                or action.state == "BLOCKED" and action.lastFailed ~= nil))
-        end
+        if not InCombatLockdown() then button:Enable() end
     end
     if self.hovered and frame:IsShown() then self:ShowSlotTooltip(self.hovered) end
 end
@@ -244,6 +242,7 @@ function Doll:Create()
         button:SetScript("OnEnter", function(b) self.hovered = b; self:ShowSlotTooltip(b) end)
         button:SetScript("OnLeave", function() self.hovered = nil; GameTooltip:Hide() end)
         button:RegisterForClicks("LeftButtonUp")
+        button:SetAttribute("useOnKeyDown", false)
         button:SetAttribute("_onstate-combat", [[
             if newstate == "combat" then
                 self:SetAttribute("type1", nil)

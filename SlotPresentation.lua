@@ -7,23 +7,30 @@ local labels = { item = "Item", gems = "Gems", enchant = "Enchant", reforging = 
     upgradeStep = "Upgrade", tinker = "Tinker", buckle = "Buckle" }
 local statusLabels = { item = "Equipped", upgradeStep = "Upgraded", gems = "Gemmed",
     enchant = "Enchant", buckle = "Buckle", tinker = "Tinker", reforging = "Reforged" }
-local styles = {
-    MATCH = { "4dff66", "" }, MISMATCH = { "ffb326", "!" },
-    UNKNOWN = { "8cb3ff", "" }, NOT_APPLICABLE = { "999999", "" },
-}
-
-function Presentation:MiniStates(difference)
+function Presentation:MiniStates(difference, clickText)
     if not difference then return "" end
-    local badges = {}
+    local item = difference.fields.item
+    if not item or item.state == "UNKNOWN" then return "|cff8cb3ffEquipment unknown|r" end
+    if item.state ~= "MATCH" then return "|cffff4040Not equipped|r" end
+    local different, matching = {}, { statusLabels.item }
     for _, field in ipairs(self.fields) do
         local value = difference.fields[field]
-        if value and (field == "item" or value.state ~= "NOT_APPLICABLE") then
-            local style = styles[value.state]
-            local color = field == "item" and value.state == "MISMATCH" and "ff4040" or style[1]
-            badges[#badges + 1] = "|cff" .. color .. style[2] .. statusLabels[field] .. "|r"
+        if field ~= "item" and value and value.state ~= "NOT_APPLICABLE" then
+            if value.state == "MATCH" then
+                matching[#matching + 1] = statusLabels[field]
+            elseif value.state == "UNKNOWN" then
+                different[#different + 1] = labels[field] .. "?"
+            else
+                different[#different + 1] = labels[field]
+            end
         end
     end
-    return table.concat(badges, ", ")
+    local lines = {
+        "|cffffb326Different: " .. (#different > 0 and table.concat(different, ", ") or "None") .. "|r",
+        "|cff4dff66Matching: " .. table.concat(matching, ", ") .. "|r",
+    }
+    if clickText then lines[#lines + 1] = clickText end
+    return table.concat(lines, "\n")
 end
 
 local function itemText(item)
