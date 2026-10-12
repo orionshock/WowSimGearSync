@@ -14,6 +14,14 @@ local function setInfo(setID)
     return { id = setID, name = name, icon = icon }
 end
 
+local function specializationIcon(profile)
+    local specID = profile and profile.specialization and profile.specialization.id
+    if type(specID) ~= "number" then return nil, specID end
+    local ok, returnedID, _, _, icon = pcall(GetSpecializationInfoForSpecID, specID)
+    if not ok or returnedID ~= specID or type(icon) ~= "number" or icon <= 0 then return nil, specID end
+    return icon, specID
+end
+
 function Sync:Block(profile, reason)
     WSGS:Debug(string.format("[SET][BLOCK] build=%s setID=%s reason=%s",
         shown(profile and profile.name), shown(profile and profile.equipmentSetID), reason))
@@ -114,7 +122,7 @@ function Sync:CallSave(action, setID, name, icon)
     self.active = { eventSeen = false, action = action, setID = setID, name = name }
     local ok, problem = pcall(function()
         configureManagedSlots()
-        if action == "CREATE" then C_EquipmentSet.CreateEquipmentSet(name, nil)
+        if action == "CREATE" then C_EquipmentSet.CreateEquipmentSet(name, icon)
         else C_EquipmentSet.SaveEquipmentSet(setID, icon) end
     end)
     local restoreOK, restoreProblem = pcall(restoreIgnoredSlots, ignored)
@@ -140,16 +148,20 @@ function Sync:SetMatchesSnapshot(setID, snapshot)
     return #mismatches == 0, #mismatches > 0 and table.concat(mismatches, ",") or nil
 end
 
-function Sync:VerifySaved(profile, setID, snapshot, eventSeen)
+function Sync:VerifySaved(profile, setID, snapshot, eventSeen, desiredIcon)
     local info = setInfo(setID)
     if not info then return nil, "The saved set could not be found after synchronization." end
     if info.name ~= profile.name then
         return nil, "The client saved the set as '" .. info.name .. "' instead of '" .. profile.name .. "'."
     end
     local matches, difference = self:SetMatchesSnapshot(setID, snapshot)
-    WSGS:Debug(string.format("[SET][VERIFY] build=%s setID=%d nameMatch=yes itemsMatch=%s eventSeen=%s differences=%s",
-        shown(profile.name), setID, matches and "yes" or "no", eventSeen and "yes" or "no", shown(difference)))
+    local iconMatch = not desiredIcon or info.icon == desiredIcon
+    WSGS:Debug(string.format("[SET][VERIFY] build=%s setID=%d nameMatch=yes itemsMatch=%s desiredIcon=%s savedIcon=%s iconMatch=%s eventSeen=%s differences=%s",
+        shown(profile.name), setID, matches and "yes" or "no", shown(desiredIcon), shown(info.icon),
+        desiredIcon and (iconMatch and "yes" or "no") or "not-required",
+        eventSeen and "yes" or "no", shown(difference)))
     if not matches then return nil, "Saved set contents did not match equipped items: " .. (difference or "unknown") end
+    if not iconMatch then return nil, "The client did not apply the managed specialization icon." end
     profile.equipmentSetID, profile.equipmentSetName = setID, info.name
     return true
 end
@@ -169,36 +181,45 @@ function Sync:Run(profile, snapshot, batch)
     local comparison, problem = self:Check(profile, snapshot, batch)
     if not comparison then return self:Block(profile, "Target equipment is not fully verified: " .. problem) end
 
+    local icon, specID = specializationIcon(profile)
+    WSGS:Debug(string.format("[SET][CHECK] build=%s specID=%s resolvedIcon=%s decision=%s",
+        shown(profile.name), shown(specID), shown(icon), icon and "use-specialization-icon" or "preserve-existing-icon"))
+
     local set, resolveProblem = self:Resolve(profile)
     if resolveProblem then return self:Block(profile, resolveProblem) end
     if not set then
         if C_EquipmentSet.GetNumEquipmentSets() >= MAX_EQUIPMENT_SETS_PER_PLAYER then
             return self:Block(profile, "The Equipment Manager set limit has been reached.")
         end
-        WSGS:Debug(string.format("[SET][CREATE] build=%s setID=nil action=C_EquipmentSet.CreateEquipmentSet",
-            shown(profile.name)))
-        local ok, callProblem, eventSeen = self:CallSave("CREATE", nil, profile.name)
+        WSGS:Debug(string.format("[SET][CREATE] build=%s setID=nil specID=%s icon=%s action=C_EquipmentSet.CreateEquipmentSet",
+            shown(profile.name), shown(specID), shown(icon)))
+        local ok, callProblem, eventSeen = self:CallSave("CREATE", nil, profile.name, icon)
         if not ok then return self:Block(profile, "CreateEquipmentSet failed: " .. callProblem) end
         local setID = C_EquipmentSet.GetEquipmentSetID(profile.name)
         if not setID then return self:Block(profile, "The created set was not returned by name lookup.") end
-        local verified, verifyProblem = self:VerifySaved(profile, setID, snapshot, eventSeen)
+        local verified, verifyProblem = self:VerifySaved(profile, setID, snapshot, eventSeen, icon)
         if not verified then return self:Block(profile, verifyProblem) end
         WSGS:Debug(string.format("[SET][CREATE] build=%s setID=%d result=verified", shown(profile.name), setID))
         return true
     end
 
     local changed, eventSeen = false, false
-    if set.name ~= profile.name then
-        WSGS:Debug(string.format("[SET][UPDATE] build=%s setID=%d action=C_EquipmentSet.ModifyEquipmentSet oldName=%s",
-            shown(profile.name), set.id, shown(set.name)))
-        self.active = { eventSeen = false, action = "RENAME", setID = set.id, name = profile.name }
-        local ok, renameProblem = pcall(C_EquipmentSet.ModifyEquipmentSet, set.id, profile.name, set.icon)
+    local nameUpdate, iconUpdate = set.name ~= profile.name, icon and set.icon ~= icon or false
+    WSGS:Debug(string.format("[SET][CHECK] build=%s setID=%d specID=%s resolvedIcon=%s existingIcon=%s nameUpdate=%s iconUpdate=%s",
+        shown(profile.name), set.id, shown(specID), shown(icon), shown(set.icon),
+        nameUpdate and "yes" or "no", iconUpdate and "yes" or "no"))
+    if nameUpdate or iconUpdate then
+        local updatedIcon = icon or set.icon
+        WSGS:Debug(string.format("[SET][UPDATE] build=%s setID=%d action=C_EquipmentSet.ModifyEquipmentSet oldName=%s oldIcon=%s newIcon=%s",
+            shown(profile.name), set.id, shown(set.name), shown(set.icon), shown(updatedIcon)))
+        self.active = { eventSeen = false, action = "MODIFY", setID = set.id, name = profile.name }
+        local ok, renameProblem = pcall(C_EquipmentSet.ModifyEquipmentSet, set.id, profile.name, updatedIcon)
         eventSeen = self.active.eventSeen
         self.active = nil
         if not ok then return self:Block(profile, "ModifyEquipmentSet failed: " .. tostring(renameProblem)) end
         local renamed = setInfo(set.id)
-        if not renamed or renamed.name ~= profile.name then
-            return self:Block(profile, "The client did not apply the managed build name.")
+        if not renamed or renamed.name ~= profile.name or icon and renamed.icon ~= icon then
+            return self:Block(profile, "The client did not apply the managed set name or specialization icon.")
         end
         set, changed = renamed, true
     end
@@ -213,7 +234,7 @@ function Sync:Run(profile, snapshot, batch)
         if not ok then return self:Block(profile, "SaveEquipmentSet failed: " .. callProblem) end
         changed = true
     end
-    local verified, verifyProblem = self:VerifySaved(profile, set.id, snapshot, eventSeen)
+    local verified, verifyProblem = self:VerifySaved(profile, set.id, snapshot, eventSeen, icon)
     if not verified then return self:Block(profile, verifyProblem) end
     WSGS:Debug(string.format("[SET][UPDATE] build=%s setID=%d result=%s",
         shown(profile.name), set.id, changed and "verified" or "already-current"))
