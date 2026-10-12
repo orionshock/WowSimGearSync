@@ -132,8 +132,8 @@ C_Item.GetItemGUID = function() error("unavailable identity") end
 scanned = WSGS.EquipmentScanner:Scan()
 check(scanned.slots[1].observations.gems.values[1].status == "UNKNOWN" and scanned.slots[1].observations.instance.status == "UNKNOWN", "uncached gem/identity errors handled")
 -- Compare summary is concise by default; detailed slots are debug-only.
-WSGS.db.global.simulationProfiles = {}
-WSGS.db.global.latestSimulationProfileId = nil
+WSGS.db.char.simulationProfiles = {}
+WSGS.db.char.latestSimulationProfileId = nil
 chat = {}
 SlashCmdList.ACECONSOLE_WSGS("compare")
 check(#chat == 1 and chat[1]:find("Import a WoW Sims build"), "no build diagnostic")
@@ -141,13 +141,13 @@ local decoded = { apiVersion = 3, player = { class = "ClassPaladin", equipment =
 for index = 1, 16 do decoded.player.equipment.items[index] = { id = 2000 + WSGS.equipmentSlots[index].id } end
 local imported = assert(WSGS:ValidateEquipment(decoded))
 imported.id, imported.name = "diagnostic", "Diagnostic build"
-WSGS.db.global.simulationProfiles.diagnostic = imported
-WSGS.db.global.latestSimulationProfileId = "diagnostic"
-WSGS.db.global.settings.debug = false
+WSGS.db.char.simulationProfiles.diagnostic = imported
+WSGS.db.char.latestSimulationProfileId = "diagnostic"
+WSGS.db.profile.debug = false
 chat = {}
 SlashCmdList.ACECONSOLE_WSGS("compare")
 check(#chat == 5, "only summary by default")
-WSGS.db.global.settings.debug = true
+WSGS.db.profile.debug = true
 chat = {}
 SlashCmdList.ACECONSOLE_WSGS("compare")
 check(#chat == 117, "debug emits sixteen slot detail blocks")
@@ -163,7 +163,7 @@ result = compare(profile, snapshot)
 check(result.assignments[11] == 11 and result.assignments[13] == 13, "equal scores keep physical assignment")
 -- Successful imports choose the latest build; failures leave that choice intact.
 local latest = assert(WSGS:ImportEquipment('{"apiVersion":3,"player":{"class":"ClassPaladin","equipment":{"items":[]}}}', "Latest"))
-check(WSGS.db.global.latestSimulationProfileId == latest.id, "new import is latest")
+check(WSGS.db.char.latestSimulationProfileId == latest.id, "new import is latest")
 WSGS:ImportEquipment("{", "Invalid")
-check(WSGS.db.global.latestSimulationProfileId == latest.id, "failed import does not change latest")
+check(WSGS.db.char.latestSimulationProfileId == latest.id, "failed import does not change latest")
 return checks

@@ -2,8 +2,8 @@ local _, WSGS = ...
 local labels = { item = "Item", gems = "Gems", enchant = "Enchant", reforging = "Reforge", upgradeStep = "Upgrade", tinker = "Tinker" }
 
 function WSGS:CompareLatestEquipment()
-    local global = self.db.global
-    local profile = global.simulationProfiles[global.latestSimulationProfileId]
+    local character = self.db.char
+    local profile = character.simulationProfiles[character.latestSimulationProfileId]
     if not profile then
         self:Print("[COMPARE] Import a WoW Sims build before comparing equipment.")
         return
@@ -16,7 +16,7 @@ function WSGS:CompareLatestEquipment()
     self:Print("[COMPARE] Item mismatches: " .. summary.itemMismatches)
     self:Print("[COMPARE] Configuration mismatches: " .. summary.configurationMismatches)
     self:Print("[COMPARE] Unknown observations: " .. summary.unknown .. " (required fields; gems counted per socket)")
-    if global.settings.debug then
+    if self.db.profile.debug then
         for _, slot in ipairs(result.slots) do
             local prefix = string.format("[SLOT:%02d] ", slot.position)
             self:Debug(prefix .. slot.slotName .. " (inventory " .. slot.currentSlotId ..

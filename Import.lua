@@ -125,9 +125,9 @@ function WSGS:ImportEquipment(text, requestedName)
         self:Debug("[IMPORT] Import failed: " .. reason)
         return nil, reason
     end
-    local global = self.db.global
-    local sequence = global.nextSimulationProfileId or 1
-    while global.simulationProfiles["import-" .. sequence] do sequence = sequence + 1 end
+    local character = self.db.char
+    local sequence = character.nextSimulationProfileId or 1
+    while character.simulationProfiles["import-" .. sequence] do sequence = sequence + 1 end
     profile.id = "import-" .. sequence
     local spec = profile.specialization
     local suggestion = spec.id and (spec.class .. " - " .. spec.name)
@@ -135,9 +135,9 @@ function WSGS:ImportEquipment(text, requestedName)
     profile.metadata.importedAt = time()
     profile.metadata.addonVersion = self.version
     profile.metadata.source = "WoW Sims API v3"
-    global.simulationProfiles[profile.id] = profile
-    global.nextSimulationProfileId = sequence + 1
-    global.latestSimulationProfileId = profile.id
+    character.simulationProfiles[profile.id] = profile
+    character.nextSimulationProfileId = sequence + 1
+    character.latestSimulationProfileId = profile.id
     self:Debug("[IMPORT] API version: " .. profile.apiVersion)
     self:Debug("[IMPORT] Equipment entries: " .. profile.metadata.entryCount)
     self:Debug("[IMPORT] Profile saved: " .. profile.name)

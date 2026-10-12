@@ -3,8 +3,10 @@ local addonName, WSGS = ...
 WSGS.version = "0.3.0"
 
 local defaults = {
-    global = {
-        settings = { debug = false },
+    profile = {
+        debug = true,
+    },
+    char = {
         simulationProfiles = {},
     },
 }
@@ -15,7 +17,7 @@ function WSGS:Print(message)
 end
 
 function WSGS:Debug(message)
-    if self.db and self.db.global.settings.debug then
+    if self.db and self.db.profile.debug then
         self:Print(message)
     end
 end
@@ -49,8 +51,8 @@ function WSGS:HandleCommand(message)
     if command == "" then
         WSGS:ToggleWindow()
     elseif command == "debug" then
-        WSGS.db.global.settings.debug = not WSGS.db.global.settings.debug
-        WSGS:Print("Debug " .. (WSGS.db.global.settings.debug and "enabled." or "disabled."))
+        WSGS.db.profile.debug = not WSGS.db.profile.debug
+        WSGS:Print("Debug " .. (WSGS.db.profile.debug and "enabled." or "disabled."))
     elseif command == "compare" then
         self:CompareLatestEquipment()
     elseif command:match("^probe%s+%d+$") then

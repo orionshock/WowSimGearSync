@@ -63,6 +63,9 @@ for file in files:
 core_frame = lua.globals().frames[2]
 core_frame.scripts.OnEvent(core_frame, 'ADDON_LOADED', 'WoWSimGearSync')
 wsgs = lua.globals().WSGS
+# Exercise quiet operation explicitly while preserving the developer's debug default.
+wsgs.db.profile.debug = False
+lua.execute('chat = {}')
 fixture = json.loads((ROOT/'tests/fixtures/synthetic-paladin-v3.json').read_text())
 checks = 0
 
@@ -76,7 +79,7 @@ def import_doc(document, name=''):
     return result if isinstance(result, tuple) else (result, None)
 
 def count_profiles():
-    return len(list(wsgs.db['global'].simulationProfiles))
+    return len(list(wsgs.db.char.simulationProfiles))
 
 profile, error = import_doc(fixture, 'Synthetic Retribution')
 check(profile is not None and error is None, 'full fixture imports')
@@ -98,7 +101,7 @@ check(second.id != profile.id and count_profiles() == 2, 'same name creates dist
 check(profile.metadata.importedAt == 1234567890 and profile.apiVersion == 3, 'metadata')
 check(len(lua.globals().chat) == 0, 'debug off is silent')
 lua.globals().SlashCmdList.ACECONSOLE_WSGS('debug')
-check(wsgs.db['global'].settings.debug, 'slash debug toggles')
+check(wsgs.db.profile.debug, 'slash debug toggles')
 short = copy.deepcopy(fixture)
 short['player']['equipment']['items'] = []
 empty, _ = import_doc(short)
@@ -243,7 +246,17 @@ check(protected.protectionPaladin is None and protected.rotation is None and pro
 # Disabled SavedVariables means a reload starts with a new session database.
 lua.execute('WSGSDB = nil')
 core_frame.scripts.OnEvent(core_frame, 'ADDON_LOADED', 'WoWSimGearSync')
-check(not wsgs.db['global'].settings.debug and count_profiles() == 0, 'new session resets builds and debug')
+check(wsgs.db.profile.debug and count_profiles() == 0, 'new session resets builds and restores debug default')
 check(not any(line.startswith('## SavedVariables:') for line in (ROOT/'WoWSimGearSync.toc').read_text().splitlines()), 'persistence disabled in manifest')
 equipment_checks = lua.compile((ROOT/'tests/test_equipment.lua').read_text(encoding='utf-8-sig'), name='tests/test_equipment.lua')(wsgs)
+# AceDB settings profiles vary independently from character-owned builds.
+latest_id = wsgs.db.char.latestSimulationProfileId
+previous_profile = wsgs.db.GetCurrentProfile(wsgs.db)
+wsgs.db.profile.debug = False
+wsgs.db.SetProfile(wsgs.db, 'Scope test')
+check(wsgs.db.profile.debug, 'new AceDB profile inherits debug default')
+check(wsgs.db.char.latestSimulationProfileId == latest_id, 'settings profile switch preserves character builds')
+wsgs.db.SetProfile(wsgs.db, previous_profile)
+check(not wsgs.db.profile.debug, 'previous settings profile retains its own debug value')
+check(wsgs.db.char.simulationProfiles[latest_id] is not None, 'character collection independent of settings profile')
 print(f'PASS: {checks} importer checks and {equipment_checks} equipment checks under {lua.eval("_VERSION")}; all TOC Lua files compile; real AceDB, mocked client APIs')
