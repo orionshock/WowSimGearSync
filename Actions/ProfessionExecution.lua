@@ -55,11 +55,6 @@ end
 
 local function showAllRecipes(request, operation)
     local previousNameFilter = GetTradeSkillItemNameFilter()
-    TradeSkillOnlyShowSkillUps(false)
-    TradeSkillOnlyShowMakeable(false)
-    SetTradeSkillSubClassFilter(-1, 1, 1)
-    SetTradeSkillInvSlotFilter(-1, 1, 1)
-    SetTradeSkillItemLevelFilter(0, 0)
     SetTradeSkillItemNameFilter("")
     for index = GetNumTradeSkills(), 1, -1 do
         local _, skillType, _, isExpanded = GetTradeSkillInfo(index)
@@ -67,7 +62,7 @@ local function showAllRecipes(request, operation)
             ExpandTradeSkillSubClass(index)
         end
     end
-    debug("EXEC", string.format("slot=%d type=%s filters=cleared previousName=%s entries=%d",
+    debug("EXEC", string.format("slot=%d type=%s nameFilter=cleared previousName=%s entries=%d",
         request.inventorySlot, operation.type, valueText(previousNameFilter), GetNumTradeSkills()))
 end
 
