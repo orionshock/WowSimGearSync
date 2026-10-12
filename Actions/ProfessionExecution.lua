@@ -53,21 +53,28 @@ local function openProfession(request, operation, profession, skillLine)
     return true
 end
 
-local function showAllRecipes(request, operation)
+local function prepareRecipeList(request, operation)
     local previousNameFilter = GetTradeSkillItemNameFilter()
-    SetTradeSkillItemNameFilter("")
+    if previousNameFilter and previousNameFilter ~= "" then
+        SetTradeSkillItemNameFilter("")
+        debug("EXEC", string.format("slot=%d type=%s nameFilter=cleared previousName=%s", request.inventorySlot,
+            operation.type, previousNameFilter))
+    end
+
+    local expanded = 0
     for index = GetNumTradeSkills(), 1, -1 do
         local _, skillType, _, isExpanded = GetTradeSkillInfo(index)
         if skillType == "header" and not isExpanded then
             ExpandTradeSkillSubClass(index)
+            expanded = expanded + 1
         end
     end
-    debug("EXEC", string.format("slot=%d type=%s nameFilter=cleared previousName=%s entries=%d",
-        request.inventorySlot, operation.type, valueText(previousNameFilter), GetNumTradeSkills()))
+    debug("EXEC", string.format("slot=%d type=%s headersExpanded=%d entries=%d", request.inventorySlot,
+        operation.type, expanded, GetNumTradeSkills()))
 end
 
 local function resolveRecipe(request, operation)
-    showAllRecipes(request, operation)
+    prepareRecipeList(request, operation)
     local candidates = {}
     for _, spellID in ipairs(operation.recipeSpellIDs or {operation.spellID}) do
         candidates[spellID] = true
