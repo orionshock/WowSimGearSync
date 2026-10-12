@@ -4,7 +4,7 @@ LibStub("AceAddon-3.0"):NewAddon(WSGS, addonName, "AceConsole-3.0", "AceEvent-3.
 WSGS.version = "0.3.0"
 
 local defaults = {
-    profile = { debug = true },
+    profile = { debug = true, minimap = { hide = false, minimapPos = 225 } },
     char = { simulationProfiles = {} },
 }
 
@@ -20,5 +20,12 @@ end
 function WSGS:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
     self:RegisterCommands()
+    self:InitializeLauncher()
+    self:RegisterMessage("WSGS_BUILD_IMPORTED", function() self.PaperDoll:Refresh() end)
     self:Debug("Loaded version " .. self.version .. ".")
+end
+
+function WSGS:GetActiveSimulationProfile()
+    local character = self.db.char
+    return character.simulationProfiles[character.latestSimulationProfileId]
 end

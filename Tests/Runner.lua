@@ -1,5 +1,5 @@
 local _, WSGS = ...
-local Tests = { suites = {}, order = { "scanner", "comparator", "importer" } }
+local Tests = { suites = {}, order = { "scanner", "comparator", "importer", "ui" } }
 WSGS.Tests = Tests
 
 function Tests:Register(name, title, cases)
@@ -11,7 +11,7 @@ function Tests:Run(name)
     name = name == "" and "all" or name or "all"
     local selected = name == "all" and self.order or { name }
     if name ~= "all" and not self.suites[name] then
-        WSGS:Print("[TEST] Unknown suite. Use all, scanner, comparator, or importer.")
+        WSGS:Print("[TEST] Unknown suite. Use all, scanner, comparator, importer, or ui.")
         return
     end
     local totals = { passed = 0, failed = 0, skipped = 0 }

@@ -16,6 +16,9 @@ Libs\AceConfig-3.0\AceConfigCmd-3.0\AceConfigCmd-3.0.lua
 Libs\AceConfig-3.0\AceConfig-3.0.lua
 Libs\AceTab-3.0\AceTab-3.0.lua
 
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
 Core.lua
 Commands.lua
 Specialization.lua
@@ -27,8 +30,11 @@ EquipmentScanner.lua
 EquipmentComparator.lua
 EquipmentDiagnostics.lua
 Window.lua
+PaperDoll.lua
+Launcher.lua
 Tests\Runner.lua
 Tests\Fixture.lua
 Tests\Scanner.lua
 Tests\Comparator.lua
 Tests\Importer.lua
+Tests\UI.lua

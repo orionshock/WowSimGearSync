@@ -1,0 +1,20 @@
+LibDataBroker-1.1, minor 4, by Tekkub
+Upstream source/documentation: https://github.com/tekkub/libdatabroker-1-1
+The local library and upstream repository supply no separate license text.
+The maintainer's project lists All Rights Reserved and explicitly instructs addon
+authors to hard-embed this library:
+https://www.wowace.com/projects/libdatabroker-1-1 (Note to addon authors).
+This unmodified copy is embedded for that documented purpose, with its original
+README and attribution retained. No broader license or public-domain dedication
+is asserted.
+
+LibDBIcon-1.0, minor 56, by Funkydude; credits Rabbit and copystring
+Upstream: https://www.wowace.com/projects/libdbicon-1-0
+License: GNU GPL version 2 or later, as identified in the locally installed
+LibDBIcon-1.0.toc at C:\WoWAddons\Gargul\Libs\LibDBIcon-1.0.
+The GPL v2 text is included in LibDBIcon-1.0/COPYING.txt, copied verbatim from
+the local AtlasLootClassic license. This applies to the library, not an invented
+license grant for unrelated source. Library source is unmodified.
+
+Both use the existing LibStub and CallbackHandler; no duplicate dependencies
+are bundled. Headers and embedded author/project notices are retained.

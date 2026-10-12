@@ -1,0 +1,99 @@
+Task 012: Broker launcher and read-only differential paper doll
+
+LIBRARIES
+Unmodified local copies from C:\WoWAddons\AtlasLootClassic\Libs:
+LibDataBroker-1.1 minor 4 and LibDBIcon-1.0 minor 56. Both load after existing
+LibStub/CallbackHandler; no duplicate dependencies. License/provenance notices
+are in Libs/Broker-NOTICES.txt, the original LDB README is retained, and the
+GPL v2 text for LibDBIcon is included. The maintainer explicitly documents LDB
+hard-embedding at https://www.wowace.com/projects/libdatabroker-1-1.
+No missing upstream license grant is invented.
+
+LAUNCHER AND DATABASE
+Launcher.lua registers the WowSimGearSync LDB launcher, with the existing WoW
+INV_Chest_Plate04 texture. Left-click toggles PaperDoll; right-click toggles the
+existing import window. Tooltip shows active/latest build and mouse actions.
+LibDBIcon registers the same object. db.profile.minimap stores hide=false and
+minimapPos=225 defaults; dragging uses LibDBIcon's own position storage. AceDB
+profile changes/copies/resets rebind the minimap configuration. SavedVariables
+remains disabled, so position/settings/builds last only for this session.
+Active means db.char.latestSimulationProfileId, as in compare; no build selector
+or persistence has been introduced. Slash registration/dispatch is unchanged.
+
+PAPER DOLL
+PaperDoll.lua owns frame lifecycle and presentation, kept together as one
+cohesive UI module under the repository's 300-line review threshold. No scanner
+or comparator logic is copied. Opening calls the existing scanner and comparator
+once; Render binds their exact targets, snapshot slots, differences and assignment
+objects. Empty/latest builds share the same 16 reusable buttons. Import sends an
+AceEvent message after saving; visible paper dolls refresh immediately.
+Two equipment columns and bottom main/off-hand slots use the authoritative
+EquipmentSlots tokens with GetInventorySlotInfo for empty-slot textures.
+The existing portrait, close, and panel-button templates supply the frame shell.
+Escape closes it; background dragging moves it. Import shows the existing editor.
+Equip stays disabled and explicitly says automation is not implemented.
+Plain slot buttons have no click, drag, item-use or secure equipment handlers.
+
+Target item icons/names/quality come from C_Item.GetItemInfo/GetItemInfoInstant.
+Unknown names fall back to item IDs; unknown icons to the question mark. Quality
+borders remain intact, with a separate differential badge:
+= green: correct item, all requested/eligible modifications confirmed.
+~ amber: known configuration mismatch; ~? also has unknown fields.
+! red: target item is missing or wrong.
+? blue: required observations remain unknown.
+- gray: empty target (tooltip still shows any item mismatch).
+Tooltips show target/current links or IDs, every comparator field, numeric values,
+remaining upgrades, unknown reasons, and per-socket results. Resolved ring and
+trinket physical slots are taken directly from currentPosition/currentSlotId;
+assignment labels distinguish inferred pairing from observed inventory data.
+
+EVENTS AND CLIENT-SOURCE EVIDENCE
+C:\WoWAddons\BlizzardInterfaceCode\Interface\AddOns:
+Blizzard_SharedXML/Classic/SharedUIPanelTemplates.xml defines PortraitFrameTemplate,
+TitleContainer.TitleText, PortraitContainer.portrait, CloseButton and panel buttons.
+Blizzard_CharacterFrame/Cata/PaperDollFrame.lua:2476 calls GetInventorySlotInfo;
+PaperDollFrame.xml lists the same HeadSlot/Finger0Slot/SecondaryHandSlot conventions.
+The shared Classic/Cata character implementation is a local MoP reference, not
+a compatibility layer. Mists/PaperDollFrameUtil.lua is present in that addon.
+PLAYER_EQUIPMENT_CHANGED is registered by that source at lines 422,2522.
+Blizzard_APIDocumentationGenerated/ItemDocumentation.lua documents C_Item item
+info/instant/request APIs and GET_ITEM_INFO_RECEIVED/ITEM_DATA_LOAD_RESULT with
+itemID/success payloads. Classic/DressUpFrames.lua:165 uses C_Timer.After(0).
+
+OnShow registers those three events; OnHide unregisters all. Relevant item IDs
+are target/current IDs in the current render. Successful item-data events are
+filtered to those IDs; requests for uncached target data occur once per item per
+opening. Event bursts are coalesced with one deferred C_Timer.After(0) callback.
+There is no addon OnUpdate loop. Pending callbacks recheck visibility, so a closed
+doll does not scan. Metadata and scanner data remain separate responsibilities.
+
+TESTS AND EXACT IN-GAME CHECKS
+/reload
+Left-click the minimap icon (or LDB display entry); expect empty slots/import prompt.
+Right-click toggles the import window independently; /wsgs import still toggles it.
+Use the doll's Import button to show the editor. Paste/import your build.
+Expect 16 target slots, latest build heading, and comparator summary immediately.
+Hover all slots, especially rings/trinkets: verify resolved physical assignments.
+Check quality borders plus separate differential badges and per-field tooltips.
+Close with X/Escape; reopen. Confirm reuse and retained editor contents.
+With the doll visible, manually change gear if desired and observe refresh;
+the addon never changes gear. Check previously uncached target names/icons load.
+Verify Equip is disabled and slot clicks do nothing.
+/wsgs test ui
+/wsgs test all
+/wsgs test scanner
+/wsgs test comparator
+/wsgs test importer
+Repeat UI tests with the doll open and closed. UI tests restore the previous
+presentation/visibility, never save builds or change settings/equipment, and
+report SKIP for latest-build selection when none is imported. Eight UI cases
+are added to the existing 22. Summary counts are computed, never hardcoded.
+
+KNOWN LIMITATIONS / VALIDATION
+Static checks only: manifests/load order, source-copy hashes, license retention,
+30 registered cases, registration/API/source review, and git whitespace.
+No game-client run, visual inspection, Lua execution or test PASS is claimed.
+Actual frame layout, LDB/minimap clicks, item metadata caching and client events
+require the above runtime validation. Existing scanner UNKNOWN behavior remains;
+no new upgrade/tinker/modification inference was added. No 3D character model,
+automation, Equip queue, Equipment Manager, LDB settings UI, or Tab work is added.

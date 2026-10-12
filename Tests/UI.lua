@@ -1,0 +1,129 @@
+local _, WSGS = ...
+local Doll = WSGS.PaperDoll
+
+-- Exercise actual frames without changing builds/settings. Always restore the
+-- previous UI presentation/visibility, including when an assertion fails.
+local function withDoll(run)
+    local frame = Doll:Create()
+    local shown = frame:IsShown()
+    local profile, snapshot, comparison, reason = Doll.profile, Doll.snapshot, Doll.comparison, Doll.error
+    frame:Hide()
+    local ok, outcome, detail = pcall(run, frame)
+    frame:Hide()
+    Doll:Render(profile, snapshot, comparison, reason)
+    if shown then frame:Show() end
+    if not ok then error(outcome, 0) end
+    return outcome, detail
+end
+
+local function scenario()
+    local document = C_EncodingUtil.DeserializeJSON(WSGS.Tests.referenceJSON)
+    local reference = assert(WSGS:ValidateEquipment(document))
+    local profile, snapshot = { name = "Synthetic UI binding", equipment = {} }, { slots = {} }
+    for position, item in ipairs(reference.equipment) do
+        profile.equipment[position] = { id = item.id }
+        snapshot.slots[position] = { id = item.id, observations = {
+            item = { status = "KNOWN", value = item.id, present = true },
+            upgradeEligibility = { status = "KNOWN", value = false },
+        } }
+    end
+    return profile, snapshot
+end
+
+WSGS.Tests:Register("ui", "UI", {
+    { name = "Paper doll created with 16 reusable slot buttons", run = function()
+        withDoll(function(frame)
+            assert(Doll:Create() == frame and #frame.slots == 16)
+            for position, button in ipairs(frame.slots) do
+                assert(button:GetObjectType() == "Button" and button.position == position)
+                assert(button.icon and button.quality and button.indicator)
+            end
+        end)
+    end },
+    { name = "Empty build prompts import and clears slots", run = function()
+        withDoll(function(frame)
+            Doll:Render(nil)
+            assert(not Doll.profile and not Doll.comparison)
+            assert(frame.buildName:GetText() == "No active build" and frame.summary:GetText():find("Import", 1, true))
+            for _, button in ipairs(frame.slots) do assert(not button.target and button.visualState == "EMPTY") end
+        end)
+    end },
+    { name = "Latest imported build selected", run = function()
+        return withDoll(function(frame)
+            local expected = WSGS:GetActiveSimulationProfile()
+            if not expected then return "SKIP", "No imported build in this session" end
+            frame:Show()
+            assert(Doll.profile == expected and frame.buildName:GetText() == expected.name)
+        end)
+    end },
+    { name = "Comparator result and visual states bound directly", run = function()
+        withDoll(function(frame)
+            local profile, snapshot = scenario()
+            profile.equipment[3].enchant = 4803
+            snapshot.slots[3].observations.enchant = { status = "KNOWN", value = 0 }
+            snapshot.slots[4].observations.upgradeEligibility = { status = "UNKNOWN" }
+            snapshot.slots[5].id = 95757
+            snapshot.slots[5].observations.item.value = 95757
+            local comparison = assert(WSGS.EquipmentComparator:Compare(profile, snapshot))
+            Doll:Render(profile, snapshot, comparison)
+            for position, button in ipairs(frame.slots) do
+                assert(button.target == profile.equipment[position] and button.difference == comparison.slots[position])
+                assert(button.current == snapshot.slots[comparison.assignments[position]])
+            end
+            assert(frame.slots[1].visualState == "MATCH" and frame.slots[3].visualState == "CONFIGURATION")
+            assert(frame.slots[4].visualState == "UNKNOWN" and frame.slots[5].visualState == "MISMATCH")
+        end)
+    end },
+    { name = "Resolved ring and trinket assignments displayed", run = function()
+        withDoll(function(frame)
+            local profile, snapshot = scenario()
+            snapshot.slots[11], snapshot.slots[12] = snapshot.slots[12], snapshot.slots[11]
+            snapshot.slots[13], snapshot.slots[14] = snapshot.slots[14], snapshot.slots[13]
+            local comparison = assert(WSGS.EquipmentComparator:Compare(profile, snapshot))
+            Doll:Render(profile, snapshot, comparison)
+            for _, pair in ipairs({ {11,12}, {12,11}, {13,14}, {14,13} }) do
+                local button = frame.slots[pair[1]]
+                assert(comparison.assignments[pair[1]] == pair[2])
+                assert(button.current == snapshot.slots[pair[2]] and button.difference.currentPosition == pair[2])
+            end
+        end)
+    end },
+    { name = "Visibility toggles without rebuilding frames", run = function()
+        withDoll(function(frame)
+            Doll:Toggle()
+            assert(frame:IsShown())
+            Doll:Toggle()
+            assert(not frame:IsShown() and Doll.frame == frame)
+            for _, event in ipairs(Doll.events) do assert(not frame:IsEventRegistered(event)) end
+        end)
+    end },
+    { name = "Refresh events registered only while visible", run = function()
+        withDoll(function(frame)
+            frame:Show()
+            for _, event in ipairs(Doll.events) do assert(frame:IsEventRegistered(event)) end
+            assert(not frame:GetScript("OnUpdate"))
+            frame:Hide()
+            for _, event in ipairs(Doll.events) do assert(not frame:IsEventRegistered(event)) end
+            local snapshot = Doll.snapshot
+            Doll:Refresh()
+            assert(Doll.snapshot == snapshot, "Closed doll scanned equipment")
+        end)
+    end },
+    { name = "UI is read-only and launcher is registered", run = function()
+        withDoll(function(frame)
+            local before = {}
+            for position, slot in ipairs(WSGS.equipmentSlots) do before[position] = GetInventoryItemID("player", slot.id) end
+            assert(not frame.equipButton:IsEnabled())
+            for _, button in ipairs(frame.slots) do
+                assert(not button:GetScript("OnClick") and not button:GetScript("OnDragStart")
+                    and not button:GetAttribute("type"))
+            end
+            frame:Show(); frame:Hide()
+            for position, slot in ipairs(WSGS.equipmentSlots) do
+                assert(before[position] == GetInventoryItemID("player", slot.id), "Equipped item changed")
+            end
+            assert(LibStub("LibDataBroker-1.1"):GetDataObjectByName("WowSimGearSync") == WSGS.launcher)
+            assert(WSGS.launcher.type == "launcher" and LibStub("LibDBIcon-1.0"):IsRegistered("WowSimGearSync"))
+        end)
+    end },
+})

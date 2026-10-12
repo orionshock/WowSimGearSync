@@ -6,7 +6,7 @@ local function unknown(reason)
     return { status = "UNKNOWN", reason = reason }
 end
 
--- Confirmed event names for future consumers. No listeners or polling yet.
+-- Confirmed event names for consumers; the scanner itself owns no listeners.
 Scanner.rescanEvents = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }
 
 function Scanner:Scan(onlyPosition)

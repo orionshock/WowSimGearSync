@@ -88,8 +88,8 @@ Settings: db.profile.debug. Builds and latest/sequence tracking: db.char.
 SavedVariables remains disabled. Reimport after each /reload.
 Scanner.rescanEvents lists PLAYER_EQUIPMENT_CHANGED (PaperDollInfoDocumentation:
 209 and Cata/PaperDollFrame.lua:2522), GET_ITEM_INFO_RECEIVED and
-ITEM_DATA_LOAD_RESULT (ItemDocumentation.lua:1119,1130). No listeners or
-OnUpdate scanning were added. Scans occur only on compare/probe commands.
+ITEM_DATA_LOAD_RESULT (ItemDocumentation.lua:1119,1130). PaperDoll.lua listens while visible and coalesces relevant events with C_Timer.After.
+There is no OnUpdate polling; closed windows unregister their listeners.
 
 RUNTIME VERIFICATION
 /reload; import the supplied Paladin export; /wsgs debug; /wsgs compare.
@@ -103,7 +103,7 @@ plus its returned engineering spell ID and tooltip text for live confirmation. N
 fields will be decoded from field 11 or from unrelated colon positions.
 
 TESTING
-Run /wsgs test scanner, /wsgs test comparator, and /wsgs test importer inside
+Run /wsgs test scanner, /wsgs test comparator, /wsgs test importer, or /wsgs test ui inside
 MoP Classic, or /wsgs test for all suites. Tests/ contains real-client scanner
 checks and deterministic Lua domain tests. Tests never save simulation builds,
 change equipment, spend resources, or alter character settings. Equipment-

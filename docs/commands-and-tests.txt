@@ -13,7 +13,8 @@ invocations open/close it. Escape closes it, including while either input is foc
 Root /wsgs still shows native help.
 Core.lua retains AceAddon initialization and AceDB defaults. Settings remain
 in db.profile, simulation builds/sequence/latest tracking in db.char.
-SavedVariables remains commented out. No LDB or paper doll was added.
+SavedVariables remains commented out. The LDB launcher now opens the paper doll
+on left-click and toggles import on right-click; see paper-doll-notes.txt.
 
 LIBRARIES AND COMPLETION LIMITATION
 Unmodified library source: C:\WoWAddons\Ace3, Release-r1403.
@@ -33,9 +34,9 @@ AceTab remains bundled and loaded but no WSGS-specific completion set is
 registered. Physical Tab completion is unverified and is not claimed to work.
 No workaround, library patch, or manual hooks have been added.
 
-IN-GAME SUITES (22 CASES TOTAL)
+IN-GAME SUITES (30 CASES TOTAL)
 Tests/Runner.lua owns registration, protected execution, PASS/FAIL/SKIP, and
-actual summary counts. /wsgs test and /wsgs test all run all three suites.
+actual summary counts. /wsgs test and /wsgs test all run all four suites.
 Scanner (6): real client snapshots, slot mappings, repeated observations,
 live upgrade comparisons, optional item 95757 and glove tinker checks.
 Comparator (8): deterministic Lua snapshots, actual maxima, unknowns, wrong
@@ -43,6 +44,8 @@ items, interchangeable pairs, duplicate rings, captured links, empty slots.
 Importer (8): initialization/scopes and native command association, native JSON,
 retained Paladin reference, gear-only schema validation, optional and unknown
 fields, malformed documents, and specialization ambiguity.
+UI (8): frame reuse/slots, empty/latest build presentation, comparator binding,
+ring/trinket assignments, visibility, refresh listeners, and read-only controls.
 Equipment-dependent cases can SKIP. Tests do not alter equipment, settings,
 saved builds, import tracking, resources, or character configuration.
 
@@ -70,6 +73,7 @@ EXACT IN-GAME VALIDATION
 /wsgs test scanner
 /wsgs test comparator
 /wsgs test importer
+/wsgs test ui
 /wsgs test nonsense         (validation error)
 Reload clears session-only builds while SavedVariables is disabled. To open the existing import screen:
 /wsgs import                (toggle open/closed; Escape closes it, including focused inputs)
@@ -79,12 +83,12 @@ latest ID, next sequence, and debug should be unchanged by the test runner.
 In unsent chat type /wsgs co and press Tab, then /wsgs test sc and Tab.
 Check repeated Tab cycling with /wsgs followed by a space. Cancel with Escape.
 Report observed behavior; native library source does not wire these completions.
-22 passed, 0 failed, 0 skipped is a target when all equipment/data is present,
+30 passed, 0 failed, 0 skipped is a target when all equipment/data is present,
 not an asserted or hardcoded summary. Optional equipment may produce SKIPs.
 
 STATIC VALIDATION AND LIMITS
 Check TOC paths, dependency order, disabled SavedVariables, exactly one
 CreateChatCommand registration, absence of custom dispatch/completion code,
-22 suite cases, and git whitespace. No offline Python harness is present.
+30 suite cases, and git whitespace. No offline Python harness is present.
 The game client was not launched: command execution, native decoder behavior,
 test outcomes, and physical Tab behavior still require runtime validation.
