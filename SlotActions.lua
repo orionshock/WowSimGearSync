@@ -612,11 +612,21 @@ end
 
 function Actions:OnEnable()
     self.planSignatures = {}
-    for _, event in ipairs({"PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED", "SOCKET_INFO_UPDATE",
-                            "SOCKET_INFO_ACCEPT", "SOCKET_INFO_SUCCESS", "SOCKET_INFO_FAILURE", "SOCKET_INFO_CLOSE",
-                            "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
-                            "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "REPLACE_ENCHANT", "BIND_ENCHANT",
-                            "ACTION_WILL_BIND_ITEM", "PLAYER_REGEN_ENABLED"}) do
-        self:RegisterEvent(event)
-    end
+    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+    self:RegisterEvent("BAG_UPDATE_DELAYED")
+    self:RegisterEvent("ITEM_LOCK_CHANGED")
+    self:RegisterEvent("SOCKET_INFO_UPDATE")
+    self:RegisterEvent("SOCKET_INFO_ACCEPT")
+    self:RegisterEvent("SOCKET_INFO_SUCCESS")
+    self:RegisterEvent("SOCKET_INFO_FAILURE")
+    self:RegisterEvent("SOCKET_INFO_CLOSE")
+    self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    self:RegisterEvent("UNIT_SPELLCAST_FAILED")
+    self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+    self:RegisterEvent("TRADE_SKILL_SHOW")
+    self:RegisterEvent("TRADE_SKILL_UPDATE")
+    self:RegisterEvent("REPLACE_ENCHANT")
+    self:RegisterEvent("BIND_ENCHANT")
+    self:RegisterEvent("ACTION_WILL_BIND_ITEM")
+    self:RegisterEvent("PLAYER_REGEN_ENABLED")
 end
