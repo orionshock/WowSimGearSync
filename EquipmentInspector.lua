@@ -50,7 +50,7 @@ end
 
 function Inspector:Inspect(slotId, link)
     local result = {}
-    for _, field in ipairs(upgradeFields) do result[field] = unknown("Upgrade tooltip unavailable or no authoritative upgrade line") end
+    for _, field in ipairs(upgradeFields) do result[field] = unknown("Upgrade tooltip unavailable, unreadable, or inconsistent") end
     result.tinker = unknown("Engineering effect not established")
     local pattern, order = upgradePattern(ITEM_UPGRADE_TOOLTIP_FORMAT)
     if pattern then
@@ -77,13 +77,13 @@ function Inspector:Inspect(slotId, link)
             for _, region in ipairs({ tooltip:GetRegions() }) do
                 if region:GetObjectType() == "FontString" then
                     local value = region:GetText()
-                    if type(value) == "string" then text[#text + 1] = clean(value) end
+                    if type(value) == "string" and value:find("%S") then text[#text + 1] = clean(value) end
                 end
             end
             tooltip:Hide()
             return text
         end)
-        if ok and lines then
+        if ok and lines and #lines > 0 then
             local current, maximum, conflict
             for _, text in ipairs(lines) do
                 local a, b = text:match(pattern)
@@ -104,6 +104,15 @@ function Inspector:Inspect(slotId, link)
                 result.upgradeRemaining = known(maximum - current, source)
                 result.upgradeState = known(current == maximum and "FULLY_UPGRADED"
                     or current == 0 and "UNUPGRADED" or "PARTIALLY_UPGRADED", source)
+            elseif not current and not conflict then
+                -- Confirmed MoP behavior: populated tooltips always show an
+                -- upgrade line for eligible items, including 0/max and max/max.
+                local source = "GameTooltip:SetInventoryItem / no upgrade line"
+                result.upgradeEligibility = known(false, source)
+                result.upgradeState = known("NOT_UPGRADEABLE", source)
+                for _, field in ipairs({ "upgradeStep", "upgradeMaximum", "upgradeRemaining" }) do
+                    result[field] = { status = "NOT_APPLICABLE", reason = "Item does not support upgrades", source = source }
+                end
             end
         end
     end

@@ -69,9 +69,13 @@ Only the client-supplied localized ITEM_UPGRADE_TOOLTIP_FORMAT is compiled;
 no English fallback. %d and positional %1$d/%2$d work; color markers are removed.
 Two consistent integer captures establish current>=0, maximum>0, current<=max.
 Remaining=max-current. Conflicting/invalid lines stay UNKNOWN. A valid line
-establishes eligibility even at 0/max; no line does NOT establish ineligibility.
-Known non-upgradeable normalized observations yield NOT_APPLICABLE in the
-comparator, but the scanner currently cannot prove this classification live.
+establishes eligibility even at 0/max. Task 009 runtime confirmation establishes
+that eligible items always show this line: a successfully populated, identity-
+verified tooltip without one establishes upgradeEligibility=KNOWN false and
+upgradeState=NOT_UPGRADEABLE; progress fields and comparison are NOT_APPLICABLE.
+Item 95757 is a confirmed example, not a hardcoded exception. Empty, failed,
+stale, and inconsistent tooltips remain UNKNOWN. Ownership is renewed before
+each inspection so probe and complete scans use the same tooltip lifecycle.
 
 Observation fields: upgradeEligibility,upgradeStep,upgradeMaximum,
 upgradeRemaining,upgradeState,tinker. Known observations include method source.
@@ -101,6 +105,7 @@ TESTING
 python tests/test_import.py --runtime-path C:\Windows\Temp\wsgs-lua-test
 Tests exercise real addon code under Lua 5.1 with synthetic tooltip translations
 of the documented format and mocked source-backed APIs. They do not claim live
-API confirmation. Non-upgradeable and positively absent-tinker fixtures exercise
-normalized comparator contracts only; missing live observations stay UNKNOWN.
+API confirmation. Non-upgradeable item 95757 tests exercise the complete inspector/scanner/
+comparator path using runtime-confirmed no-upgrade-line behavior. Positively
+absent-tinker fixtures exercise normalized comparator contracts only.
 No game-client testing was performed by the agent.

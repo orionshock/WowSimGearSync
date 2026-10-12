@@ -70,10 +70,10 @@ check(observations.tinker.status == "UNKNOWN" and differences.tinker.state == "U
 spellId = 12345
 check(WSGS.EquipmentInspector:Inspect(10, currentLink).tinker.status == "UNKNOWN", "unmapped use effect not confused with engineering")
 spellId = 126734
-for _, lines in ipairs({ {}, { "Gloves", "Use: increases stats by 1920" }, { "Upgrade Level: 3/2" },
+for _, lines in ipairs({ {}, { "", "   " }, { "Upgrade Level: 3/2" },
     { "Upgrade Level: 0/0" }, { "Upgrade Level: 1/2", "Upgrade Level: 2/2" } }) do
     tooltipLines = lines
-    check(WSGS.EquipmentInspector:Inspect(10, currentLink).upgradeEligibility.status == "UNKNOWN", "absent/malformed/conflicting tooltip never means nonupgradeable")
+    check(WSGS.EquipmentInspector:Inspect(10, currentLink).upgradeEligibility.status == "UNKNOWN", "empty/malformed/conflicting tooltip stays unknown")
 end
 tooltipLines = { "|cffff0000Upgrade Level: 1/4|r" }
 check(WSGS.EquipmentInspector:Inspect(10, currentLink).upgradeMaximum.value == 4, "color markers do not affect authoritative pattern")
@@ -95,8 +95,8 @@ profile.equipment[7].id = 99999
 observations, differences = scanCompare()
 check(differences.tinker.state == "UNKNOWN" and differences.upgradeStep.state == "UNKNOWN", "incorrect target item blocks modification matches")
 profile.equipment[7].id = original
--- Non-upgradeability/confirmed missing tinker are normalized contracts only;
--- no local API evidence permits deriving either from a missing tooltip/spell.
+-- Confirmed missing tinker remains a normalized contract only; a missing
+-- use spell cannot distinguish absent and uncached effects.
 local snapshot = WSGS.EquipmentScanner:Scan(7)
 snapshot.slots[7].observations.upgradeEligibility = { status = "KNOWN", value = false, source = "synthetic contract" }
 snapshot.slots[7].observations.tinker = { status = "KNOWN", value = 0, source = "synthetic contract" }
@@ -172,8 +172,12 @@ for _, data in ipairs({ {2, 2, "MATCH", 0}, {1, 2, "MISMATCH", 1},
 end
 equipment[3].lines[4] = nil
 freshTooltip()
-assertUpgrade(WSGS:CompareLatestEquipment(), "UNKNOWN")
+assertUpgrade(WSGS:CompareLatestEquipment(), "NOT_APPLICABLE")
 WSGS:ProbeEquipment(3)
+assertUpgrade(WSGS:CompareLatestEquipment(), "NOT_APPLICABLE")
+equipment[3].lines = {}
+assertUpgrade(WSGS:CompareLatestEquipment(), "UNKNOWN")
+equipment[3].lines = { "", "   " }
 assertUpgrade(WSGS:CompareLatestEquipment(), "UNKNOWN")
 equipment[3].lines[4] = "Upgrade Level: 2/2"
 equipment[3].unavailable = true
@@ -183,6 +187,39 @@ equipment[3].id, equipment[3].link = 99999, "item:99999:4803:76699:76699:::::90:
 local wrong = WSGS:CompareLatestEquipment().slots[3].fields
 check(wrong.item.state == "MISMATCH" and wrong.upgradeStep.state == "UNKNOWN"
     and wrong.enchant.state == "UNKNOWN", "wrong equipped item cannot match modifications")
+-- Runtime-confirmed non-upgradeable example; all other tooltip lines are
+-- synthetic. No item-specific exception exists in production code.
+local originalTrinket = profile.equipment[14]
+profile.equipment[14] = { id = 95757 }
+equipment[14] = { id = 95757, link = "item:95757:0:::::::90:0:66::::::::",
+    lines = { "Primordius' Talisman of Rage", "Item Level 502" } }
+local function assertTrinket(state)
+    local comparison = WSGS:CompareLatestEquipment()
+    check(comparison.slots[14].fields.upgradeStep.state == state, "95757 complete comparison: " .. state)
+end
+freshTooltip()
+assertTrinket("NOT_APPLICABLE")
+local trinket = WSGS.EquipmentScanner:Scan(14).slots[14].observations
+check(trinket.upgradeEligibility.status == "KNOWN" and trinket.upgradeEligibility.value == false
+    and trinket.upgradeState.value == "NOT_UPGRADEABLE", "95757 populated tooltip proves ineligibility")
+check(trinket.upgradeStep.status == "NOT_APPLICABLE" and trinket.upgradeMaximum.status == "NOT_APPLICABLE"
+    and trinket.upgradeRemaining.status == "NOT_APPLICABLE", "nonupgradeable progress is not fabricated zero")
+WSGS:ProbeEquipment(14)
+assertTrinket("NOT_APPLICABLE")
+assertTrinket("NOT_APPLICABLE")
+equipment[14].lines = {}
+assertTrinket("UNKNOWN")
+equipment[14].lines = { "Primordius' Talisman of Rage" }
+equipment[14].unavailable = true
+assertTrinket("UNKNOWN")
+equipment[14].unavailable = nil
+local setInventory = reusable.SetInventoryItem
+reusable.SetInventoryItem = function() error("tooltip unavailable") end
+assertTrinket("UNKNOWN")
+reusable.SetInventoryItem = setInventory
+profile.equipment[14] = { id = 99999 }
+assertTrinket("UNKNOWN")
+profile.equipment[14] = originalTrinket
 CreateFrame = originalCreateFrame
 WSGS.db.char, WSGS.db.profile = originalCharacter, originalSettings
 WSGS.EquipmentInspector.tooltip = nil

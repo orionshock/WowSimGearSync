@@ -49,8 +49,11 @@ Every nonempty target is evaluated under policy=MAXIMUM independently of
 export upgradeStep. EquipmentInspector.lua reads current/maximum only from
 GameTooltip:SetInventoryItem using ITEM_UPGRADE_TOOLTIP_FORMAT, derives remaining
 and FULLY_UPGRADED/PARTIALLY_UPGRADED/UNUPGRADED, and never hardcodes the maximum.
-Missing, inconsistent, stale, or uncached tooltip information stays UNKNOWN;
-absence does not prove non-upgradeability. Empty slots are NOT_APPLICABLE.
+Empty, failed, inconsistent, stale, or uncached tooltip information stays UNKNOWN.
+Confirmed MoP behavior: a populated, identity-verified tooltip without an upgrade
+line establishes KNOWN false eligibility and NOT_APPLICABLE upgrade progress.
+Item 95757 is a confirmed example; no item exceptions are hardcoded.
+Empty inventory slots are NOT_APPLICABLE.
 Glove use effects from C_Item.GetItemSpell map to tinkers 4898, 4697, and 4698
 using corroborated local MoP SpellItemEnchantment data. Missing/unmapped use
 spells stay UNKNOWN. Neither tooltip inspection nor item-use-spell queries
