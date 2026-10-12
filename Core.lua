@@ -79,7 +79,7 @@ function WSGS:Debug(message)
     if self.db and self.db.profile.debug then self:Print(message) end
 end
 
-function WSGS:RegisterCommands()
+function WSGS:RegisterAceConfig()
     LibStub("AceConfig-3.0"):RegisterOptionsTable("WowSimGearSync", commandOptions)
     LibStub("AceConfigCmd-3.0"):CreateChatCommand("wsgs", "WowSimGearSync")
 end
@@ -98,7 +98,7 @@ end
 
 function WSGS:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
-    self:RegisterCommands()
+    self:RegisterAceConfig()
     self:RegisterDBIcon()
     self:Debug("Loaded version " .. self.version .. ".")
 end
