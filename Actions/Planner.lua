@@ -1,6 +1,8 @@
 local _, WSGS = ...
+local Internal = WSGS.ActionsInternal or {}
+WSGS.ActionsInternal = Internal
 local Planner = {}
-WSGS.SlotActionPlanner = Planner
+Internal.Planner = Planner
 
 local function targetGuid(current)
     local observed = current and current.observations and current.observations.instance
@@ -62,16 +64,15 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
         inventorySlot = controller.inventorySlot,
         target = target,
         fields = difference.fields,
-        bags = bags,
-        controller = controller
+        bags = bags
     }
     local professionSocket = difference.fields.professionSocket
     local buckle = difference.fields.buckle
     context.additionalSocketMissing = professionSocket and professionSocket.state == "MISMATCH" or
                                           buckle and buckle.state == "MISMATCH"
     context.availableSocketCount = professionSocket and professionSocket.actual or buckle and buckle.actual
-    for _, handlerName in ipairs(WSGS.SlotActionHandlers:ForSlot(controller.inventorySlot)) do
-        local handler = WSGS.SlotActionHandlers.handlers[handlerName]
+    for _, handlerName in ipairs(Internal.Handlers:ForSlot(controller.inventorySlot)) do
+        local handler = Internal.Handlers.handlers[handlerName]
         for _, operation in ipairs(handler:Check(context)) do
             local prepared, reason, retryable = handler:Prepare(context, operation)
             classify(controller, operation, prepared, reason, retryable)

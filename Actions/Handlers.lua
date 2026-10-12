@@ -1,8 +1,10 @@
 local _, WSGS = ...
+local Internal = WSGS.ActionsInternal or {}
+WSGS.ActionsInternal = Internal
 local Registry = {
     handlers = {}
 }
-WSGS.SlotActionHandlers = Registry
+Internal.Handlers = Registry
 local MaterialCatalog = WSGS.ModificationMaterials
 
 -- Inventory-slot capabilities in execution order. The imported target and the
@@ -28,6 +30,16 @@ Registry.SlotHandlers = {
 
 local function valueText(value)
     return value == nil and "nil" or tostring(value)
+end
+
+local function executionRequest(context, method)
+    return {
+        method = method,
+        operation = context.operation,
+        inventorySlot = context.inventorySlot,
+        targetItemID = context.target.id,
+        targetGUID = context.targetGuid
+    }
 end
 
 local function verify(context)
@@ -104,7 +116,7 @@ function AdditionalSockets:Prepare(context, operation)
     return operation
 end
 function AdditionalSockets:Apply(context)
-    return context.actions:ApplyPrepared(context)
+    return executionRequest(context, context.operation.method)
 end
 AdditionalSockets.Verify = verify
 
@@ -164,7 +176,7 @@ function Gems:Prepare(context, operation)
     return operation
 end
 function Gems:Apply(context)
-    return context.actions:ApplyPrepared(context)
+    return executionRequest(context, "GEM")
 end
 Gems.Verify = verify
 
@@ -206,7 +218,7 @@ function ItemEnhancement:Prepare(context, operation)
     return operation
 end
 function ItemEnhancement:Apply(context)
-    return context.actions:ApplyPrepared(context)
+    return executionRequest(context, "ITEM")
 end
 ItemEnhancement.Verify = verify
 
@@ -258,7 +270,7 @@ function ProfessionEnhancement:Prepare(context, operation)
     return operation
 end
 function ProfessionEnhancement:Apply(context)
-    return context.actions:ApplyPrepared(context)
+    return executionRequest(context, "PROFESSION")
 end
 ProfessionEnhancement.Verify = verify
 

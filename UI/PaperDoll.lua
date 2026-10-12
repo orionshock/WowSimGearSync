@@ -38,7 +38,8 @@ function UI:ShowSlotTooltip(button)
     for _, line in ipairs(Presentation:TooltipLines(button, WSGS.db.profile.debug)) do
         GameTooltip:AddLine(line, 1, 1, 1, true)
     end
-    for _, line in ipairs(WSGS.SlotActions:TooltipLines(button.position)) do
+    local actionState = WSGS.Actions:GetSlotState(button.position)
+    for _, line in ipairs(actionState.tooltipLines) do
         GameTooltip:AddLine(line, 1, 1, 1, true)
     end
     GameTooltip:Show()
@@ -97,10 +98,9 @@ function UI:RenderPaperDoll(profile, snapshot, comparison, reason)
         button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
         local state = visualState(target, button.difference)
         button.visualState = state
-        button.miniState:SetText(Presentation:MiniStates(button.difference, WSGS.SlotActions:ClickText(button.position)))
-        local action = WSGS.SlotActions.controllers[position]
-        local pending = action and action.state == "PENDING"
-        button.icon:SetDesaturated(pending == true)
+        local actionState = WSGS.Actions:GetSlotState(button.position)
+        button.miniState:SetText(Presentation:MiniStates(button.difference, actionState.clickText))
+        button.icon:SetDesaturated(actionState.pending)
         if not InCombatLockdown() then
             button:Enable()
         end
@@ -250,13 +250,7 @@ function UI:CreatePaperDoll()
             end
         ]])
         RegisterStateDriver(button, "combat", "[combat] combat; nocombat")
-        button:SetScript("PreClick", function(b)
-            WSGS.SlotActions:PreClick(b.position, b)
-        end)
-        button:SetScript("PostClick", function(b)
-            WSGS.SlotActions:PostClick(b.position, b)
-        end)
-        WSGS.SlotActions:RegisterButton(position, button)
+        WSGS.Actions:RegisterSlotButton(position, button)
     end
     local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     legend:SetPoint("CENTER", 0, 20)

@@ -284,13 +284,13 @@ function Actions:RefreshCurrentBuild()
     local profile = WSGS:GetActiveSimulationProfile()
     if not profile then
         self:Refresh(nil)
-        WSGS.SlotActions:Refresh()
+        WSGS.Actions:Refresh()
         return nil
     end
     local snapshot = WSGS.EquipmentScanner:Scan()
     local comparison, reason = WSGS.EquipmentComparator:Compare(profile, snapshot)
     self:Refresh(profile, snapshot)
-    WSGS.SlotActions:Refresh(profile, snapshot, comparison)
+    WSGS.Actions:Refresh(profile, snapshot, comparison)
     return profile, snapshot, comparison, reason
 end
 

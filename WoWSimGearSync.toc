@@ -35,10 +35,11 @@ EquipmentPlanner.lua
 EquipmentExecution.lua
 EquipmentSetSync.lua
 EquipmentActions.lua
-SlotActionHandlers.lua
-SlotActionPlanner.lua
-ProfessionEnhancementExecution.lua
-SlotActions.lua
+Actions\Presentation.lua
+Actions\Handlers.lua
+Actions\Planner.lua
+Actions\ProfessionExecution.lua
+Actions\Module.lua
 UI\Module.lua
 UI\SlotPresentation.lua
 UI\ImportDialog.lua
