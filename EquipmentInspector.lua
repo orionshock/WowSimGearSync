@@ -57,10 +57,12 @@ function Inspector:Inspect(slotId, link)
         local ok, lines = pcall(function()
             if not self.tooltip then
                 local tooltip = CreateFrame("GameTooltip", "WSGSEquipmentInspectionTooltip", nil, "GameTooltipTemplate")
-                tooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
                 self.tooltip = tooltip
             end
             local tooltip = self.tooltip
+            -- Hide ends the previous inspection; establish ownership for every
+            -- item, including subsequent slots in a complete equipment scan.
+            tooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
             tooltip:ClearLines()
             local hasItem = tooltip:SetInventoryItem("player", slotId)
             if not hasItem then tooltip:Hide(); return nil end

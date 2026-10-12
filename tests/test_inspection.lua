@@ -105,5 +105,85 @@ check(result.slots[7].fields.upgradeStep.state == "NOT_APPLICABLE", "known nonup
 check(result.slots[7].fields.tinker.state == "MISMATCH", "positively known absent tinker contract")
 C_Item.GetItemSpell = function() error("uncached") end
 check(WSGS.EquipmentInspector:Inspect(10, currentLink).tinker.status == "UNKNOWN", "item spell errors safe")
+-- Exercise command paths with the reusable tooltip lifecycle used by the
+-- local CharacterStatsPaneImproved scanner: ownership must be set after Hide.
+local originalCreateFrame = CreateFrame
+local originalCharacter, originalSettings = WSGS.db.char, WSGS.db.profile
+local equipment = {
+    [1] = { id = 99029, link = "item:99029:0:95344:76667:::::90:0:66::::::::", lines = { "Head", "Upgrade Level: 1/2" } },
+    [3] = { id = 99027, link = "item:99027:4803:76699:76699:::::90:160:66::::::::",
+        lines = { "Shoulderguards of Winged Triumph", "Celestial", "Item Level 536", "Upgrade Level: 2/2" } },
+}
+local reusable = { owned = false }
+function reusable:SetOwner() self.owned = true end
+function reusable:ClearLines() self.item = nil end
+function reusable:Hide() self.owned = false end
+function reusable:SetInventoryItem(unit, slot)
+    assert(unit == "player")
+    if not self.owned then return false end
+    self.item = equipment[slot]
+    return self.item ~= nil and not self.item.unavailable
+end
+function reusable:GetItem() return "Equipped item", self.item and self.item.link end
+function reusable:GetRegions()
+    local regions = {}
+    for _, text in ipairs(self.item and self.item.lines or {}) do
+        local line = text
+        regions[#regions + 1] = { GetObjectType = function() return "FontString" end,
+            GetText = function() return line end }
+    end
+    return unpack(regions)
+end
+CreateFrame = function(kind) assert(kind == "GameTooltip"); return reusable end
+GetInventoryItemID = function(unit, slot) return equipment[slot] and equipment[slot].id end
+GetInventoryItemLink = function(unit, slot) return equipment[slot] and equipment[slot].link end
+C_Item.GetItemSpell = function() end
+WSGS.db.char = { simulationProfiles = { regression = profile }, latestSimulationProfileId = "regression" }
+WSGS.db.profile = { debug = true }
+profile.name = "Upgrade lifecycle regression"
+local function freshTooltip()
+    WSGS.EquipmentInspector.tooltip = nil
+    reusable.owned, reusable.item = false, nil
+end
+local function assertUpgrade(result, state, remaining, maximum)
+    local difference = result.slots[3].fields.upgradeStep
+    check(result.slots[3].fields.item.state == "MATCH", "shoulder item survives complete scan")
+    check(difference.state == state, "complete command path upgrade state: " .. state)
+    if remaining ~= nil then
+        check(difference.remaining == remaining and difference.expected == maximum,
+            "complete command path preserves actual maximum and remaining")
+    end
+end
+for _, data in ipairs({ {2, 2, "MATCH", 0}, {1, 2, "MISMATCH", 1},
+    {0, 2, "MISMATCH", 2}, {1, 4, "MISMATCH", 3}, {4, 4, "MATCH", 0} }) do
+    equipment[3].lines[4] = string.format(ITEM_UPGRADE_TOOLTIP_FORMAT, data[1], data[2])
+    freshTooltip()
+    -- Compare must work without a prior probe, including earlier equipped slots.
+    assertUpgrade(WSGS:CompareLatestEquipment(), data[3], data[4], data[2])
+    local single = WSGS.EquipmentScanner:Scan(3).slots[3].observations
+    check(single.upgradeStep.status == "KNOWN" and single.upgradeStep.value == data[1]
+        and single.upgradeMaximum.value == data[2], "single-slot and complete scan observations agree")
+    WSGS:ProbeEquipment(3)
+    assertUpgrade(WSGS:CompareLatestEquipment(), data[3], data[4], data[2])
+    assertUpgrade(WSGS:CompareLatestEquipment(), data[3], data[4], data[2])
+    freshTooltip()
+    WSGS:ProbeEquipment(3)
+    assertUpgrade(WSGS:CompareLatestEquipment(), data[3], data[4], data[2])
+end
+equipment[3].lines[4] = nil
+freshTooltip()
+assertUpgrade(WSGS:CompareLatestEquipment(), "UNKNOWN")
+WSGS:ProbeEquipment(3)
+assertUpgrade(WSGS:CompareLatestEquipment(), "UNKNOWN")
+equipment[3].lines[4] = "Upgrade Level: 2/2"
+equipment[3].unavailable = true
+assertUpgrade(WSGS:CompareLatestEquipment(), "UNKNOWN")
+equipment[3].unavailable = nil
+equipment[3].id, equipment[3].link = 99999, "item:99999:4803:76699:76699:::::90:160:66::::::::"
+local wrong = WSGS:CompareLatestEquipment().slots[3].fields
+check(wrong.item.state == "MISMATCH" and wrong.upgradeStep.state == "UNKNOWN"
+    and wrong.enchant.state == "UNKNOWN", "wrong equipped item cannot match modifications")
+CreateFrame = originalCreateFrame
+WSGS.db.char, WSGS.db.profile = originalCharacter, originalSettings
 WSGS.EquipmentInspector.tooltip = nil
 return checks
