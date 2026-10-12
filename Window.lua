@@ -1,5 +1,17 @@
 local addonName, WSGS = ...
 
+-- Blizzard closes every visible UISpecialFrames entry. One alias resolves to
+-- our topmost open window; changing it during Hide does not add another entry.
+function WSGS:RefreshEscapeWindow()
+    if not self.escapeWindowRegistered then
+        table.insert(UISpecialFrames, "WSGSEscapeWindow")
+        self.escapeWindowRegistered = true
+    end
+    local doll = self.PaperDoll and self.PaperDoll.frame
+    _G.WSGSEscapeWindow = self.window and self.window:IsShown() and self.window
+        or doll and doll:IsShown() and doll or nil
+end
+
 function WSGS:ToggleWindow()
     if not self.window then
         self:CreateWindow()
@@ -25,7 +37,6 @@ end
 
 function WSGS:CreateWindow()
     local frame = CreateFrame("Frame", "WSGSMainWindow", UIParent, "PortraitFrameTemplate")
-    table.insert(UISpecialFrames, "WSGSMainWindow")
     frame:Hide()
     frame:SetSize(640, 550)
     frame:SetPoint("CENTER")
@@ -45,31 +56,26 @@ function WSGS:CreateWindow()
     end)
     frame:SetScript("OnShow", function(self)
         self:Raise()
+        WSGS:RefreshEscapeWindow()
         self.importStatus:SetText("")
         WSGS:Debug("Window opened.")
     end)
     frame:SetScript("OnHide", function(self)
         self:StopMovingOrSizing()
+        WSGS:RefreshEscapeWindow()
         WSGS:Debug("Window closed.")
     end)
 
-    frame.TitleContainer.TitleText:SetText("WowSimGearSync - Import")
+    frame.TitleContainer.TitleText:SetText("Import Equipment from WoWSims JSON")
     frame.PortraitContainer.portrait:SetTexture("Interface\\Icons\\INV_Misc_Note_01")
     frame.CloseButton:SetScript("OnClick", function() frame:Hide() end)
 
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 24, -40)
-    title:SetText("Import equipment")
-    local version = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    version:SetPoint("TOPRIGHT", -30, -44)
-    version:SetText("v" .. self.version)
-
     local inputLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    inputLabel:SetPoint("TOPLEFT", 24, -78)
-    inputLabel:SetText("Paste a complete WoW Sims API v3 JSON export:")
+    inputLabel:SetPoint("TOPLEFT", 74, -48)
+    inputLabel:SetText("Paste at least the Gear from WoW Sims JSON Export")
     local scroll = CreateFrame("ScrollFrame", "WSGSImportScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 24, -102)
-    scroll:SetSize(570, 340)
+    scroll:SetPoint("TOPLEFT", 24, -72)
+    scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -46, 116)
     local inputBackground = frame:CreateTexture(nil, "ARTWORK")
     inputBackground:SetAllPoints(scroll)
     inputBackground:SetColorTexture(0, 0, 0, 0.7)
@@ -107,14 +113,15 @@ function WSGS:CreateWindow()
     end)
 
     local status = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    status:SetPoint("TOPLEFT", 24, -500)
-    status:SetWidth(590)
+    status:SetPoint("TOPLEFT", scroll, "BOTTOMLEFT", 0, -14)
+    status:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 62)
     status:SetJustifyH("LEFT")
+    status:SetJustifyV("TOP")
     status:SetTextColor(1, 0.35, 0.35)
     status:SetText("")
     local importButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     importButton:SetSize(120, 28)
-    importButton:SetPoint("TOPLEFT", 24, -460)
+    importButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 22)
     importButton:SetText("Import")
     importButton:SetScript("OnClick", function()
         WSGS:SubmitImport(frame, function(text) return WSGS:ImportEquipment(text) end)
@@ -124,14 +131,12 @@ function WSGS:CreateWindow()
     end)
     frame.importInput = input
     frame.importStatus = status
+    frame.importButton = importButton
+    frame.importInstruction = inputLabel
 
     -- Child controls consume mouse input; raise without replacing their handlers.
     for _, control in ipairs({ input, scroll, scroll.ScrollBar, importButton }) do
         control:HookScript("OnMouseDown", function() frame:Raise() end)
     end
-    local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hint:SetPoint("LEFT", importButton, "RIGHT", 12, 0)
-    hint:SetText("Only equipment and build identification are retained.")
-
     self.window = frame
 end

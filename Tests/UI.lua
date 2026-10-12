@@ -251,4 +251,87 @@ WSGS.Tests:Register("ui", "UI", {
             assert(name:GetText() == "Raid tank" and build.name == "Raid tank")
         end)
     end },
+    { name = "Import title content and bottom-right action layout", run = function()
+        withImportWindow(function(frame)
+            assert(frame.TitleContainer.TitleText:GetText() == "Import Equipment from WoWSims JSON",
+                "Import title bar text differs")
+            assert(frame.importInstruction:GetText() == "Paste at least the Gear from WoW Sims JSON Export",
+                "Import instruction differs")
+            for _, region in ipairs({ frame:GetRegions() }) do
+                if region:GetObjectType() == "FontString" then
+                    local text = region:GetText()
+                    assert(text ~= "Import equipment" and text ~= "Import Equipment"
+                        and text ~= "v" .. WSGS.version
+                        and text ~= "Only equipment and build identification are retained.",
+                        "Redundant import text remains: " .. tostring(text))
+                end
+            end
+            local point, relative, relativePoint, x, y = frame.importButton:GetPoint()
+            assert(point == "BOTTOMRIGHT" and relative == frame and relativePoint == "BOTTOMRIGHT"
+                and x == -24 and y == 22, "Import button is not inset at the bottom-right")
+        end)
+    end },
+    { name = "Native special-window alias closes import before paper doll", run = function()
+        withDoll(function(doll)
+            withImportWindow(function(frame)
+                doll:Show(); frame:Show()
+                local count = 0
+                for _, name in pairs(UISpecialFrames) do
+                    if name == "WSGSEscapeWindow" then count = count + 1 end
+                    assert(name ~= "WSGSMainWindow" and name ~= "WSGSPaperDoll",
+                        "Both windows still have independent Escape entries")
+                end
+                assert(count == 1 and _G.WSGSEscapeWindow == frame, "Top window alias is incorrect")
+                -- Exercise exactly Blizzard's per-entry Hide path, without
+                -- calling CloseSpecialWindows and closing unrelated user UIs.
+                local top = _G.WSGSEscapeWindow
+                top:Hide()
+                assert(not frame:IsShown() and doll:IsShown(), "First Escape did not preserve the paper doll")
+                assert(_G.WSGSEscapeWindow == doll, "Escape alias did not advance to the paper doll")
+                top = _G.WSGSEscapeWindow
+                top:Hide()
+                assert(not doll:IsShown() and not _G.WSGSEscapeWindow, "Second Escape did not close the paper doll")
+            end)
+        end)
+    end },
+    { name = "Focused editor Escape after failure preserves underlying doll", run = function()
+        withDoll(function(doll)
+            withImportWindow(function(frame)
+                doll:Show(); frame:Show()
+                local character = { simulationProfiles = {} }
+                frame.importInput:SetText("{broken")
+                assert(not WSGS:SubmitImport(frame, function(text) return WSGS:ImportInto(character, text) end))
+                frame.importInput:SetFocus()
+                assert(frame.importInput:HasFocus(), "JSON editor did not receive focus")
+                frame.importInput:GetScript("OnEscapePressed")(frame.importInput)
+                assert(not frame:IsShown() and doll:IsShown(), "Focused Escape closed the wrong windows")
+                assert(frame.importInput:GetText() == "{broken", "Focused Escape changed the JSON")
+                assert(_G.WSGSEscapeWindow == doll, "Focused Escape did not advance the native alias")
+            end)
+        end)
+    end },
+    { name = "Import-only and doll-only Escape registration", run = function()
+        withDoll(function(doll)
+            withImportWindow(function(frame)
+                doll:Hide(); frame:Show()
+                assert(_G.WSGSEscapeWindow == frame, "Import-only Escape target missing")
+                _G.WSGSEscapeWindow:Hide()
+                assert(not frame:IsShown() and not _G.WSGSEscapeWindow, "Import-only Escape failed")
+                doll:Show()
+                assert(_G.WSGSEscapeWindow == doll, "Doll-only Escape target missing")
+                _G.WSGSEscapeWindow:Hide()
+                assert(not doll:IsShown() and not _G.WSGSEscapeWindow, "Doll-only Escape failed")
+                WSGS:ToggleWindow()
+                assert(frame:IsShown() and _G.WSGSEscapeWindow == frame, "Import toggle did not open the dialog")
+                WSGS:ToggleWindow()
+                assert(not frame:IsShown() and not _G.WSGSEscapeWindow, "Import toggle did not close the dialog")
+                frame:Show()
+                frame.CloseButton:GetScript("OnClick")(frame.CloseButton)
+                assert(not frame:IsShown() and not _G.WSGSEscapeWindow, "Import close button failed")
+                doll:Show()
+                doll.CloseButton:GetScript("OnClick")(doll.CloseButton)
+                assert(not doll:IsShown() and not _G.WSGSEscapeWindow, "Paper doll close button failed")
+            end)
+        end)
+    end },
 })
