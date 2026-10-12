@@ -148,8 +148,9 @@ function Gems:Prepare(context, operation)
     if not operation.expected or operation.expected == 0 then
         return nil, "An installed gem cannot be removed without a replacement"
     end
-    if context.additionalSocketMissing then
-        return nil, "Required additional socket must be applied first"
+    if context.additionalSocketMissing and
+        (not context.availableSocketCount or operation.socket > context.availableSocketCount) then
+        return nil, "Required additional socket must be applied before this gem"
     end
     local material, count = MaterialCatalog:ForGem(context.bags, operation.expected)
     operation.material, operation.materialItemID, operation.available = material, operation.expected, count

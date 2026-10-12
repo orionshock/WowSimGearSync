@@ -1,7 +1,6 @@
 local _, WSGS = ...
 local Scanner = {}
 WSGS.EquipmentScanner = Scanner
-local Prerequisites = WSGS.ModificationMaterials.actions.prerequisites
 
 local function unknown(reason)
     return {
@@ -58,22 +57,11 @@ function Scanner:Scan(onlyPosition)
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
         for _, field in ipairs({"enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum",
-                                "upgradeRemaining", "upgradeState", "tinker", "buckle", "professionSocket",
-                                "socketCount", "instance"}) do
+                                "upgradeRemaining", "upgradeState", "tinker", "socketCount", "instance"}) do
             observations[field] = empty and {
                 status = "NOT_APPLICABLE",
                 reason = "Empty inventory slot"
             } or unknown("No verified equipped-item observation for this field")
-        end
-        if slot.id ~= Prerequisites.beltBuckle.slot then
-            observations.buckle = {
-                status = "NOT_APPLICABLE"
-            }
-        end
-        if not Prerequisites.professionSockets[slot.id] then
-            observations.professionSocket = {
-                status = "NOT_APPLICABLE"
-            }
         end
         if not empty then
             local ok, guid = pcall(function()
@@ -93,58 +81,28 @@ function Scanner:Scan(onlyPosition)
                 observations.reforging = decoded.reforging
                 local socketOK, nativeSockets = pcall(C_Item.GetItemNumSockets, current.link)
                 local addedOK, addedSockets = pcall(C_Item.GetItemNumAddedSockets, current.link)
+                local populatedSocketCount = 0
+                for index, gem in ipairs(decoded.gems.values) do
+                    if gem.status == "KNOWN" and gem.value > 0 then
+                        populatedSocketCount = index
+                    end
+                end
+                local apiSocketCount
                 if socketOK and type(nativeSockets) == "number" and nativeSockets >= 0 and addedOK and
                     type(addedSockets) == "number" and addedSockets >= 0 then
+                    apiSocketCount = nativeSockets + addedSockets
+                end
+                if apiSocketCount or populatedSocketCount > 0 then
                     observations.socketCount = {
                         status = "KNOWN",
-                        value = nativeSockets + addedSockets,
-                        native = nativeSockets,
-                        added = addedSockets,
-                        source = "C_Item.GetItemNumSockets + C_Item.GetItemNumAddedSockets"
+                        value = math.max(apiSocketCount or 0, populatedSocketCount),
+                        native = apiSocketCount and nativeSockets or nil,
+                        added = apiSocketCount and addedSockets or nil,
+                        populated = populatedSocketCount,
+                        source = "C_Item socket counts and populated item-link gem positions"
                     }
                 else
                     observations.socketCount = unknown("Equipped socket count unavailable")
-                end
-                if Prerequisites.professionSockets[slot.id] then
-                    local ok, added = pcall(C_Item.GetItemNumAddedSockets, current.link)
-                    if ok and type(added) == "number" and added >= 0 then
-                        observations.professionSocket = {
-                            status = "KNOWN",
-                            value = added > 0,
-                            count = added,
-                            source = "C_Item.GetItemNumAddedSockets"
-                        }
-                    else
-                        observations.professionSocket = unknown("Added profession socket count unavailable")
-                    end
-                end
-                if slot.id == Prerequisites.beltBuckle.slot then
-                    local third = decoded.gems.values[3]
-                    if third.status == "KNOWN" and third.value > 0 then
-                        observations.buckle = {
-                            status = "KNOWN",
-                            value = true,
-                            source = "Populated third waist gem position"
-                        }
-                    else
-                        -- Empty gem fields do not establish whether an empty socket exists.
-                        local ok, added = pcall(function()
-                            if not C_Item.GetItemInfo(current.link) then
-                                return nil
-                            end
-                            return C_Item.GetItemNumAddedSockets(current.link)
-                        end)
-                        if ok and type(added) == "number" and added >= 0 then
-                            observations.buckle = {
-                                status = "KNOWN",
-                                value = added > 0,
-                                source = "C_Item.GetItemNumAddedSockets"
-                            }
-                        else
-                            observations.buckle = unknown(
-                                "Added waist sockets unavailable; empty gem fields are inconclusive")
-                        end
-                    end
                 end
                 for field, observed in pairs(WSGS.EquipmentInspector:Inspect(slot.id, current.link)) do
                     observations[field] = observed

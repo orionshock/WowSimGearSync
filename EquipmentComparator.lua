@@ -173,15 +173,7 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
             local targetCount = requestedSocketCount(target.gems)
             local socketCount = observations.socketCount
             local actualCount = socketCount and socketCount.status == "KNOWN" and socketCount.value or nil
-            local buckle = observations.buckle
-            if buckle and buckle.status == "KNOWN" and buckle.value == true then
-                difference = {
-                    state = "MATCH",
-                    expected = true,
-                    actual = true,
-                    source = buckle.source
-                }
-            elseif actualCount ~= nil then
+            if actualCount ~= nil then
                 difference = {
                     state = actualCount >= targetCount and "MATCH" or "MISMATCH",
                     expected = targetCount,
@@ -189,7 +181,12 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
                     source = "Imported gem count versus equipped socket count"
                 }
             else
-                difference = scalar(true, buckle)
+                difference = {
+                    state = "UNKNOWN",
+                    expected = targetCount,
+                    actual = nil,
+                    reason = socketCount and socketCount.reason or "Equipped socket count is unavailable"
+                }
             end
             debugSocket(position, slot.id, "BUCKLE", true, targetCount, actualCount, difference)
         elseif field == "tinker" and not emptyTarget and expected ~= nil and result.fields.item.state == "MATCH" and

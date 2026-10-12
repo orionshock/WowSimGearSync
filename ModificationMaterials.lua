@@ -174,6 +174,7 @@ Materials.actions = {
             spellID = 126392, -- Goblin Glider recipe.
             slot = 15, -- Back inventory slot.
             recommended = true,
+            presumedWhenOmitted = true, -- Engineers default to Goblin Glider when the import has no cloak tinker.
             reagents = tinkerReagents
         },
         [4898] = { -- Synapse Springs (hands); equipped use spell 126734.
@@ -303,7 +304,7 @@ Materials.equippedProfessionEffects = {
         },
         [15] = { -- Back.
             [126389] = {effectID = 4897}, -- Goblin Glider.
-            [55001] = {different = true, name = "Parachute"} -- Known alternate effect.
+            [55001] = {different = true, name = "Parachute"} -- Flexweave/Springy alternate; Goblin Glider takes precedence.
         }
     }
 }
@@ -357,12 +358,13 @@ function Materials:CharacterContext()
 end
 
 function Materials:RecommendedProfessionEnhancement(inventorySlot, context)
-    if not context or not context.recommendedProfessionEnhancements then
+    if not context then
         return nil
     end
     for effectID, definition in pairs(self.actions.profession) do
         local validSlot = definition.slot == inventorySlot or definition.slots and definition.slots[inventorySlot]
-        if definition.recommended and validSlot and context.professions[definition.profession] then
+        local enabled = definition.presumedWhenOmitted or context.recommendedProfessionEnhancements
+        if definition.recommended and enabled and validSlot and context.professions[definition.profession] then
             return effectID, "RECOMMENDED"
         end
     end

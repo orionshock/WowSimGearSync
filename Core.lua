@@ -77,7 +77,7 @@ local commandOptions = {
             type = "toggle",
             name = "Engineering defaults",
             order = 5,
-            desc = "Recommend glove, cloak and waist tinkers when the export omits them.",
+            desc = "Recommend glove and waist tinkers when the export omits them; Goblin Glider is always presumed.",
             get = function()
                 return WSGS.db.profile.recommendedEngineeringTinkers
             end,

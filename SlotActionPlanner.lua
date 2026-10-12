@@ -65,9 +65,11 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
         bags = bags,
         controller = controller
     }
-    context.additionalSocketMissing = difference.fields.professionSocket and difference.fields.professionSocket.state ==
-                                          "MISMATCH" or difference.fields.buckle and difference.fields.buckle.state ==
-                                          "MISMATCH"
+    local professionSocket = difference.fields.professionSocket
+    local buckle = difference.fields.buckle
+    context.additionalSocketMissing = professionSocket and professionSocket.state == "MISMATCH" or
+                                          buckle and buckle.state == "MISMATCH"
+    context.availableSocketCount = professionSocket and professionSocket.actual or buckle and buckle.actual
     for _, handlerName in ipairs(WSGS.SlotActionHandlers:ForSlot(controller.inventorySlot)) do
         local handler = WSGS.SlotActionHandlers.handlers[handlerName]
         for _, operation in ipairs(handler:Check(context)) do
