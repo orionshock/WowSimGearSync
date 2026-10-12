@@ -36,12 +36,8 @@ Plain slot buttons have no click, drag, item-use or secure equipment handlers.
 
 Target item icons/names/quality come from C_Item.GetItemInfo/GetItemInfoInstant.
 Unknown names fall back to item IDs; unknown icons to the question mark. Quality
-borders remain intact, with a separate differential badge:
-= green: correct item, all requested/eligible modifications confirmed.
-~ amber: known configuration mismatch; ~? also has unknown fields.
-! red: target item is missing or wrong.
-? blue: required observations remain unknown.
-- gray: empty target (tooltip still shows any item mismatch).
+borders remain intact. Status is displayed only beside the icon; the old
+bottom-right text badge and its black background have been removed.
 Normal tooltips show target/current names and concise applicable-step statuses.
 Upgrade progress includes current/maximum and remaining upgrades. Debug mode
 appends raw states, observation sources/reasons and resolved inventory assignment. Resolved ring and
@@ -75,7 +71,7 @@ Right-click toggles the import window independently; /wsgs import still toggles 
 Use the doll's Import button to show the editor. Paste/import your build.
 Expect 16 target slots, latest build heading, and comparator summary immediately.
 Hover all slots, especially rings/trinkets: verify resolved physical assignments.
-Check quality borders plus separate differential badges and per-field tooltips.
+Check quality borders, adjacent status text and per-field tooltips.
 Close with X/Escape; reopen. Confirm reuse and retained editor contents.
 With the doll visible, manually change gear if desired and observe refresh;
 the addon never changes gear. Check previously uncached target names/icons load.
@@ -107,7 +103,7 @@ Green means matched, amber means pending, red means wrong/missing item,
 and blue means unknown. Missing/pending steps have a leading !; matched steps
 have no symbol. Words are comma-separated and wrap within each slot's column.
 Adjacent slot names are removed; names remain in tooltips. The center contains
-only a small hover hint. Bottom counts, quality borders and disabled Equip remain.
+only a small hover hint. Bottom counts, quality borders and disabled Equip remain. Icon corners stay clear.
 
 Buckle requirement is implied only by a positive target gems[3] at waist (export
 position 8, inventory 6). A populated third observed gem proves the implied socket

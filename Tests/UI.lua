@@ -36,7 +36,8 @@ WSGS.Tests:Register("ui", "UI", {
             assert(Doll:Create() == frame and #frame.slots == 16)
             for position, button in ipairs(frame.slots) do
                 assert(button:GetObjectType() == "Button" and button.position == position)
-                assert(button.icon and button.quality and button.indicator)
+                assert(button.icon and button.quality and button.miniState)
+                assert(not button.indicator)
             end
         end)
     end },

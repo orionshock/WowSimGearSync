@@ -2,11 +2,6 @@ local _, WSGS = ...
 local Doll = { events = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" } }
 WSGS.PaperDoll = Doll
 local fields = WSGS.SlotPresentation.fields
-local appearance = {
-    MATCH = { "=", 0.3, 1, 0.4 }, CONFIGURATION = { "~", 1, 0.7, 0.15 },
-    MISMATCH = { "!", 1, 0.25, 0.25 }, UNKNOWN = { "?", 0.55, 0.7, 1 }, EMPTY = { "-", 0.6, 0.6, 0.6 },
-}
-
 -- Translate comparator states into presentation only; no item/modification
 -- comparison or interchangeable-slot assignment is performed here.
 local function visualState(target, difference)
@@ -66,11 +61,8 @@ function Doll:Render(profile, snapshot, comparison, reason)
         button.icon:SetTexture(texture)
         local color = quality and ITEM_QUALITY_COLORS[quality]
         button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
-        local state, unknown = visualState(target, button.difference)
+        local state = visualState(target, button.difference)
         button.visualState = state
-        local style = appearance[state]
-        button.indicator:SetText(style[1] .. (unknown and state == "CONFIGURATION" and "?" or ""))
-        button.indicator:SetTextColor(style[2], style[3], style[4])
         button.miniState:SetText(WSGS.SlotPresentation:MiniStates(button.difference))
     end
     if self.hovered and frame:IsShown() then self:ShowSlotTooltip(self.hovered) end
@@ -157,12 +149,6 @@ function Doll:Create()
         button.quality = button:CreateTexture(nil, "OVERLAY")
         button.quality:SetTexture("Interface\\Common\\WhiteIconFrame")
         button.quality:SetAllPoints()
-        local backdrop = button:CreateTexture(nil, "OVERLAY", nil, 1)
-        backdrop:SetColorTexture(0, 0, 0, 0.85)
-        backdrop:SetSize(21, 17)
-        backdrop:SetPoint("BOTTOMRIGHT")
-        button.indicator = button:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        button.indicator:SetPoint("BOTTOMRIGHT", -1, 1)
         button.miniState = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         button.miniState:SetWidth(position <= 14 and 240 or 180)
         if position <= 6 then
