@@ -77,12 +77,15 @@ local function guidFor(bag, slot)
     return ok and guid or nil
 end
 
-local function profession(skillLineID)
+function Materials:GetProfession(skillLineID)
     local first, second = GetProfessions()
     for _, professionIndex in pairs({ first, second }) do
         local name, _, _, _, numSpells, spellOffset, skillLine = GetProfessionInfo(professionIndex)
         if skillLine == skillLineID then
-            return name, numSpells > 0 and spellOffset + 1 or nil
+            local spellBookIndex = type(numSpells) == "number" and numSpells > 0
+                and type(spellOffset) == "number" and spellOffset + 1 or nil
+            return { name = name, index = professionIndex, skillLine = skillLine,
+                spellBookIndex = spellBookIndex }
         end
     end
 end
@@ -92,18 +95,17 @@ local function professionAvailability(bags, recipe, inventorySlot)
         or recipe.slots and not recipe.slots[inventorySlot] then
         return nil, "Direct profession recipe is not valid for this equipment slot"
     end
-    local professionName, professionSpellIndex = profession(recipe.profession)
-    if not professionName then
+    local profession = Materials:GetProfession(recipe.profession)
+    if not profession then
         return nil, (Materials.professionNames[recipe.profession] or "Required profession") .. " is unavailable"
     end
-    if not professionSpellIndex then return nil, "Profession spellbook action is unavailable" end
     for itemID, quantity in pairs(recipe.reagents or {}) do
         if (bags.counts[itemID] or 0) < quantity then
             return nil, string.format("Missing item %d (%d required)", itemID, quantity)
         end
     end
     local spellID = recipe.spellID or recipe.spellIDs and recipe.spellIDs[1]
-    return recipe, nil, C_Spell.GetSpellName(spellID), professionName, professionSpellIndex
+    return recipe, nil, C_Spell.GetSpellName(spellID), profession.name, profession.spellBookIndex
 end
 
 function Materials:ScanBags()
@@ -164,17 +166,14 @@ function Materials:TinkerAvailability(bags, enchantID)
     local recipe = self.tinkerRecipes[enchantID]
     if not recipe then return nil, "No confirmed MoP tinker recipe mapping" end
     local recipeName = C_Spell.GetSpellName(recipe.spellID)
-    local professionName, professionSpellIndex = profession(202)
-    if not professionName then
+    local profession = self:GetProfession(202)
+    if not profession then
         return nil, "Engineering profession is unavailable"
-    end
-    if not professionSpellIndex then
-        return nil, "Engineering profession spellbook action is unavailable"
     end
     for itemID, quantity in pairs(recipe.reagents) do
         if (bags.counts[itemID] or 0) < quantity then
             return nil, string.format("Missing item %d (%d required)", itemID, quantity)
         end
     end
-    return recipe, nil, recipeName, professionName, professionSpellIndex
+    return recipe, nil, recipeName, profession.name, profession.spellBookIndex
 end

@@ -15,16 +15,40 @@ local function recipeIDFromLink(link)
 end
 
 function Execution:Submit(controller, operation)
+    local profession = WSGS.ModificationMaterials:GetProfession(operation.professionSkillLine)
+    if not profession then
+        controller.failure = (WSGS.ModificationMaterials.professionNames[operation.professionSkillLine]
+            or "Required profession") .. " is unavailable"
+        debug("BLOCK", string.format("slot=%d type=%s professionSkillLine=%s reason=%s",
+            controller.inventorySlot, operation.type, valueText(operation.professionSkillLine), controller.failure))
+        return
+    end
     CloseTradeSkill()
-    debug("EXEC", string.format("slot=%d type=%s api=CastSpell profession=%s spellBookIndex=%d recipe=%s effect=%s",
-        controller.inventorySlot, operation.type, operation.professionName, operation.professionSpellIndex,
+    operation.professionName = profession.name
+    operation.professionSpellIndex = profession.spellBookIndex
+    debug("EXEC", string.format(
+        "slot=%d type=%s profession=%s professionSkillLine=%s detected=true spellBookIndex=%s recipe=%s effect=%s",
+        controller.inventorySlot, operation.type, operation.professionName,
+        valueText(operation.professionSkillLine), valueText(operation.professionSpellIndex),
         valueText(operation.spellID), valueText(operation.expected)))
-    local opened, openProblem = pcall(CastSpell, operation.professionSpellIndex, BOOKTYPE_PROFESSION)
+    local opened, openProblem
+    if operation.professionSpellIndex then
+        debug("EXEC", string.format("slot=%d type=%s api=CastSpell profession=%s spellBookIndex=%s",
+            controller.inventorySlot, operation.type, operation.professionName,
+            valueText(operation.professionSpellIndex)))
+        opened, openProblem = pcall(CastSpell, operation.professionSpellIndex, BOOKTYPE_PROFESSION)
+    end
+    local professionName = GetTradeSkillLine()
+    if professionName ~= operation.professionName then
+        debug("EXEC", string.format("slot=%d type=%s api=CastSpellByName profession=%s fallback=true",
+            controller.inventorySlot, operation.type, operation.professionName))
+        opened, openProblem = pcall(CastSpellByName, operation.professionName)
+        professionName = GetTradeSkillLine()
+    end
     if not opened then
         controller.failure = "Opening " .. operation.professionName .. " failed: " .. tostring(openProblem)
         return
     end
-    local professionName = GetTradeSkillLine()
     if professionName ~= operation.professionName then
         controller.failure = operation.professionName .. " recipe data did not open during the click"
         debug("BLOCK", string.format("slot=%d type=%s recipe=%s profession=%s reason=%s",
