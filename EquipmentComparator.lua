@@ -18,7 +18,7 @@ local function scalar(expected, observed)
         expected = expected, actual = observed.value, source = observed.source }
 end
 
-local function compareSlot(target, current, position, currentPosition)
+local function compareSlot(target, current, position, currentPosition, context)
     local slot = WSGS.equipmentSlots[position]
     local result = { position = position, slotName = slot.name, targetSlotId = slot.id,
         currentPosition = currentPosition, currentSlotId = WSGS.equipmentSlots[currentPosition].id, fields = {} }
@@ -34,6 +34,8 @@ local function compareSlot(target, current, position, currentPosition)
     end
     for _, field in ipairs(fields) do
         local expected = target[field]
+        local targetSource
+        if field == "tinker" then expected, targetSource = WSGS.Engineering:Target(target, slot.id, context) end
         if field == "buckle" then
             expected = slot.id == 6 and type(target.gems) == "table"
                 and type(target.gems[3]) == "number" and target.gems[3] > 0 or nil
@@ -75,6 +77,7 @@ local function compareSlot(target, current, position, currentPosition)
         else
             difference = scalar(expected, observations[field])
         end
+        difference.targetSource = targetSource
         result.fields[field] = difference
     end
     return result
@@ -103,13 +106,13 @@ function Comparator:Compare(profile, snapshot)
     for position = 1, 16 do
         local target = profile.equipment[position]
         if not target then return nil, "Imported build is missing equipment position " .. position .. "." end
-        result.slots[position] = compareSlot(target, snapshot.slots[position], position, position)
+        result.slots[position] = compareSlot(target, snapshot.slots[position], position, position, snapshot.context)
         result.assignments[position] = position
     end
     for _, pair in ipairs({ { 11, 12 }, { 13, 14 } }) do
         local a, b = pair[1], pair[2]
-        local swappedA = compareSlot(profile.equipment[a], snapshot.slots[b], a, b)
-        local swappedB = compareSlot(profile.equipment[b], snapshot.slots[a], b, a)
+        local swappedA = compareSlot(profile.equipment[a], snapshot.slots[b], a, b, snapshot.context)
+        local swappedB = compareSlot(profile.equipment[b], snapshot.slots[a], b, a, snapshot.context)
         local directItems, directMods = score(result.slots[a], result.slots[b])
         local swappedItems, swappedMods = score(swappedA, swappedB)
         local bothMatch = result.slots[a].fields.item.state == "MATCH" and result.slots[b].fields.item.state == "MATCH"

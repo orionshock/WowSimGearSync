@@ -1,5 +1,5 @@
 local _, WSGS = ...
-local Doll = { events = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" } }
+local Doll = { events = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT", "SKILL_LINES_CHANGED" } }
 WSGS.PaperDoll = Doll
 local fields = WSGS.SlotPresentation.fields
 -- Translate comparator states into presentation only; no item/modification
@@ -28,7 +28,11 @@ end
 function Doll:Render(profile, snapshot, comparison, reason)
     local frame = self:Create()
     self.profile, self.snapshot, self.comparison, self.error = profile, snapshot, comparison, reason
-    frame.buildName:SetText(profile and profile.name or "No active build")
+    if not frame.buildName:HasFocus() or frame.buildName.buildId ~= (profile and profile.id) then
+        frame.buildName:SetText(profile and profile.name or "No active build")
+    end
+    frame.buildName.buildId = profile and profile.id
+    if profile then frame.buildName:Enable() else frame.buildName:Disable() end
     if not profile then frame.summary:SetText("Import a WoW Sims build to display target equipment.")
     elseif comparison then
         local s = comparison.summary
@@ -68,6 +72,19 @@ function Doll:Render(profile, snapshot, comparison, reason)
     if self.hovered and frame:IsShown() then self:ShowSlotTooltip(self.hovered) end
 end
 
+function Doll:CommitBuildName(character)
+    local input = self.frame.buildName
+    local build, reason = WSGS.ManagedBuilds:Rename(character, input.buildId, input:GetText())
+    if build then
+        self.profile = build
+        input:SetText(build.name)
+    else
+        input:SetText(self.profile and self.profile.name or "No active build")
+    end
+    input:ClearFocus()
+    return build, reason
+end
+
 function Doll:Refresh()
     if not self.frame or not self.frame:IsShown() then return end
     local profile = WSGS:GetActiveSimulationProfile()
@@ -79,7 +96,7 @@ end
 
 function Doll:QueueRefresh(event, itemId, success)
     if not self.frame:IsShown() then return end
-    if event ~= "PLAYER_EQUIPMENT_CHANGED" and (not success or not self.relevantItems[itemId]) then return end
+    if event ~= "PLAYER_EQUIPMENT_CHANGED" and event ~= "SKILL_LINES_CHANGED" and (not success or not self.relevantItems[itemId]) then return end
     if self.refreshQueued then return end
     self.refreshQueued = true
     C_Timer.After(0, function()
@@ -112,9 +129,29 @@ function Doll:Create()
     frame.PortraitContainer.portrait:SetTexture("Interface\\Icons\\INV_Chest_Plate04")
     frame.CloseButton:SetScript("OnClick", function() frame:Hide() end)
     table.insert(UISpecialFrames, "WSGSPaperDoll")
-    frame.buildName = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    frame.buildName = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
     frame.buildName:SetPoint("TOP", 0, -35)
-    frame.buildName:SetWidth(510)
+    frame.buildName:SetSize(300, 24)
+    frame.buildName:SetAutoFocus(false)
+    frame.buildName:SetMaxBytes(80)
+    frame.buildName:SetScript("OnEnter", function(input)
+        GameTooltip:SetOwner(input, "ANCHOR_TOP")
+        GameTooltip:AddLine("Build name")
+        GameTooltip:AddLine("Enter saves; Escape or leaving the field cancels.", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    frame.buildName:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    frame.buildName:SetScript("OnEnterPressed", function()
+        local build, reason = self:CommitBuildName(WSGS.db.char)
+        if not build then WSGS:Print(reason) end
+    end)
+    frame.buildName:SetScript("OnEscapePressed", function(input)
+        input:SetText(self.profile and self.profile.name or "No active build")
+        input:ClearFocus()
+    end)
+    frame.buildName:SetScript("OnEditFocusLost", function(input)
+        input:SetText(self.profile and self.profile.name or "No active build")
+    end)
     local import = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     import:SetSize(100, 24)
     import:SetPoint("TOPLEFT", 70, -62)
@@ -182,6 +219,7 @@ function Doll:Create()
     end)
     frame:SetScript("OnHide", function()
         frame:StopMovingOrSizing()
+        frame.buildName:ClearFocus()
         frame:UnregisterAllEvents()
         if self.hovered then GameTooltip:Hide(); self.hovered = nil end
     end)

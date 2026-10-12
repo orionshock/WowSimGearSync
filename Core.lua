@@ -4,7 +4,7 @@ LibStub("AceAddon-3.0"):NewAddon(WSGS, addonName, "AceConsole-3.0", "AceEvent-3.
 WSGS.version = "0.3.0"
 
 local defaults = {
-    profile = { debug = true, minimap = { hide = false, minimapPos = 225 } },
+    profile = { recommendedEngineeringTinkers = true, debug = true, minimap = { hide = false, minimapPos = 225 } },
     char = { simulationProfiles = {} },
 }
 

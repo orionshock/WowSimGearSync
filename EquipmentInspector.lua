@@ -2,10 +2,6 @@ local _, WSGS = ...
 local Inspector = {}
 WSGS.EquipmentInspector = Inspector
 local upgradeFields = { "upgradeEligibility", "upgradeStep", "upgradeMaximum", "upgradeRemaining", "upgradeState" }
--- Local MoP SpellItemEnchantment data corroborates the effects recognized by
--- CharacterStatsPaneImproved/newstats.lua; see docs/equipment-observations.txt.
-local gloveTinkers = { [126734] = 4898, [108788] = 4697, [109076] = 4698 }
-
 local function unknown(reason)
     return { status = "UNKNOWN", reason = reason }
 end
@@ -52,6 +48,7 @@ function Inspector:Inspect(slotId, link)
     local result = {}
     for _, field in ipairs(upgradeFields) do result[field] = unknown("Upgrade tooltip unavailable, unreadable, or inconsistent") end
     result.tinker = unknown("Engineering effect not established")
+    local populatedTooltip = false
     local pattern, order = upgradePattern(ITEM_UPGRADE_TOOLTIP_FORMAT)
     if pattern then
         local ok, lines = pcall(function()
@@ -84,6 +81,7 @@ function Inspector:Inspect(slotId, link)
             return text
         end)
         if ok and lines and #lines > 0 then
+            populatedTooltip = true
             local current, maximum, conflict
             for _, text in ipairs(lines) do
                 local a, b = text:match(pattern)
@@ -116,15 +114,19 @@ function Inspector:Inspect(slotId, link)
             end
         end
     end
-    if slotId == 10 then
+    local effects = WSGS.Engineering.effects[slotId]
+    if effects then
         local ok, name, spellId = pcall(C_Item.GetItemSpell, link)
-        if ok and gloveTinkers[spellId] then
-            result.tinker = known(gloveTinkers[spellId], "C_Item.GetItemSpell / MoP SpellItemEnchantment mapping")
-            result.tinker.spellId, result.tinker.spellName = spellId, name
+        if ok and effects[spellId] then
+            result.tinker = known(effects[spellId], "C_Item.GetItemSpell / MoP SpellItemEnchantment mapping")
+        elseif ok and not spellId and not name and populatedTooltip and C_Item.GetItemInfo(link) then
+            result.tinker = known(0, "Cached item and populated inventory tooltip / no item use spell")
         else
-            result.tinker = unknown("No mapped engineering use spell; missing and uncached data are not distinguished")
-            if ok then result.tinker.spellId, result.tinker.spellName = spellId, name end
+            result.tinker = unknown("Use spell unmapped or item information unavailable")
         end
+        if ok then result.tinker.spellId, result.tinker.spellName = spellId, name end
+    else
+        result.tinker = { status = "NOT_APPLICABLE", reason = "Not a supported engineering slot" }
     end
     return result
 end

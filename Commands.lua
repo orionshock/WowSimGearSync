@@ -15,6 +15,15 @@ function WSGS:RegisterCommands()
                     self:Print("Debug " .. (enabled and "enabled." or "disabled."))
                 end,
             },
+            engineering = {
+                type = "toggle", name = "Engineering defaults", order = 5,
+                desc = "Recommend glove, cloak and waist tinkers when the export omits them.",
+                get = function() return self.db.profile.recommendedEngineeringTinkers end,
+                set = function(_, enabled)
+                    self.db.profile.recommendedEngineeringTinkers = enabled
+                    self.PaperDoll:Refresh()
+                end,
+            },
             compare = {
                 type = "execute", name = "Compare", desc = "Compare the latest imported build.", order = 2,
                 func = function() self:CompareLatestEquipment() end,

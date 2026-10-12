@@ -8,6 +8,7 @@ WSGS.Tests:Register("importer", "Importer", {
     { name = "Ace3 initialization and database scopes", run = function()
         assert(LibStub("AceAddon-3.0"):GetAddon(WSGS.name) == WSGS)
         assert(type(WSGS.db.profile.debug) == "boolean" and type(WSGS.db.char.simulationProfiles) == "table")
+        assert(type(WSGS.db.profile.recommendedEngineeringTinkers) == "boolean")
         local options = LibStub("AceConfigRegistry-3.0"):GetOptionsTable("WowSimGearSync", "cmd", "AceConfigCmd-3.0")
         assert(options == WSGS.commandOptions and options.args.test and options.args.probe)
         assert(LibStub("AceConfigCmd-3.0"):GetChatCommandOptions("wsgs") == "WowSimGearSync")
@@ -54,8 +55,7 @@ WSGS.Tests:Register("importer", "Importer", {
         -- The native decoder may return a table for malformed input. A table
         -- alone is not an equipment build: use the production schema validator.
         local character = WSGS.db.char
-        local builds, latest, sequence = character.simulationProfiles,
-            character.latestSimulationProfileId, character.nextSimulationProfileId
+        local builds, latest = character.simulationProfiles, character.latestSimulationProfileId
         local before = {}
         for id, build in pairs(builds) do before[id] = build end
         local ok, document = pcall(C_EncodingUtil.DeserializeJSON, "{broken")
@@ -65,8 +65,8 @@ WSGS.Tests:Register("importer", "Importer", {
         end
         -- Do not call ImportEquipment: this test exercises its decode/validate
         -- path without entering the save stage or substituting a database.
-        assert(character.simulationProfiles == builds and character.latestSimulationProfileId == latest
-            and character.nextSimulationProfileId == sequence, "Import tracking changed")
+        assert(character.simulationProfiles == builds and character.latestSimulationProfileId == latest,
+            "Import tracking changed")
         for id, build in pairs(builds) do assert(before[id] == build, "Build added or replaced") end
         for id, build in pairs(before) do assert(builds[id] == build, "Build removed or replaced") end
     end },
@@ -83,5 +83,61 @@ WSGS.Tests:Register("importer", "Importer", {
         assert(not assert(WSGS:ValidateEquipment(document)).specialization.id)
         document.player.protectionPaladin, document.player.retributionPaladin = {}, {}
         assert(not assert(WSGS:ValidateEquipment(document)).specialization.id)
+    end },
+    { name = "First import creates and selects a specialization build", run = function()
+        local character = { simulationProfiles = {} }
+        local build = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        assert(build.id == "Paladin:66" and build.name == "Protection")
+        assert(character.simulationProfiles[build.id] == build and character.latestSimulationProfileId == build.id)
+    end },
+    { name = "Reimport replaces equipment without duplicate builds", run = function()
+        local character = { simulationProfiles = {} }
+        local first = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        local json = WSGS.Tests.referenceJSON:gsub('"id":99029', '"id":100584')
+        local second = assert(WSGS:ImportInto(character, json))
+        assert(first ~= second and first.id == second.id and second.equipment[1].id == 100584)
+        local count = 0
+        for _ in pairs(character.simulationProfiles) do count = count + 1 end
+        assert(count == 1)
+    end },
+    { name = "Committed custom name survives reimport", run = function()
+        local character = { simulationProfiles = {} }
+        local first = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        assert(WSGS.ManagedBuilds:Rename(character, first.id, "  Raid tank  "))
+        local second = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        assert(second.name == "Raid tank" and second.customName and second.specialization.id == 66)
+    end },
+    { name = "Different specializations keep separate managed builds", run = function()
+        local character = { simulationProfiles = {} }
+        local first = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        local second = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON:gsub("protectionPaladin", "retributionPaladin")))
+        assert(first.id ~= second.id and character.simulationProfiles[first.id] == first)
+        assert(second.id == "Paladin:70" and second.name == "Retribution")
+    end },
+    { name = "Invalid import preserves existing managed build and selection", run = function()
+        local character = { simulationProfiles = {} }
+        local first = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        local result, reason = WSGS:ImportInto(character, "{broken")
+        assert(not result and reason and character.simulationProfiles[first.id] == first)
+        assert(character.latestSimulationProfileId == first.id)
+    end },
+    { name = "Unknown or ambiguous specialization cannot replace builds", run = function()
+        local character = { simulationProfiles = {} }
+        local first = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        for _, source in ipairs({ "missing", "ambiguous" }) do
+            local document = decode()
+            if source == "missing" then document.player.protectionPaladin = nil
+            else document.player.retributionPaladin = {} end
+            local candidate = assert(WSGS:ValidateEquipment(document))
+            assert(not WSGS.ManagedBuilds:Save(character, candidate))
+            assert(character.simulationProfiles[first.id] == first and character.latestSimulationProfileId == first.id)
+        end
+    end },
+    { name = "Empty and overlong names cannot replace a valid name", run = function()
+        local character = { simulationProfiles = {} }
+        local first = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+        assert(not WSGS.ManagedBuilds:Rename(character, first.id, "   "))
+        assert(not WSGS.ManagedBuilds:Rename(character, first.id, string.rep("x", 81)))
+        assert(first.name == "Protection" and not first.customName and first.id == "Paladin:66")
     end },
 })

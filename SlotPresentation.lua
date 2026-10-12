@@ -56,6 +56,7 @@ function Presentation:TooltipLines(button, debug)
                     math.max(0, value.expected - value.actual))
             end
             lines[#lines + 1] = labels[field] .. ": " .. text
+                .. (value.targetSource == "RECOMMENDED" and " (recommended)" or "")
         end
     end
     if debug then

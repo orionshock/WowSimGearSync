@@ -1,0 +1,113 @@
+Task 014: Engineering defaults, managed builds and simplified import
+
+ENGINEERING EVIDENCE (REFERENCE ADDONS READ ONLY)
+NAG/mists/data/enchants.lua:
+4898 Synapse Springs -> use spell 126734
+4897 Goblin Glider -> use spell 126389
+4223 Nitro Boosts -> use spell 55004
+3605 Flexweave Underlay -> use spell 55001
+3859 Springy Arachnoweave -> same use spell 55001 (ambiguous; not inferred).
+TipTac/libs/LibFroznFunctions-1.0/tables/
+LFF_ENCHANTID_TO_SPELLID_LOOKUP.MoPC.lua independently corroborates the mappings
+(lines 591, 646, 694, 747-748). Its header identifies MoP 5.5.3.65746 DB2 data.
+Only factual mappings are used; no reference-addon code or data file is copied.
+The user selected Goblin Glider 4897 after the original Flexweave/4897 conflict
+was identified. Recommended slots: Hands 4898, Back 4897, Waist 4223.
+
+WowSimsExporter/Shared.lua:341 GetHandTinker recognizes glove tooltip on-use
+stat amounts. This localized amount heuristic is not copied.
+CharacterStatsPaneImproved/newstats.lua:737-765,855 recognizes engineering
+use spells via equipped-item GetItemSpell. The addon calls C_Item.GetItemSpell
+directly, whose itemInfo -> spellName,spellID/no-value contract is documented
+in local Blizzard_APIDocumentationGenerated/ItemDocumentation.lua.
+No tinker is decoded from unverified item-link fields or conventional enchants.
+
+EquipmentInspector retains its tooltip lifecycle and localized upgrade parsing.
+Recognized slot-specific use spells produce KNOWN enchant IDs independently
+of ordinary enchants. Cached item info + populated identity-checked tooltip +
+no use spell produce KNOWN zero (missing use tinker). Missing/uncached/unmapped
+information stays UNKNOWN. Live testing must confirm the no-use/cache behavior;
+unsupported tinker effects are not guessed. Flexweave cannot be distinguished
+from Springy Arachnoweave through their shared use spell; it remains UNKNOWN.
+
+LIVE PROFESSION AND TARGET SELECTION
+GetProfessions returns primary profession indices; GetProfessionInfo(index)
+returns skillLine in its seventh result. Engineering is skillLine 202.
+Local Mists SpellBookFrame.lua:586,700 uses these exact profession API contracts;
+CharacterStatsPaneImproved/newstats.lua:87,94-103 corroborates Engineering 202.
+The scanner records context.engineering and context.recommendedTinkers once
+per scan. SKILL_LINES_CHANGED (Mists SpellBookFrame.lua:17) refreshes the visible
+doll. No repeated polling, compatibility dispatch or profession name matching.
+db.profile.recommendedEngineeringTinkers defaults true; native AceConfig toggle
+/wsgs engineering controls it. This adds one option to the existing command tree.
+
+Explicit item.tinker wins, including zero; otherwise enabled recommendations
+apply only for live Engineers. No default is written into imported equipment.
+Comparator fields.tinker.targetSource is SIMULATION or RECOMMENDED. Missing
+recommended effects count as configuration differences; unreadable effects
+remain UNKNOWN, and wrong items block matches. Without Engineering/defaults,
+omitted tinkers are NOT_APPLICABLE. Explicit simulation targets remain intact.
+Waist buckle and waist tinker observations/comparisons remain independent.
+
+MANAGED STORAGE AND NAMES
+db.char.simulationProfiles["Paladin:66"] = normalized build
+db.char.latestSimulationProfileId = selected managed-build key
+Identity uses normalized class + Blizzard specialization ID, never display name.
+Builds retain equipment, class/apiVersion/specialization, import metadata, id,
+name and customName. Default name is specialization only (Protection, etc.).
+Subsequent imports replace the same key and preserve a committed custom name.
+Different specs/classes use different keys. No append sequence or migration.
+SavedVariables remains commented; /reload clears builds/settings as before.
+
+ImportInto(character,text) performs native decoding and complete existing gear
+validation before ManagedBuilds:Save. Unknown/ambiguous specs fail before saving
+or selecting. ImportEquipment uses the real db.char and sends the existing
+build-imported message only on success. In-game tests use temporary collections.
+Rename trims whitespace, rejects empty/>80-byte names, marks customName and
+does not change class/spec/key. The paper doll name EditBox commits on Enter,
+cancels on Escape/focus loss and avoids overwriting an active edit on refresh.
+
+IMPORT UI
+The JSON editor/scroll mechanics, high strata, click raise, close and Escape
+are preserved. Name entry, suggestion decoding, successful summary and item-ID
+listing are removed. Success selects/replaces, refreshes the visible doll via
+the existing message and closes import. Failure retains JSON and existing
+builds with a readable error; reopening clears old errors.
+The paper doll layout/status words/corner-free icons and disabled Equip remain.
+
+TESTS / EXACT RUNTIME VALIDATION
+51 registered in-game cases: scanner 8, comparator 15, importer 15, UI 13.
+16 new cases cover target priority/default slots, disabled/non-Engineer contexts,
+missing/unknown/wrong-item effects, buckle independence, live effect mappings,
+create/replace/rename/separate specs/invalid imports and both import UI outcomes.
+Tests use ephemeral builds and synthetic comparison contexts, never replace the
+actual database, change settings, equip items, consume resources or transact.
+The native decoder and real frame APIs are exercised in-game.
+
+ /reload
+ /wsgs test importer
+ /wsgs test comparator
+ /wsgs test ui
+ /wsgs test all
+Open import via /wsgs import; paste the Protection export and Import.
+Expect dialog closed, selected Protection build and refreshed visible doll.
+Rename to Raid tank and press Enter. Reimport changed Protection gear:
+expect the same key, updated gear and preserved name. Import Retribution:
+expect a separate selected build. Try malformed/unknown/ambiguous spec input:
+expect an error, unchanged selection/builds and retained editor contents.
+Try blank rename, Escape and focus-loss cancellation.
+For equipped Engineering items:
+ /wsgs probe 7
+ /wsgs probe 4
+ /wsgs probe 8
+ /run for _,s in ipairs({10,15,6}) do local l=GetInventoryItemLink("player",s); if l then print(s,C_Item.GetItemSpell(l)) end end
+Compare against actual tooltip use effects; check missing tinkers on cached,
+readable equipment and UNKNOWN for unavailable/unmapped data.
+ /wsgs compare
+Toggle /wsgs engineering if desired and restore its prior value afterward.
+Explicit exports must keep their target when recommendations are toggled.
+
+Static checks cover TOC paths/order, disabled SavedVariables, no removed-name
+references, registered case counts, source/API review and git whitespace.
+No WoW client execution, visual verification or in-game PASS results are claimed.
+No automation, Equipment Manager, persistence, Tab or LDB changes are included.

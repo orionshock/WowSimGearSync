@@ -10,7 +10,7 @@ end
 Scanner.rescanEvents = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT" }
 
 function Scanner:Scan(onlyPosition)
-    local snapshot = { capturedAt = time(), slots = {} }
+    local snapshot = { capturedAt = time(), slots = {}, context = WSGS.Engineering:CharacterContext() }
     for position = onlyPosition or 1, onlyPosition or 16 do
         local slot = WSGS.equipmentSlots[position]
         local current = { position = position, slotId = slot.id, slotName = slot.name, observations = {} }

@@ -25,6 +25,7 @@ function WSGS:CompareLatestEquipment()
                 local difference = slot.fields[field]
                 local detail = difference.actual ~= nil and " (observed " .. tostring(difference.actual) .. ")" or ""
                 if difference.source then detail = detail .. " via " .. difference.source end
+                if difference.targetSource then detail = detail .. " target=" .. difference.targetSource end
                 if difference.progressState then detail = detail .. " " .. difference.progressState end
                 if difference.remaining then detail = detail .. " remaining=" .. difference.remaining end
                 if difference.reason then detail = detail .. " - " .. difference.reason end

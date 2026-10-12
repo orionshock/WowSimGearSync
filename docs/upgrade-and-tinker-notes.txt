@@ -111,3 +111,12 @@ The user-provided Paladin reference is retained in Tests/Fixture.lua.
 The obsolete Python/Lua mock-client harness and its synthetic fixture were
 removed. See docs/commands-and-tests.txt for runtime verification instructions.
 No game-client run was performed by the agent.
+
+TASK 014 UPDATE
+Engineering.lua now maps cloak use spell 126389 -> Goblin Glider 4897 and
+waist use spell 55004 -> Nitro Boosts 4223, alongside the existing glove map.
+Cached item info plus a successfully populated, identity-checked inventory
+tooltip and no GetItemSpell return establish a missing use tinker (value 0).
+Unmapped effects and unavailable item data remain UNKNOWN. This extends the
+older glove-only behavior above; it does not parse unverified item-link fields.
+See managed-builds-notes.txt for source evidence and live validation.

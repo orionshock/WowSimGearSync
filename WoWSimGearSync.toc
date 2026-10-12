@@ -23,7 +23,9 @@ Core.lua
 Commands.lua
 Specialization.lua
 EquipmentSlots.lua
+ManagedBuilds.lua
 Import.lua
+Engineering.lua
 ItemLinkDecoder.lua
 EquipmentInspector.lua
 EquipmentScanner.lua

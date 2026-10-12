@@ -96,8 +96,7 @@ function WSGS:ValidateEquipment(document)
         metadata = { entryCount = entryCount, equippedCount = equipped, warnings = warnings, schemaVersion = 1 } }
 end
 
-function WSGS:ImportEquipment(text, requestedName)
-    self:Debug("[IMPORT] Starting import")
+function WSGS:ImportInto(character, text)
     local document, reason
     if type(text) ~= "string" or not text:match("%S") then
         reason = "Paste a WoW Sims JSON export first."
@@ -116,28 +115,18 @@ function WSGS:ImportEquipment(text, requestedName)
     local profile
     if document then profile, reason = self:ValidateEquipment(document) end
     if not profile then
+        return nil, reason
+    end
+    return self.ManagedBuilds:Save(character, profile)
+end
+
+function WSGS:ImportEquipment(text)
+    self:Debug("[IMPORT] Starting import")
+    local profile, reason = self:ImportInto(self.db.char, text)
+    if not profile then
         self:Debug("[IMPORT] Import failed: " .. reason)
         return nil, reason
     end
-    local name = (requestedName or ""):match("^%s*(.-)%s*$")
-    if #name > 80 then
-        local reason = "Profile names must be at most 80 bytes."
-        self:Debug("[IMPORT] Import failed: " .. reason)
-        return nil, reason
-    end
-    local character = self.db.char
-    local sequence = character.nextSimulationProfileId or 1
-    while character.simulationProfiles["import-" .. sequence] do sequence = sequence + 1 end
-    profile.id = "import-" .. sequence
-    local spec = profile.specialization
-    local suggestion = spec.id and (spec.class .. " - " .. spec.name)
-    profile.name = name ~= "" and name or suggestion or "Imported Build " .. sequence
-    profile.metadata.importedAt = time()
-    profile.metadata.addonVersion = self.version
-    profile.metadata.source = "WoW Sims API v3"
-    character.simulationProfiles[profile.id] = profile
-    character.nextSimulationProfileId = sequence + 1
-    character.latestSimulationProfileId = profile.id
     self:Debug("[IMPORT] API version: " .. profile.apiVersion)
     self:Debug("[IMPORT] Equipment entries: " .. profile.metadata.entryCount)
     self:Debug("[IMPORT] Profile saved: " .. profile.name)

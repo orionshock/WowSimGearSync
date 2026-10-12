@@ -7,9 +7,10 @@ Commands.lua registers the existing options table with AceConfig under
 handling, and help output; it uses AceConsole internally. Root /wsgs displays
 standard AceConfigCmd help. There is no custom dispatcher, input normalization,
 root window toggle, completion candidate generator, or manual chat hook.
-Debug uses a native toggle; compare/import execute options; probe/test validated inputs.
+Debug and Engineering recommendations use native toggles; compare/import execute
+options; probe/test validated inputs. /wsgs engineering controls recommended tinkers.
 /wsgs import creates the existing import window if needed and toggles it; repeated
-invocations open/close it. Escape closes it, including while either input is focused.
+invocations open/close it. Escape closes it, including while the JSON editor is focused.
 Root /wsgs still shows native help.
 Core.lua retains AceAddon initialization and AceDB defaults. Settings remain
 in db.profile, simulation builds/sequence/latest tracking in db.char.
@@ -34,17 +35,17 @@ AceTab remains bundled and loaded but no WSGS-specific completion set is
 registered. Physical Tab completion is unverified and is not claimed to work.
 No workaround, library patch, or manual hooks have been added.
 
-IN-GAME SUITES (35 CASES TOTAL)
+IN-GAME SUITES (51 CASES TOTAL)
 Tests/Runner.lua owns registration, protected execution, PASS/FAIL/SKIP, and
 actual summary counts. /wsgs test and /wsgs test all run all four suites.
-Scanner (7): real client snapshots, slot mappings, repeated observations,
+Scanner (8): real client snapshots, slot mappings, repeated observations,
 live upgrade comparisons, optional item 95757 and glove tinker checks.
-Comparator (10): deterministic Lua snapshots, actual maxima, unknowns, wrong
+Comparator (15): deterministic Lua snapshots, actual maxima, unknowns, wrong
 items, interchangeable pairs, duplicate rings, captured links, empty slots.
-Importer (8): initialization/scopes and native command association, native JSON,
+Importer (15): initialization/scopes and native command association, native JSON,
 retained Paladin reference, gear-only schema validation, optional and unknown
 fields, malformed documents, and specialization ambiguity.
-UI (10): frame reuse/slots, empty/latest build presentation, comparator binding,
+UI (13): frame reuse/slots, empty/latest build presentation, comparator binding,
 ring/trinket assignments, visibility, refresh listeners, and read-only controls.
 Equipment-dependent cases can SKIP. Tests do not alter equipment, settings,
 saved builds, import tracking, resources, or character configuration.
@@ -56,9 +57,9 @@ not a guarantee of exceptions or non-table results for malformed text.
 The corrected case decodes using the real API and, if decoding returns normally,
 passes the result to production ValidateEquipment(). It requires rejection with
 an error reason. A decoder exception is also rejection, as in the real importer.
-It checks collection identity, every existing build reference, latest ID and
-next sequence remain unchanged. It never calls the saving ImportEquipment()
-method or substitutes a test database. No native decoder replacement is used.
+It checks that collection identity, existing build references and the selected
+build ID remain unchanged. It never calls the saving ImportEquipment() method
+or substitutes a test database. No native decoder replacement is used.
 
 EXACT IN-GAME VALIDATION
 /reload
@@ -76,28 +77,30 @@ EXACT IN-GAME VALIDATION
 /wsgs test ui
 /wsgs test nonsense         (validation error)
 Reload clears session-only builds while SavedVariables is disabled. To open the existing import screen:
-/wsgs import                (toggle open/closed; Escape closes it, including focused inputs)
+/wsgs import                (toggle open/closed; Escape closes it, including the focused JSON editor)
 Import your gear, then repeat compare/probe. Run tests twice; build collection,
-latest ID, next sequence, and debug should be unchanged by the test runner.
+selected build ID and debug should be unchanged by the test runner.
 
 In unsent chat type /wsgs co and press Tab, then /wsgs test sc and Tab.
 Check repeated Tab cycling with /wsgs followed by a space. Cancel with Escape.
 Report observed behavior; native library source does not wire these completions.
-35 passed, 0 failed, 0 skipped is a target when all equipment/data is present,
+51 passed, 0 failed, 0 skipped is a target when all equipment/data is present,
 not an asserted or hardcoded summary. Optional equipment may produce SKIPs.
 
 STATIC VALIDATION AND LIMITS
 Check TOC paths, dependency order, disabled SavedVariables, exactly one
 CreateChatCommand registration, absence of custom dispatch/completion code,
-35 suite cases, and git whitespace. No offline Python harness is present.
+51 suite cases, and git whitespace. No offline Python harness is present.
 The game client was not launched: command execution, native decoder behavior,
 test outcomes, and physical Tab behavior still require runtime validation.
 
-IMPORT WINDOW PRESENTATION
-The import window uses PortraitFrameTemplate, with a wider profile-name field
-and separate equipment heading/version. FULLSCREEN_DIALOG keeps it above the
-DIALOG paper doll; showing it or clicking its background/editor/controls raises it.
-After /reload, open the paper doll, then /wsgs import. Overlap the windows and
-click each: import must remain above the doll. Paste a full export, scroll/edit,
-import, drag the dialog, then verify its close button and Escape in both inputs.
-Visual appearance and mouse behavior require in-game verification.
+IMPORT WINDOW PRESENTATION (TASK 014)
+The PortraitFrameTemplate import dialog contains the JSON editor, Import and
+error display. FULLSCREEN_DIALOG keeps it above the DIALOG paper doll; showing
+it or clicking its background/editor/controls raises it. Success validates and
+updates a specialization-managed build, selects it, refreshes the visible doll
+and closes import. Failure preserves existing builds and pasted JSON, keeping
+the editor open. Reopening clears errors. There is no import name or ID listing.
+Rename the selected build in the doll's top field; Enter saves, Escape or focus
+loss cancels. Empty/overlong names are rejected. Names survive reimport.
+Detailed storage, Engineering evidence and runtime checks: managed-builds-notes.txt.

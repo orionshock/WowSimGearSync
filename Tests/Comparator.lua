@@ -113,4 +113,62 @@ WSGS.Tests:Register("comparator", "Comparator", {
         snapshot.slots[8].observations.buckle = { status = "KNOWN", value = true }
         assert(compare(profile, snapshot).slots[8].fields.buckle.state == "UNKNOWN")
     end },
+    { name = "Recommended Engineering glove cloak and waist defaults", run = function()
+        local profile, snapshot = scenario()
+        snapshot.context = { engineering = true, recommendedTinkers = true }
+        for position, id in pairs({ [7] = 4898, [4] = 4897, [8] = 4223 }) do
+            snapshot.slots[position].observations.tinker = { status = "KNOWN", value = id }
+        end
+        local result = compare(profile, snapshot)
+        for position, id in pairs({ [7] = 4898, [4] = 4897, [8] = 4223 }) do
+            local value = result.slots[position].fields.tinker
+            assert(value.state == "MATCH" and value.expected == id and value.targetSource == "RECOMMENDED")
+            assert(profile.equipment[position].tinker == nil, "Recommendation changed imported data")
+        end
+    end },
+    { name = "Explicit simulation tinkers override recommendations", run = function()
+        local profile, snapshot = scenario()
+        snapshot.context = { engineering = true, recommendedTinkers = true }
+        profile.equipment[7].tinker = 4697
+        snapshot.slots[7].observations.tinker = { status = "KNOWN", value = 4697 }
+        local value = compare(profile, snapshot).slots[7].fields.tinker
+        assert(value.expected == 4697 and value.state == "MATCH" and value.targetSource == "SIMULATION")
+    end },
+    { name = "Non-Engineers and disabled recommendations have no defaults", run = function()
+        for _, context in ipairs({
+            { engineering = false, recommendedTinkers = true },
+            { engineering = true, recommendedTinkers = false },
+        }) do
+            local profile, snapshot = scenario()
+            snapshot.context = context
+            local result = compare(profile, snapshot)
+            for _, position in ipairs({4,7,8}) do assert(result.slots[position].fields.tinker.state == "NOT_APPLICABLE") end
+            profile.equipment[7].tinker = 4898
+            assert(compare(profile, snapshot).slots[7].fields.tinker.expected == 4898)
+        end
+    end },
+    { name = "Missing defaults are actionable but unknowns never mismatch", run = function()
+        local profile, snapshot = scenario()
+        snapshot.context = { engineering = true, recommendedTinkers = true }
+        for _, position in ipairs({4,7,8}) do snapshot.slots[position].observations.tinker = { status = "KNOWN", value = 0 } end
+        assert(compare(profile, snapshot).summary.configurationMismatches == 3)
+        snapshot.slots[4].observations.tinker = { status = "UNKNOWN" }
+        local result = compare(profile, snapshot)
+        assert(result.slots[4].fields.tinker.state == "UNKNOWN" and result.summary.configurationMismatches == 2)
+        snapshot.slots[7].observations.item.value = 99999
+        assert(compare(profile, snapshot).slots[7].fields.tinker.state == "UNKNOWN")
+    end },
+    { name = "Waist buckle and tinker remain independent", run = function()
+        local profile, snapshot = scenario()
+        snapshot.context = { engineering = true, recommendedTinkers = true }
+        profile.equipment[8].gems = { 10, 20, 30 }
+        local o = snapshot.slots[8].observations
+        o.gems = { values = { {status="KNOWN",value=10}, {status="KNOWN",value=20}, {status="KNOWN",value=30} } }
+        o.buckle, o.tinker = { status = "KNOWN", value = true }, { status = "KNOWN", value = 0 }
+        local fields = compare(profile, snapshot).slots[8].fields
+        assert(fields.buckle.state == "MATCH" and fields.tinker.state == "MISMATCH")
+        o.buckle.value, o.tinker.value = false, 4223
+        fields = compare(profile, snapshot).slots[8].fields
+        assert(fields.buckle.state == "MISMATCH" and fields.tinker.state == "MATCH")
+    end },
 })

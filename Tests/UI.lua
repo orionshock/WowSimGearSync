@@ -16,6 +16,18 @@ local function withDoll(run)
     return outcome, detail
 end
 
+local function withImportWindow(run)
+    if not WSGS.window then WSGS:CreateWindow() end
+    local frame = WSGS.window
+    local shown, text, errorText = frame:IsShown(), frame.importInput:GetText(), frame.importStatus:GetText()
+    local ok, reason = pcall(run, frame)
+    frame:Hide()
+    frame.importInput:SetText(text)
+    if shown then frame:Show() end
+    frame.importStatus:SetText(errorText)
+    if not ok then error(reason, 0) end
+end
+
 local function scenario()
     local document = C_EncodingUtil.DeserializeJSON(WSGS.Tests.referenceJSON)
     local reference = assert(WSGS:ValidateEquipment(document))
@@ -177,6 +189,46 @@ WSGS.Tests:Register("ui", "UI", {
             Doll:Render(profile, snapshot, assert(WSGS.EquipmentComparator:Compare(profile, snapshot)))
             text = table.concat(WSGS.SlotPresentation:TooltipLines(frame.slots[8], false), "\n")
             assert(text:find("Buckle: Matched", 1, true))
+        end)
+    end },
+    { name = "Successful import closes editor and selects temporary build", run = function()
+        withImportWindow(function(frame)
+            local character = { simulationProfiles = {} }
+            frame:Show()
+            frame.importInput:SetText(WSGS.Tests.referenceJSON)
+            local build = assert(WSGS:SubmitImport(frame, function(text) return WSGS:ImportInto(character, text) end))
+            assert(not frame:IsShown() and character.latestSimulationProfileId == build.id)
+            assert(not frame.profileNameInput and not frame.importSummary)
+        end)
+    end },
+    { name = "Failed import retains JSON and clears error on reopen", run = function()
+        withImportWindow(function(frame)
+            local character = { simulationProfiles = {} }
+            frame:Show()
+            frame.importInput:SetText("{broken")
+            local build = WSGS:SubmitImport(frame, function(text) return WSGS:ImportInto(character, text) end)
+            assert(not build and frame:IsShown() and frame.importInput:GetText() == "{broken")
+            assert(frame.importStatus:GetText():find("Import failed:", 1, true))
+            assert(next(character.simulationProfiles) == nil)
+            frame:Hide(); frame:Show()
+            assert(frame.importStatus:GetText() == "" and frame.importInput:GetText() == "{broken")
+        end)
+    end },
+    { name = "Editable build name commits once and preserves identity", run = function()
+        withDoll(function(frame)
+            local character = { simulationProfiles = {} }
+            local build = assert(WSGS:ImportInto(character, WSGS.Tests.referenceJSON))
+            local _, snapshot = scenario()
+            Doll:Render(build, snapshot, assert(WSGS.EquipmentComparator:Compare(build, snapshot)))
+            local name = frame.buildName
+            assert(name:GetObjectType() == "EditBox" and name:GetText() == "Protection")
+            name:SetText("Raid tank")
+            assert(build.name == "Protection", "Partial edit saved")
+            assert(Doll:CommitBuildName(character))
+            assert(build.name == "Raid tank" and name:GetText() == "Raid tank" and build.id == "Paladin:66")
+            name:SetText(" ")
+            assert(not Doll:CommitBuildName(character))
+            assert(name:GetText() == "Raid tank" and build.name == "Raid tank")
         end)
     end },
 })

@@ -70,7 +70,7 @@ Tests:Register("scanner", "Scanner", {
     end },
     { name = "Glove tinker independent of enchant", run = function()
         local slot = WSGS.EquipmentScanner:Scan(7).slots[7]
-        if not slot.id or slot.observations.tinker.status ~= "KNOWN" then return "SKIP", "No recognized glove tinker" end
+        if not slot.id or slot.observations.tinker.status ~= "KNOWN" or slot.observations.tinker.value == 0 then return "SKIP", "No recognized glove tinker" end
         assert(slot.observations.tinker.spellId and slot.observations.enchant.status == "KNOWN")
         local _, spell = C_Item.GetItemSpell(slot.link)
         assert(slot.observations.tinker.spellId == spell)
@@ -97,5 +97,19 @@ Tests:Register("scanner", "Scanner", {
         profile.equipment[8].gems = { 10, 20, 30 } -- ephemeral target; never imported/saved
         local result = assert(WSGS.EquipmentComparator:Compare(profile, snapshot))
         assert(result.slots[8].fields.buckle.state == (observed.value and "MATCH" or "MISMATCH"))
+    end },
+    { name = "Live Engineering slot use spells match MoP tinker mappings", run = function()
+        local snapshot, checked = WSGS.EquipmentScanner:Scan(), 0
+        for _, position in ipairs({4,7,8}) do
+            local slot = snapshot.slots[position]
+            local observed = slot.observations.tinker
+            if slot.id and observed.status == "KNOWN" then
+                local name, spell = C_Item.GetItemSpell(slot.link)
+                if observed.value == 0 then assert(not name and not spell)
+                else assert(WSGS.Engineering.effects[slot.slotId][spell] == observed.value) end
+                checked = checked + 1
+            end
+        end
+        if checked == 0 then return "SKIP", "No readable cloak/glove/waist tinker observations" end
     end },
 })

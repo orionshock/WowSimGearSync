@@ -17,21 +17,22 @@ LibDBIcon registers the same object. db.profile.minimap stores hide=false and
 minimapPos=225 defaults; dragging uses LibDBIcon's own position storage. AceDB
 profile changes/copies/resets rebind the minimap configuration. SavedVariables
 remains disabled, so position/settings/builds last only for this session.
-Active means db.char.latestSimulationProfileId, as in compare; no build selector
-or persistence has been introduced. Slash registration/dispatch is unchanged.
+Active means db.char.latestSimulationProfileId, as in compare; importing selects
+the specialization-managed build. No build selector or persistence is introduced. Slash registration/dispatch is unchanged.
 
 PAPER DOLL
 PaperDoll.lua owns frame lifecycle and binding. SlotPresentation.lua owns
 compact badges and player-facing tooltip translation. No scanner
 or comparator logic is copied. Opening calls the existing scanner and comparator
 once; Render binds their exact targets, snapshot slots, differences and assignment
-objects. Empty/latest builds share the same 16 reusable buttons. Import sends an
+objects. Empty/selected builds share the same 16 reusable buttons. Import sends an
 AceEvent message after saving; visible paper dolls refresh immediately.
 Two equipment columns, with Main Hand then Off Hand below Wrist on the left,
 use the authoritative
 EquipmentSlots tokens with GetInventorySlotInfo for empty-slot textures.
 The existing portrait, close, and panel-button templates supply the frame shell.
-Escape closes it; background dragging moves it. Import shows the existing editor.
+Escape closes it; background dragging moves it. The top build name is editable;
+Enter commits a rename, while Escape/focus loss cancels pending edits. Import shows the existing editor.
 Equip stays disabled and explicitly says automation is not implemented.
 Plain slot buttons have no click, drag, item-use or secure equipment handlers.
 
@@ -58,7 +59,7 @@ Blizzard_APIDocumentationGenerated/ItemDocumentation.lua documents C_Item item
 info/instant/request APIs and GET_ITEM_INFO_RECEIVED/ITEM_DATA_LOAD_RESULT with
 itemID/success payloads. Classic/DressUpFrames.lua:165 uses C_Timer.After(0).
 
-OnShow registers those three events; OnHide unregisters all. Relevant item IDs
+OnShow registers those item/equipment events plus SKILL_LINES_CHANGED; OnHide unregisters all. Relevant item IDs
 are target/current IDs in the current render. Successful item-data events are
 filtered to those IDs; requests for uncached target data occur once per item per
 opening. Event bursts are coalesced with one deferred C_Timer.After(0) callback.
@@ -85,12 +86,12 @@ Verify Equip is disabled and slot clicks do nothing.
 Repeat UI tests with the doll open and closed. UI tests restore the previous
 presentation/visibility, never save builds or change settings/equipment, and
 report SKIP for latest-build selection when none is imported. There are now
-10 UI, 10 comparator, 7 scanner and 8 importer cases (35 total). Summary counts
+13 UI, 15 comparator, 8 scanner and 15 importer cases (51 total). Summary counts
 are computed, never hardcoded.
 
 KNOWN LIMITATIONS / VALIDATION
 Static checks only: manifests/load order, source-copy hashes, license retention,
-35 registered cases, registration/API/source review, and git whitespace.
+51 registered cases, registration/API/source review, and git whitespace.
 No game-client run, visual inspection, Lua execution or test PASS is claimed.
 Actual frame layout, LDB/minimap clicks, item metadata caching and client events
 require the above runtime validation. Existing scanner UNKNOWN behavior remains;

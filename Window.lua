@@ -11,28 +11,23 @@ function WSGS:ToggleWindow()
     end
 end
 
--- Own only automatically generated names; any user edit gives control to them.
-function WSGS:UpdateSuggestedProfileName(nameInput, text)
-    if nameInput.userEdited or (nameInput:GetText() ~= "" and nameInput:GetText() ~= nameInput.suggestedName) then
-        return
+-- The import callback owns storage/notifications; this dialog owns presentation.
+function WSGS:SubmitImport(frame, import)
+    frame.importInput:ClearFocus()
+    local profile, reason = import(frame.importInput:GetText())
+    if not profile then
+        frame.importStatus:SetText("Import failed: " .. reason)
+        return nil, reason
     end
-    local suggestion = ""
-    if #text <= 1048576 then
-        local ok, document = pcall(C_EncodingUtil.DeserializeJSON, text)
-        if ok and type(document) == "table" and document.apiVersion == 3 and type(document.player) == "table" then
-            local spec = self:DetectSpecialization(document.player)
-            if spec.id then suggestion = spec.class .. " - " .. spec.name end
-        end
-    end
-    nameInput.suggestedName = suggestion
-    if nameInput:GetText() ~= suggestion then nameInput:SetText(suggestion) end
+    frame:Hide()
+    return profile
 end
 
 function WSGS:CreateWindow()
     local frame = CreateFrame("Frame", "WSGSMainWindow", UIParent, "PortraitFrameTemplate")
     table.insert(UISpecialFrames, "WSGSMainWindow")
     frame:Hide()
-    frame:SetSize(640, 660)
+    frame:SetSize(640, 550)
     frame:SetPoint("CENTER")
     -- Keep the import dialog above the paper doll, which uses DIALOG.
     frame:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -50,6 +45,7 @@ function WSGS:CreateWindow()
     end)
     frame:SetScript("OnShow", function(self)
         self:Raise()
+        self.importStatus:SetText("")
         WSGS:Debug("Window opened.")
     end)
     frame:SetScript("OnHide", function(self)
@@ -68,26 +64,12 @@ function WSGS:CreateWindow()
     version:SetPoint("TOPRIGHT", -30, -44)
     version:SetText("v" .. self.version)
 
-    local nameLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    nameLabel:SetPoint("TOPLEFT", 24, -76)
-    nameLabel:SetText("Profile name (optional)")
-    local nameInput = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    nameInput:SetSize(540, 24)
-    nameInput:SetPoint("TOPLEFT", 29, -98)
-    nameInput:SetAutoFocus(false)
-    nameInput:SetMaxBytes(80)
-    nameInput:SetScript("OnTextChanged", function(self, userInput)
-        if userInput then self.userEdited = true end
-    end)
-    nameInput:SetScript("OnEscapePressed", function() frame:Hide() end)
-    nameInput:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-
     local inputLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    inputLabel:SetPoint("TOPLEFT", 24, -136)
+    inputLabel:SetPoint("TOPLEFT", 24, -78)
     inputLabel:SetText("Paste a complete WoW Sims API v3 JSON export:")
     local scroll = CreateFrame("ScrollFrame", "WSGSImportScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 24, -160)
-    scroll:SetSize(570, 282)
+    scroll:SetPoint("TOPLEFT", 24, -102)
+    scroll:SetSize(570, 340)
     local inputBackground = frame:CreateTexture(nil, "ARTWORK")
     inputBackground:SetAllPoints(scroll)
     inputBackground:SetColorTexture(0, 0, 0, 0.7)
@@ -106,19 +88,8 @@ function WSGS:CreateWindow()
     input:SetScript("OnEscapePressed", function() frame:Hide() end)
     ScrollingEdit_OnLoad(input)
     input:SetScript("OnCursorChanged", ScrollingEdit_OnCursorChanged)
-    local suggestionDelay
-    input:SetScript("OnUpdate", function(self, elapsed)
-        ScrollingEdit_OnUpdate(self, elapsed)
-        if suggestionDelay then
-            suggestionDelay = suggestionDelay - elapsed
-            if suggestionDelay <= 0 then
-                suggestionDelay = nil
-                WSGS:UpdateSuggestedProfileName(nameInput, self:GetText())
-            end
-        end
-    end)
+    input:SetScript("OnUpdate", ScrollingEdit_OnUpdate)
     input:SetScript("OnTextChanged", function(self)
-        suggestionDelay = 0.25
         scroll:UpdateScrollChildRect()
         local range = scroll:GetVerticalScrollRange()
         if scroll:GetVerticalScroll() > range then
@@ -136,53 +107,26 @@ function WSGS:CreateWindow()
     end)
 
     local status = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    status:SetPoint("TOPLEFT", 24, -505)
+    status:SetPoint("TOPLEFT", 24, -500)
     status:SetWidth(590)
     status:SetJustifyH("LEFT")
-    status:SetText("Ready to import. Each import creates a separate build for this session.")
-    local summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    summary:SetPoint("TOPLEFT", 24, -570)
-    summary:SetWidth(590)
-    summary:SetJustifyH("LEFT")
+    status:SetTextColor(1, 0.35, 0.35)
+    status:SetText("")
     local importButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     importButton:SetSize(120, 28)
     importButton:SetPoint("TOPLEFT", 24, -460)
     importButton:SetText("Import")
     importButton:SetScript("OnClick", function()
-        input:ClearFocus()
-        nameInput:ClearFocus()
-        WSGS:UpdateSuggestedProfileName(nameInput, input:GetText())
-        local profile, reason = WSGS:ImportEquipment(input:GetText(), nameInput:GetText())
-        if not profile then
-            status:SetTextColor(1, 0.35, 0.35)
-            status:SetText("Import failed: " .. reason)
-            return
-        end
-        status:SetTextColor(0.4, 1, 0.4)
-        local metadata = profile.metadata
-        local message = string.format("Imported %s (%s): %d entries, %d equipped, %d warnings.",
-            profile.name, profile.specialization.class .. " - " .. profile.specialization.name, metadata.entryCount, metadata.equippedCount, #metadata.warnings)
-        if #metadata.warnings > 0 then message = message .. "\n" .. metadata.warnings[1]:sub(1, 180) end
-        status:SetText(message)
-        local lines = {}
-        for index, item in ipairs(profile.equipment) do
-            local line = math.floor((index - 1) / 4) + 1
-            local label = item.slotName .. ": " .. (item.empty and "empty" or tostring(item.id))
-            lines[line] = lines[line] and (lines[line] .. " / " .. label) or label
-        end
-        summary:SetText(table.concat(lines, "\n"))
+        WSGS:SubmitImport(frame, function(text) return WSGS:ImportEquipment(text) end)
     end)
     frame:HookScript("OnHide", function()
         input:ClearFocus()
-        nameInput:ClearFocus()
     end)
     frame.importInput = input
-    frame.profileNameInput = nameInput
     frame.importStatus = status
-    frame.importSummary = summary
 
     -- Child controls consume mouse input; raise without replacing their handlers.
-    for _, control in ipairs({ nameInput, input, scroll, scroll.ScrollBar, importButton }) do
+    for _, control in ipairs({ input, scroll, scroll.ScrollBar, importButton }) do
         control:HookScript("OnMouseDown", function() frame:Raise() end)
     end
     local hint = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
