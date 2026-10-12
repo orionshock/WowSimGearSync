@@ -17,11 +17,19 @@ local function recipeIDFromLink(link)
     return tonumber(link and (link:match("|Henchant:(%d+)") or link:match("|Hspell:(%d+)")))
 end
 
-local function failed(reason)
+local function result(status, reason)
     return {
-        status = "FAILED",
+        status = status,
         reason = reason
     }
+end
+
+local function failed(reason)
+    return result("FAILED", reason)
+end
+
+local function unresolved(reason)
+    return result("UNRESOLVED", reason)
 end
 
 local function openProfession(request, operation, profession, skillLine)
@@ -45,8 +53,26 @@ local function openProfession(request, operation, profession, skillLine)
     return true
 end
 
-local function resolveRecipe(operation)
-    ExpandTradeSkillSubClass(0)
+local function showAllRecipes(request, operation)
+    local previousNameFilter = GetTradeSkillItemNameFilter()
+    TradeSkillOnlyShowSkillUps(false)
+    TradeSkillOnlyShowMakeable(false)
+    SetTradeSkillSubClassFilter(-1, 1, 1)
+    SetTradeSkillInvSlotFilter(-1, 1, 1)
+    SetTradeSkillItemLevelFilter(0, 0)
+    SetTradeSkillItemNameFilter("")
+    for index = GetNumTradeSkills(), 1, -1 do
+        local _, skillType, _, isExpanded = GetTradeSkillInfo(index)
+        if skillType == "header" and not isExpanded then
+            ExpandTradeSkillSubClass(index)
+        end
+    end
+    debug("EXEC", string.format("slot=%d type=%s filters=cleared previousName=%s entries=%d",
+        request.inventorySlot, operation.type, valueText(previousNameFilter), GetNumTradeSkills()))
+end
+
+local function resolveRecipe(request, operation)
+    showAllRecipes(request, operation)
     local candidates = {}
     for _, spellID in ipairs(operation.recipeSpellIDs or {operation.spellID}) do
         candidates[spellID] = true
@@ -57,7 +83,7 @@ local function resolveRecipe(operation)
             return index, spellID
         end
     end
-    return nil, nil, "Required recipe is not learned, hidden, or unavailable in the profession list"
+    return nil, nil, "Required recipe did not appear in the unfiltered profession list"
 end
 
 local function missingReagents(recipeIndex)
@@ -171,9 +197,9 @@ function Execution:Submit(request)
     if not opened then
         return failed(problem)
     end
-    local recipeIndex, recipeSpellID, recipeProblem = resolveRecipe(operation)
+    local recipeIndex, recipeSpellID, recipeProblem = resolveRecipe(request, operation)
     if not recipeIndex then
-        return failed(recipeProblem)
+        return unresolved(recipeProblem)
     end
     local spellName, inspectionProblem = inspectRecipe(request, operation, profession, recipeIndex, recipeSpellID)
     if not spellName then

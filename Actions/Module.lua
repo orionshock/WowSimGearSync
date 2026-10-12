@@ -182,6 +182,8 @@ local function refreshFromClient(self, reason)
     self:SendMessage("WSGS_ACTIONS_CHANGED", reason)
 end
 
+local fail
+
 local function scheduleTimeout(self, controller)
     if controller.timeoutScheduled then
         return
@@ -190,12 +192,23 @@ local function scheduleTimeout(self, controller)
     local pendingSerial = controller.serial
     C_Timer.After(8, function()
         local current = controllers[controller.position]
-        if current and current.state == "PENDING" and current.serial == pendingSerial then
-            debug("EVENT", string.format("slot=%d event=VERIFICATION_TIMEOUT serial=%d", current.inventorySlot,
-                pendingSerial))
-            current.failure = "Timed out without a verified item-state change"
-            refreshFromClient(self, "VERIFICATION_TIMEOUT")
+        if not current or current.state ~= "PENDING" or current.serial ~= pendingSerial then
+            return
         end
+        debug("EVENT", string.format("slot=%d event=VERIFICATION_TIMEOUT serial=%d phase=rescan",
+            current.inventorySlot, pendingSerial))
+        refreshFromClient(self, "VERIFICATION_TIMEOUT_RESCAN")
+        C_Timer.After(0, function()
+            current = controllers[controller.position]
+            if not current or current.state ~= "PENDING" or current.serial ~= pendingSerial then
+                return
+            end
+            refreshFromClient(self, "VERIFICATION_TIMEOUT_FINAL_RESCAN")
+            current = controllers[controller.position]
+            if current and current.state == "PENDING" and current.serial == pendingSerial then
+                fail(self, current, current.pending, "Timed out without a verified item-state change")
+            end
+        end)
     end)
 end
 
@@ -213,7 +226,7 @@ local function markPending(self, controller, operation, waitForSocketAccept)
     end
 end
 
-local function fail(self, controller, operation, reason)
+fail = function(self, controller, operation, reason)
     controller.state = "BLOCKED"
     controller.reason = reason
     controller.lastFailed = operation
@@ -223,6 +236,19 @@ local function fail(self, controller, operation, reason)
     self:SendMessage("WSGS_ACTIONS_CHANGED", "FAILED")
 end
 
+local function markUnknown(self, controller, operation, reason)
+    operation.reason = reason
+    controller.state = "UNKNOWN"
+    controller.reason = reason
+    controller.prepared = nil
+    controller.pending = nil
+    controller.submitting = nil
+    controller.lastFailed = nil
+    controller.unknown = {operation}
+    debug("PLAN", string.format("slot=%d handler=%s result=UNKNOWN reason=%s", controller.inventorySlot,
+        operation.handlerName, reason))
+    self:SendMessage("WSGS_ACTIONS_CHANGED", "UNRESOLVED")
+end
 local function submitGem(self, controller, request)
     local operation = request.operation
     local ok, problem = pcall(SocketInventoryItem, request.inventorySlot)
@@ -248,6 +274,11 @@ local function submitProfession(self, controller, request, button)
         controller.inventorySlot, operation.handlerName, valueText(operation.professionName),
         valueText(operation.spellID), valueText(operation.expected)))
     local result = Internal.ProfessionExecution:Submit(request)
+    if result and result.status == "UNRESOLVED" then
+        button.wsgsSubmission = nil
+        markUnknown(self, controller, operation, result.reason)
+        return false
+    end
     if not result or result.status ~= "SUBMITTED" then
         button.wsgsSubmission = nil
         fail(self, controller, operation, result and result.reason or "Profession execution returned no result")

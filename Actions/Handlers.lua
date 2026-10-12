@@ -253,9 +253,6 @@ function ProfessionEnhancement:Check(context)
     return results
 end
 function ProfessionEnhancement:Prepare(context, operation)
-    if operation.observationUnknown or operation.unresolved then
-        return nil, operation.reason or "Profession enhancement state is unknown", true
-    end
     local mapping = MaterialCatalog.actions.profession[operation.expected]
     local recipe, reason, recipeName, professionName, professionSpellIndex =
         MaterialCatalog:ProfessionEnhancementAvailability(context.bags, operation.expected,
