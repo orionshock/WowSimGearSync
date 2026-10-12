@@ -92,13 +92,7 @@ end
 function Materials:TinkerAvailability(bags, enchantID)
     local recipe = self.tinkerRecipes[enchantID]
     if not recipe then return nil, "No confirmed MoP tinker recipe mapping" end
-    if not C_SpellBook.IsSpellKnown(recipe.spellID) then
-        return nil, "Required Engineering recipe is not known"
-    end
     local recipeName = C_Spell.GetSpellName(recipe.spellID)
-    if not recipeName then
-        return nil, "Engineering recipe name is unavailable"
-    end
     local professionName = engineeringProfessionName()
     if not professionName then
         return nil, "Engineering profession is unavailable"

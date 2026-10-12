@@ -145,7 +145,7 @@ function Actions:DoTinkerRecipe(recipeID)
         end
     end
     if not recipeIndex then
-        controller.failure = "Engineering recipe is hidden or unavailable in the profession list"
+        controller.failure = "Engineering recipe is not learned, hidden, or unavailable in the profession list"
         debug("BLOCK", string.format("slot=%d type=TINKER recipe=%d reason=%s",
             controller.inventorySlot, recipeID, controller.failure))
         return
