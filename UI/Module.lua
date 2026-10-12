@@ -2,8 +2,6 @@ local _, WSGS = ...
 local UI = WSGS:NewModule("UI", "AceEvent-3.0")
 WSGS.UI = UI
 
-local refreshEvents = {"GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT", "SKILL_LINES_CHANGED"}
-
 function UI:RefreshEscapeWindow()
     if not self.escapeWindowRegistered then
         table.insert(UISpecialFrames, "WSGSEscapeWindow")
@@ -52,9 +50,6 @@ function UI:QueuePaperDollRefresh(event, itemId, success)
     end)
 end
 
-function UI:OnUIEvent(event, ...)
-    self:QueuePaperDollRefresh(event, ...)
-end
 
 function UI:WSGS_BUILD_IMPORTED()
     self:RefreshPaperDoll()
@@ -73,9 +68,9 @@ function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED()
 end
 
 function UI:OnEnable()
-    for _, event in ipairs(refreshEvents) do
-        self:RegisterEvent(event, "OnUIEvent")
-    end
+    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "QueuePaperDollRefresh")
+    self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "QueuePaperDollRefresh")
+    self:RegisterEvent("SKILL_LINES_CHANGED", "QueuePaperDollRefresh")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
     self:RegisterMessage("WSGS_ACTIONS_CHANGED")
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED")

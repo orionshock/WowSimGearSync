@@ -1,8 +1,5 @@
 local _, WSGS = ...
 local Actions = WSGS:NewModule("Equipment", "AceEvent-3.0")
-Actions.events = {"PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED", "PLAYER_REGEN_DISABLED",
-                  "PLAYER_REGEN_ENABLED", "UI_ERROR_MESSAGE", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT",
-                  "SPELLS_CHANGED", "CURSOR_CHANGED"}
 WSGS.EquipmentActions = Actions
 local verificationEvents = {
     PLAYER_EQUIPMENT_CHANGED = true,
@@ -317,29 +314,41 @@ function Actions:QueueRefresh(event)
     end)
 end
 
-function Actions:OnRuntimeEvent(event, ...)
+function Actions:OnEquipmentStateEvent(event, ...)
     local active = self.batch and self:PendingCount() > 0
-    if active and (verificationEvents[event] or event == "UI_ERROR_MESSAGE") then
+    if active and verificationEvents[event] then
         WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
-    end
-    if event == "UI_ERROR_MESSAGE" then
-        local _, message = ...
-        local record = self.executingRecord or self.lastSubmittedRecord
-        if record and record.status == "STILL_PENDING" then
-            record.error = type(message) == "string" and message or "Client rejected the operation."
-            WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d inv=%d reason=%s", record.index, record.operation.slotId,
-                record.error))
-            self:QueueRefresh(event)
-        end
-        return
     end
     self:QueueRefresh(event)
 end
 
-function Actions:OnEnable()
-    for _, event in ipairs(self.events) do
-        self:RegisterEvent(event, "OnRuntimeEvent")
+function Actions:UI_ERROR_MESSAGE(event, ...)
+    local active = self.batch and self:PendingCount() > 0
+    if active then
+        WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
     end
+    local _, message = ...
+    local record = self.executingRecord or self.lastSubmittedRecord
+    if not record or record.status ~= "STILL_PENDING" then
+        return
+    end
+    record.error = type(message) == "string" and message or "Client rejected the operation."
+    WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d inv=%d reason=%s", record.index, record.operation.slotId,
+        record.error))
+    self:QueueRefresh(event)
+end
+
+function Actions:OnEnable()
+    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "OnEquipmentStateEvent")
+    self:RegisterEvent("BAG_UPDATE_DELAYED", "OnEquipmentStateEvent")
+    self:RegisterEvent("ITEM_LOCK_CHANGED", "OnEquipmentStateEvent")
+    self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnEquipmentStateEvent")
+    self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnEquipmentStateEvent")
+    self:RegisterEvent("UI_ERROR_MESSAGE")
+    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnEquipmentStateEvent")
+    self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "OnEquipmentStateEvent")
+    self:RegisterEvent("SPELLS_CHANGED", "OnEquipmentStateEvent")
+    self:RegisterEvent("CURSOR_CHANGED", "OnEquipmentStateEvent")
 end
 
 local function blockRemaining(batch, first, reason)
