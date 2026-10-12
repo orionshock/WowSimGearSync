@@ -1,78 +1,89 @@
-Ace3 command migration and in-game tests (Task 010)
+Native AceConfigCmd commands and in-game tests (Task 011)
 
-LIBRARIES
-Source: C:\WoWAddons\Ace3, Release-r1403. Vendored Lua files are unmodified.
+REGISTRATION AND ROOT BEHAVIOR
+Commands.lua registers the existing options table with AceConfig under
+"WowSimGearSync" and calls AceConfigCmd:CreateChatCommand("wsgs",
+"WowSimGearSync"). AceConfigCmd solely owns registration, dispatch, argument
+handling, and help output; it uses AceConsole internally. Root /wsgs displays
+standard AceConfigCmd help. There is no custom dispatcher, input normalization,
+root window toggle, completion candidate generator, or manual chat hook.
+Debug uses a native toggle; compare an execute; probe/test validated inputs.
+Core.lua retains AceAddon initialization and AceDB defaults. Settings remain
+in db.profile, simulation builds/sequence/latest tracking in db.char.
+SavedVariables remains commented out. No LDB or paper doll was added.
+
+LIBRARIES AND COMPLETION LIMITATION
+Unmodified library source: C:\WoWAddons\Ace3, Release-r1403.
 Load order: LibStub -> CallbackHandler -> AceAddon -> AceEvent -> AceConsole
 -> AceDB -> AceConfigRegistry -> AceConfigCmd -> AceConfig -> AceTab.
-AceAddon needs LibStub; AceEvent and AceConfigRegistry need CallbackHandler;
-AceConfigCmd needs Registry and Console; AceConfig wraps Registry and Cmd.
-The local XML manifests were inspected. We load the required Lua files directly:
-AceConfig's aggregate XML additionally includes AceConfigDialog, which needs
-AceGUI and is unnecessary for command-only configuration. Neither is bundled.
-One copy of each library is present. Libs/Ace3-LICENSE.txt retains the source
-BSD license; library headers, including LibStub's public-domain notice, remain.
+AceConfig's aggregate XML includes Dialog/AceGUI; these are unnecessary for
+command-only use, so the required Lua files are loaded directly instead.
+The source BSD license remains in Libs/Ace3-LICENSE.txt; library headers remain.
 
-INITIALIZATION AND COMMANDS
-Core.lua turns the existing WSGS namespace table into an AceAddon instance with
-AceConsole and AceEvent embedded. OnInitialize creates AceDB and registers
-commands. OnEnable installs completion after login. No custom event frame or
-slash-command dispatcher remains. Settings stay db.profile; builds, sequence,
-and latest tracking stay db.char. SavedVariables remains commented out.
-Commands.lua registers a group options table with AceConfig. AceConsole owns
-/wsgs; an empty invocation toggles the window. Nonempty input is normalized and
-passed to AceConfigCmd:HandleCommand. Debug is a toggle, compare an execute,
-probe/test input options with validation. No AceConfigDialog UI was introduced.
+The bundled AceConfigCmd-3.0 minor 14 CreateChatCommand() comment advertises
+AceTab integration, but its implementation only registers through AceConsole
+and records commands[slashcmd]=appName. GetChatCommandOptions() exposes that
+association. No call to AceTab/RegisterTabCompletion is made, and the bundled
+AceTab-3.0 minor 10 never consumes AceConfigCmd's command/options registry.
+Thus CreateChatCommand does NOT register a completion tree with this AceTab.
+AceTab remains bundled and loaded but no WSGS-specific completion set is
+registered. Physical Tab completion is unverified and is not claimed to work.
+No workaround, library patch, or manual hooks have been added.
 
-TAB COMPLETION
-The local AceConfigCmd:CreateChatCommand comment advertises AceTab completion,
-but its code never calls AceTab. Explicit AceTab:RegisterTabCompletion registers
-real chat EditBox hooks in OnEnable, with commands plus test suite/probe argument
-phrases. Root candidates derive from the registered options table. AceTab handles
-prefix matching and cycling; usage chatter is suppressed. OnDisable unregisters
-the candidate set. Default chat edit boxes present at login are registered;
-custom or later-created edit boxes are not explicitly supported.
-Actual Tab behavior has NOT been verified inside WoW. Check both the default
-chat box and any extra Blizzard chat window you use.
+IN-GAME SUITES (22 CASES TOTAL)
+Tests/Runner.lua owns registration, protected execution, PASS/FAIL/SKIP, and
+actual summary counts. /wsgs test and /wsgs test all run all three suites.
+Scanner (6): real client snapshots, slot mappings, repeated observations,
+live upgrade comparisons, optional item 95757 and glove tinker checks.
+Comparator (8): deterministic Lua snapshots, actual maxima, unknowns, wrong
+items, interchangeable pairs, duplicate rings, captured links, empty slots.
+Importer (8): initialization/scopes and native command association, native JSON,
+retained Paladin reference, gear-only schema validation, optional and unknown
+fields, malformed documents, and specialization ambiguity.
+Equipment-dependent cases can SKIP. Tests do not alter equipment, settings,
+saved builds, import tracking, resources, or character configuration.
 
-IN-GAME SUITES
-Tests/Runner.lua owns registration, protected case execution, PASS/FAIL/SKIP,
-and summary counts. Each command runs synchronously on demand; no polling.
-Scanner: slot mapping, real inventory snapshots, repeated full/single-slot
-observations, live upgrade comparison, optional item 95757 and glove tinkers.
-Comparator: deterministic synthetic snapshots for maximum upgrades, unknowns,
-wrong items, swapped pairs, duplicate rings, captured links, and empty slots.
-Importer: native C_EncodingUtil.DeserializeJSON, retained user Paladin fixture,
-gear-only validation, optional fields, duplicate IDs, invalid documents,
-specialization ambiguity, unknown item fields, and AceDB/AceConfig initialization.
-Tests never call ImportEquipment (which saves builds), vendor operations, or
-commands that alter settings. The fixture is embedded Lua text because the client
-cannot read a JSON file from disk on demand. It retains the prior reference data.
-No Python, lupa, external test runner, or client API mocks are required.
+MALFORMED JSON REGRESSION
+Confirmed runtime evidence: DeserializeJSON("{broken") can return a table.
+Blizzard EncodingUtilDocumentation.lua declares a nullable LuaValueVariant,
+not a guarantee of exceptions or non-table results for malformed text.
+The corrected case decodes using the real API and, if decoding returns normally,
+passes the result to production ValidateEquipment(). It requires rejection with
+an error reason. A decoder exception is also rejection, as in the real importer.
+It checks collection identity, every existing build reference, latest ID and
+next sequence remain unchanged. It never calls the saving ImportEquipment()
+method or substitutes a test database. No native decoder replacement is used.
 
-EXACT RUNTIME CHECKS
+EXACT IN-GAME VALIDATION
 /reload
-/wsgs                       (open; repeat to close; test movement/close button)
-/wsgs debug                 (toggle; repeat to restore the previous value)
+/wsgs                       (standard AceConfigCmd root help; no window toggle)
+/wsgs debug                 (toggle; repeat to restore prior setting)
+/wsgs compare               (latest build, or useful missing-build message)
+/wsgs probe 3
+/wsgs probe 14
+/wsgs probe 0               (validation error)
 /wsgs test
 /wsgs test all
 /wsgs test scanner
 /wsgs test comparator
 /wsgs test importer
-/wsgs test nonsense         (expect useful validation error)
-/wsgs probe 3
-/wsgs probe 14
-/wsgs probe 0               (expect useful validation error)
-/wsgs compare               (useful message if no build is imported)
-Import your gear through the window, then repeat compare and probe. Reload
-clears session-only builds while SavedVariables is disabled, as before.
-In chat type /wsgs co then press Tab; check compare completion. Type /wsgs test
-sc then Tab; check scanner completion. Type /wsgs probe 1 then Tab to inspect
-numeric candidates. Cancel unsent text with Escape; do not submit it as a test.
-Run all suites twice; imported build count/latest and debug must stay unchanged.
-Scanner SKIPs are expected when optional equipment or cached data is absent.
+/wsgs test nonsense         (validation error)
+Reload clears session-only builds while SavedVariables is disabled. To compare
+an imported build without a window launcher, use the existing namespace method:
+/run LibStub("AceAddon-3.0"):GetAddon("WoWSimGearSync"):ToggleWindow()
+This is a manual verification probe, not a new slash command or root behavior.
+Import your gear, then repeat compare/probe. Run tests twice; build collection,
+latest ID, next sequence, and debug should be unchanged by the test runner.
 
-VALIDATION LIMITS
-Manifest existence/load-order checks, source-copy hashes, registration review,
-and git whitespace checks are static checks. The game client was not launched.
-Initialization, command execution, native decoding, test outcomes, and Tab-key
-behavior require the above runtime checks; no in-game PASS result is claimed.
+In unsent chat type /wsgs co and press Tab, then /wsgs test sc and Tab.
+Check repeated Tab cycling with /wsgs followed by a space. Cancel with Escape.
+Report observed behavior; native library source does not wire these completions.
+22 passed, 0 failed, 0 skipped is a target when all equipment/data is present,
+not an asserted or hardcoded summary. Optional equipment may produce SKIPs.
+
+STATIC VALIDATION AND LIMITS
+Check TOC paths, dependency order, disabled SavedVariables, exactly one
+CreateChatCommand registration, absence of custom dispatch/completion code,
+22 suite cases, and git whitespace. No offline Python harness is present.
+The game client was not launched: command execution, native decoder behavior,
+test outcomes, and physical Tab behavior still require runtime validation.

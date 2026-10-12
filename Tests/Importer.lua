@@ -8,8 +8,9 @@ WSGS.Tests:Register("importer", "Importer", {
     { name = "Ace3 initialization and database scopes", run = function()
         assert(LibStub("AceAddon-3.0"):GetAddon(WSGS.name) == WSGS)
         assert(type(WSGS.db.profile.debug) == "boolean" and type(WSGS.db.char.simulationProfiles) == "table")
-        local options = LibStub("AceConfigRegistry-3.0"):GetOptionsTable(WSGS.name, "cmd", "AceConfigCmd-3.0")
+        local options = LibStub("AceConfigRegistry-3.0"):GetOptionsTable("WowSimGearSync", "cmd", "AceConfigCmd-3.0")
         assert(options == WSGS.commandOptions and options.args.test and options.args.probe)
+        assert(LibStub("AceConfigCmd-3.0"):GetChatCommandOptions("wsgs") == "WowSimGearSync")
     end },
     { name = "Native JSON decoder and Paladin reference", run = function()
         local profile = assert(WSGS:ValidateEquipment(decode()))
@@ -50,8 +51,24 @@ WSGS.Tests:Register("importer", "Importer", {
         assert(not WSGS:ValidateEquipment(document))
     end },
     { name = "Malformed JSON cannot become equipment", run = function()
-        local ok, value = pcall(C_EncodingUtil.DeserializeJSON, "{broken")
-        assert(not ok or type(value) ~= "table", "Malformed JSON decoded as a document")
+        -- The native decoder may return a table for malformed input. A table
+        -- alone is not an equipment build: use the production schema validator.
+        local character = WSGS.db.char
+        local builds, latest, sequence = character.simulationProfiles,
+            character.latestSimulationProfileId, character.nextSimulationProfileId
+        local before = {}
+        for id, build in pairs(builds) do before[id] = build end
+        local ok, document = pcall(C_EncodingUtil.DeserializeJSON, "{broken")
+        if ok then
+            local build, reason = WSGS:ValidateEquipment(document)
+            assert(not build and reason, "Malformed JSON validated as equipment")
+        end
+        -- Do not call ImportEquipment: this test exercises its decode/validate
+        -- path without entering the save stage or substituting a database.
+        assert(character.simulationProfiles == builds and character.latestSimulationProfileId == latest
+            and character.nextSimulationProfileId == sequence, "Import tracking changed")
+        for id, build in pairs(builds) do assert(before[id] == build, "Build added or replaced") end
+        for id, build in pairs(before) do assert(builds[id] == build, "Build removed or replaced") end
     end },
     { name = "Unknown item fields retained", run = function()
         local document = decode()
@@ -68,4 +85,3 @@ WSGS.Tests:Register("importer", "Importer", {
         assert(not assert(WSGS:ValidateEquipment(document)).specialization.id)
     end },
 })
-

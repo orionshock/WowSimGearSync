@@ -22,12 +22,3 @@ function WSGS:OnInitialize()
     self:RegisterCommands()
     self:Debug("Loaded version " .. self.version .. ".")
 end
-
-function WSGS:OnEnable()
-    -- AceAddon enables at PLAYER_LOGIN, after Blizzard creates chat edit boxes.
-    self:RegisterCommandCompletion()
-end
-
-function WSGS:OnDisable()
-    LibStub("AceTab-3.0"):UnregisterTabCompletion("WSGS commands")
-end
