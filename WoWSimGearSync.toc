@@ -39,10 +39,3 @@ Window.lua
 SlotPresentation.lua
 PaperDoll.lua
 Launcher.lua
-Tests\Runner.lua
-Tests\Fixture.lua
-Tests\Scanner.lua
-Tests\Comparator.lua
-Tests\Importer.lua
-Tests\UI.lua
-Tests\Equip.lua

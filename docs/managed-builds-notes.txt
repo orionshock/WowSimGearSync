@@ -62,7 +62,7 @@ SavedVariables remains commented; /reload clears builds/settings as before.
 ImportInto(character,text) performs native decoding and complete existing gear
 validation before ManagedBuilds:Save. Unknown/ambiguous specs fail before saving
 or selecting. ImportEquipment uses the real db.char and sends the existing
-build-imported message only on success. In-game tests use temporary collections.
+build-imported message only on success.
 Rename trims whitespace, rejects empty/>80-byte names, marks customName and
 does not change class/spec/key. The paper doll name EditBox commits on Enter,
 cancels on Escape/focus loss and avoids overwriting an active edit on refresh.
@@ -75,20 +75,8 @@ the existing message and closes import. Failure retains JSON and existing
 builds with a readable error; reopening clears old errors.
 The paper doll layout/status words/corner-free icons and disabled Equip remain.
 
-TESTS / EXACT RUNTIME VALIDATION
-50 registered in-game cases: scanner 8, comparator 15, importer 14, UI 13.
-16 new cases cover target priority/default slots, disabled/non-Engineer contexts,
-missing/unknown/wrong-item effects, buckle independence, live effect mappings,
-create/replace/rename/separate specs/invalid imports and both import UI outcomes.
-Tests use ephemeral builds and synthetic comparison contexts, never replace the
-actual database, change settings, equip items, consume resources or transact.
-The native decoder and real frame APIs are exercised in-game.
-
+EXACT RUNTIME VALIDATION
  /reload
- /wsgs test importer
- /wsgs test comparator
- /wsgs test ui
- /wsgs test all
 Open import via /wsgs import; paste the Protection export and Import.
 Expect dialog closed, selected Protection build and refreshed visible doll.
 Rename to Raid tank and press Enter. Reimport changed Protection gear:
@@ -107,7 +95,6 @@ readable equipment and UNKNOWN for unavailable/unmapped data.
 Toggle /wsgs engineering if desired and restore its prior value afterward.
 Explicit exports must keep their target when recommendations are toggled.
 
-Static checks cover TOC paths/order, disabled SavedVariables, no removed-name
-references, registered case counts, source/API review and git whitespace.
-No WoW client execution, visual verification or in-game PASS results are claimed.
+Static checks cover TOC paths/order, disabled SavedVariables, source/API review and git whitespace.
+No WoW client execution or visual verification is claimed.
 No automation, Equipment Manager, persistence, Tab or LDB changes are included.

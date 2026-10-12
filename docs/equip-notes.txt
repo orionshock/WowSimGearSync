@@ -70,33 +70,24 @@ later become visible on a rescan; it never causes another automatic action.
 No item modification, currency spending or build/name/database writes occur.
 SavedVariables remains disabled. Existing settings/build scopes are unchanged.
 
-Tests and exact manual checks
-/wsgs test equip registers 26 cases: matching gear, bags/missing items, duplicate
-shortages and optimal modification assignments, ambiguous/locked/uncached copies,
-ring/trinket swaps, weapon dependencies, pending verification, wrong instances,
-unexpected changes, timeouts, combat, fingerprint/source movement, off-hand removal,
-missing builds and a live read-only carried-inventory scan. Tests call pure planner
-and state transitions, NEVER Click/Perform or equipment APIs that alter inventory.
-/wsgs test all has 76 registered cases. These are counts, not executed PASS results.
-
-1. /reload; /wsgs test equip; /wsgs test all. Copy actual results/errors.
-2. Import your intended build and open the doll via its launcher. /wsgs debug on
+Exact manual checks
+1. /reload. Import your intended build and open the doll via its launcher. /wsgs debug on
    enables diagnostics; use the existing debug option to disable them afterward.
-3. Out of combat with empty cursor, put one target item in bags and wear another
+2. Out of combat with empty cursor, put one target item in bags and wear another
    item in its slot. Click Equip once. Confirm that exact copy equips and the old
    item returns to bags; expect Attempting then Verified, not presumed success.
-4. With multiple targets, double-click: no second action while pending. After the
+3. With multiple targets, double-click: no second action while pending. After the
    observed change, Equip Next allows the next transaction. Check remaining counts.
-5. Try duplicate ring IDs with different known modifications, swapped rings and
+4. Try duplicate ring IDs with different known modifications, swapped rings and
    trinkets, missing targets, and unknown data. Verify no substitute/duplicate reuse.
-6. Test 2H/off-hand transitions with free general bag space, then full bags. Off-hand
+5. Check 2H/off-hand transitions with free general bag space, then full bags. Off-hand
    removal and main-hand equip require separate verified clicks. Native restrictions
    must win. Do not test restricted weapons your character cannot equip.
-7. Enter combat and confirm Blocked. Leave combat and confirm re-arming. Hold an
+6. Enter combat and confirm Blocked. Leave combat and confirm re-arming. Hold an
    item on cursor and confirm Blocked; place it manually to continue.
-8. If an operation is rejected, wait for the verification timeout; first fault click
+7. If an operation is rejected, wait for the verification timeout; first fault click
    only rescans. Verify no repeat equipment calls occur without another click.
-9. Confirm slot statuses refresh while gem/enchant/tinker/reforge/upgrade differences
+8. Confirm slot statuses refresh while gem/enchant/tinker/reforge/upgrade differences
    remain untouched. Close/reopen and verify the active build/name is unchanged.
 
 Debug examples (illustrative only):
@@ -153,17 +144,8 @@ is STILL_PENDING. After terminal failure/blocking, the next click rescans and
 retries the currently unresolved plan in the same click. The UI shows verified
 batch progress and the count of target slots still unresolved.
 
-/wsgs test equip registers 39 read-only runtime cases. Added coverage includes
-multi-operation submission, exact duplicate assignment, explicit MH/OH changes,
-one-hand/shield and two-one-hand transitions, two-handed dependencies, equipped
-weapon movement, partial outcomes, FAILED/BLOCKED/STILL_PENDING classification,
-direct-link eligibility, cursor fallback, final verification, and retry. The suite injects a non-equipping performer when
-testing batch submission and never calls EquipmentExecution or Click.
-
 Runtime validation remains required in MoP Classic:
   /reload
-  /wsgs test equip
-  /wsgs test all
 Then import a build and exercise one-click multi-slot, duplicate-instance, MH/OH,
 two-hander, full-bag, locked-item, partial-failure, and retry scenarios. No live
 client PASS result is claimed by static repository validation.

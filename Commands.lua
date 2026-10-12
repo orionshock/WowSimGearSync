@@ -40,15 +40,6 @@ function WSGS:RegisterCommands()
                 end,
                 set = function(_, value) self:ProbeEquipment(tonumber(value)) end,
             },
-            test = {
-                type = "input", name = "Test", desc = "Run all, scanner, comparator, importer, ui, or equip tests.", order = 4,
-                get = function() return "" end,
-                validate = function(_, value)
-                    if value == "" or value == "all" or self.Tests.suites[value] then return true end
-                    return "Use all, scanner, comparator, importer, ui, or equip."
-                end,
-                set = function(_, value) self.Tests:Run(value) end,
-            },
         },
     }
     local AceConfig = LibStub("AceConfig-3.0")

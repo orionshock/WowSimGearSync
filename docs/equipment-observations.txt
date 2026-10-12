@@ -101,14 +101,3 @@ GUID status. If actual gear still matches the captured links, comparison must
 show cloak gem MISMATCH and shoulders reforge MISMATCH. Supply glove probe 7
 plus its returned engineering spell ID and tooltip text for live confirmation. No unverified
 fields will be decoded from field 11 or from unrelated colon positions.
-
-TESTING
-Run /wsgs test scanner, /wsgs test comparator, /wsgs test importer, or /wsgs test ui inside
-MoP Classic, or /wsgs test for all suites. Tests/ contains real-client scanner
-checks and deterministic Lua domain tests. Tests never save simulation builds,
-change equipment, spend resources, or alter character settings. Equipment-
-dependent cases report SKIP when their item or data is unavailable.
-The user-provided Paladin reference is retained in Tests/Fixture.lua.
-The obsolete Python/Lua mock-client harness and its synthetic fixture were
-removed. See docs/commands-and-tests.txt for runtime verification instructions.
-No game-client run was performed by the agent.

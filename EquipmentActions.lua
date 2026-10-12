@@ -5,6 +5,22 @@ local Actions = { events = { "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "
 WSGS.EquipmentActions = Actions
 local verificationEvents = { PLAYER_EQUIPMENT_CHANGED=true, BAG_UPDATE_DELAYED=true, ITEM_LOCK_CHANGED=true }
 
+local function shown(value)
+    if value == nil or value == "" then return "nil" end
+    return tostring(value)
+end
+
+local function cursorState()
+    local kind, id = GetCursorInfo()
+    return kind and (shown(kind) .. ":" .. shown(id)) or "empty"
+end
+
+local function eventArguments(...)
+    local values = {}
+    for index = 1, select("#", ...) do values[index] = shown(select(index, ...)) end
+    return #values > 0 and table.concat(values, ",") or "none"
+end
+
 function Actions:New()
     return setmetatable({}, { __index = self })
 end
@@ -20,38 +36,50 @@ end
 function Actions:Verify(operation, snapshot, bags)
     local destination = snapshot.slots[operation.position]
     if operation.kind == "UNEQUIP" then
-        if destination.observations.item.status ~= "KNOWN" or destination.id then return false end
+        if destination.observations.item.status ~= "KNOWN" then
+            return false, "destination identity is unknown", destination
+        end
+        if destination.id then return false, "destination is not empty", destination end
         for _, item in ipairs(bags.items) do
             if item.bag == operation.destination.bag and item.bagSlot == operation.destination.bagSlot then
-                if operation.source.guid then return item.guid == operation.source.guid end
-                return item.fingerprint == operation.source.fingerprint
+                if operation.source.guid then
+                    return item.guid == operation.source.guid,
+                        item.guid == operation.source.guid and "destination is empty and intended instance is in the planned bag slot"
+                            or "planned bag slot contains a different instance", destination
+                end
+                return item.fingerprint == operation.source.fingerprint,
+                    item.fingerprint == operation.source.fingerprint
+                        and "destination is empty and intended fingerprint is in the planned bag slot"
+                        or "planned bag slot contains a different fingerprint", destination
             end
         end
-        return false
+        return false, "planned bag destination is empty or unreadable", destination
     end
-    if destination.id ~= operation.id then return false end
-    if operation.source.guid then return destination.guid == operation.source.guid end
+    if destination.id ~= operation.id then return false, "observed item ID does not match target", destination end
+    if operation.source.guid then
+        return destination.guid == operation.source.guid,
+            destination.guid == operation.source.guid and "observed item ID and instance match target"
+                or "observed item ID matches but instance GUID does not", destination
+    end
     local oldSource = sourceAt(operation, snapshot, bags)
-    return destination.fingerprint == operation.source.fingerprint
-        and (not oldSource or oldSource.fingerprint ~= operation.source.fingerprint)
+    if destination.fingerprint ~= operation.source.fingerprint then
+        return false, "observed item ID matches but fingerprint does not", destination
+    end
+    if oldSource and oldSource.fingerprint == operation.source.fingerprint then
+        return false, "matching fingerprint remains at the planned source", destination
+    end
+    return true, "observed item ID and fingerprint match and source moved", destination
 end
 
 function Actions:BeginBatch(operations, snapshot, now)
     local batch = { records = {}, deadline = now + 4, total = #operations }
     for index, operation in ipairs(operations) do
-        batch.records[index] = { operation = operation, status = "STILL_PENDING",
+        batch.records[index] = { operation = operation, status = "STILL_PENDING", index = index,
             beforeId = snapshot.slots[operation.position].id,
             beforeGUID = snapshot.slots[operation.position].guid }
     end
     self.batch, self.state, self.fault = batch, "PENDING", nil
     return batch
-end
-
--- Retained as a narrow test seam for a one-operation batch.
-function Actions:Begin(operation, snapshot, now)
-    local batch = self:BeginBatch({ operation }, snapshot, now)
-    self.pending = batch.records[1]
-    return self.pending
 end
 
 function Actions:PendingCount()
@@ -79,22 +107,44 @@ local function wrongDestination(record, snapshot)
         and destination.guid ~= operation.source.guid and destination.guid ~= record.beforeGUID
 end
 
--- Pure state transition used by live events and deterministic in-game tests.
--- No equipment APIs, character DB writes, callbacks, or actions are issued here.
+function Actions:LogVerification(record, snapshot, verified, reason, event)
+    local operation = record.operation
+    local observed = snapshot.slots[operation.position]
+    local expected = operation.kind == "UNEQUIP" and "empty" or shown(operation.id)
+    local instanceMatch = operation.source.guid and observed.guid == operation.source.guid
+        and "yes" or operation.source.guid and "no" or "fingerprint"
+    local weapon = operation.position == 15 and "MH" or operation.position == 16 and "OH" or "no"
+    WSGS:Debug(string.format("[EQUIP][VERIFY] op=%d weapon=%s inv=%d intended=%s intendedGUID=%s observed=%s observedGUID=%s instanceMatch=%s event=%s decision=%s reason=%s",
+        record.index, weapon, operation.slotId, expected, shown(operation.source.guid), shown(observed.id),
+        shown(observed.guid), instanceMatch, shown(event), record.status, reason))
+    record.diagnosticLogged = true
+end
+
 function Actions:Reconcile(profile, snapshot, bags, combat, now, event)
     local final = self.batch and (now >= self.batch.deadline or event == "FINAL")
     if self.batch then
         for _, record in ipairs(self.batch.records) do
-            if record.status ~= "VERIFIED" and (verificationEvents[event] or final)
-                and self:Verify(record.operation, snapshot, bags) then
-                record.status, record.reason = "VERIFIED", nil
+            if record.status ~= "VERIFIED" and (verificationEvents[event] or final) then
+                local verified, reason = self:Verify(record.operation, snapshot, bags)
+                if verified then
+                    record.status, record.reason = "VERIFIED", reason
+                elseif record.status == "STILL_PENDING" then
+                    if record.error then
+                        record.status, record.reason = "FAILED", record.error
+                    elseif verificationEvents[event] and wrongDestination(record, snapshot) then
+                        record.status, record.reason = "FAILED", "A different item instance occupied the destination."
+                    elseif final then
+                        record.status, record.reason = "FAILED", "Equipment change could not be verified: " .. reason
+                    else
+                        record.reason = reason
+                    end
+                end
+                self:LogVerification(record, snapshot, verified,
+                    "classification=" .. record.status .. "; reason=" .. (record.reason or reason)
+                        .. "; observed=" .. reason, event)
             elseif record.status == "STILL_PENDING" then
                 if record.error then
                     record.status, record.reason = "FAILED", record.error
-                elseif verificationEvents[event] and wrongDestination(record, snapshot) then
-                    record.status, record.reason = "FAILED", "A different item instance occupied the destination."
-                elseif final then
-                    record.status, record.reason = "FAILED", "Equipment change could not be verified."
                 end
             end
         end
@@ -125,6 +175,37 @@ function Actions:ReadNow()
     return snapshot, bags
 end
 
+function Actions:UnresolvedSlots(profile, snapshot)
+    local comparison = WSGS.EquipmentComparator:Compare(profile, snapshot)
+    local unresolved = {}
+    if not comparison then return unresolved end
+    for position, result in ipairs(comparison.slots) do
+        if result.fields.item.state ~= "MATCH" then
+            unresolved[#unresolved + 1] = WSGS.equipmentSlots[position].id .. ":" .. result.fields.item.state
+        end
+    end
+    return unresolved
+end
+
+function Actions:LogDone(profile, snapshot)
+    if not self.batch or self.batch.summaryLogged or self:PendingCount() > 0 then return end
+    self.batch.summaryLogged = true
+    local counts, attempted = self:OutcomeCounts(), 0
+    for _, record in ipairs(self.batch.records) do
+        if record.attempted then attempted = attempted + 1 end
+        if not record.diagnosticLogged then
+            local verified, reason = self:Verify(record.operation, snapshot, self.bags)
+            self:LogVerification(record, snapshot, verified,
+                "classification=" .. record.status .. "; observed=" .. reason, "FINAL_RESCAN")
+        end
+    end
+    local unresolved = self:UnresolvedSlots(profile, snapshot)
+    WSGS:Debug(string.format("[EQUIP][DONE] planned=%d attempted=%d verified=%d failed=%d blocked=%d pending=%d completed=%d actualUnresolved=%d slots=%s",
+        self.batch.total, attempted, counts.VERIFIED, counts.FAILED, counts.BLOCKED, counts.STILL_PENDING,
+        counts.VERIFIED + counts.FAILED + counts.BLOCKED, #unresolved,
+        #unresolved > 0 and table.concat(unresolved, ",") or "none"))
+end
+
 function Actions:Refresh(profile, snapshot)
     local bags
     if snapshot then bags = WSGS.EquipmentInventory:Scan(snapshot)
@@ -138,9 +219,10 @@ function Actions:Refresh(profile, snapshot)
         self.state = "CURSOR"
     end
     if counts and before and counts.VERIFIED > before.VERIFIED then
-        WSGS:Debug(string.format("[EQUIP] Verified: %d/%d; unresolved targets: %d",
+        WSGS:Debug(string.format("[EQUIP][VERIFY] progress=%d/%d plannerUnresolved=%d",
             counts.VERIFIED, self.batch.total, self.plan.unresolvedCount))
     end
+    self:LogDone(profile, snapshot)
     if self.stateChanged then self.stateChanged() end
     return self.plan
 end
@@ -164,11 +246,18 @@ function Actions:Initialize()
     local listener = CreateFrame("Frame")
     self.listener = listener
     for _, event in ipairs(self.events) do listener:RegisterEvent(event) end
-    listener:SetScript("OnEvent", function(_, event, _, message)
+    listener:SetScript("OnEvent", function(_, event, ...)
+        local active = self.batch and self:PendingCount() > 0
+        if active and (verificationEvents[event] or event == "UI_ERROR_MESSAGE") then
+            WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
+        end
         if event == "UI_ERROR_MESSAGE" then
+            local _, message = ...
             local record = self.executingRecord or self.lastSubmittedRecord
             if record and record.status == "STILL_PENDING" then
                 record.error = type(message) == "string" and message or "Client rejected the operation."
+                WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d inv=%d reason=%s",
+                    record.index, record.operation.slotId, record.error))
                 self:QueueRefresh(event)
             end
             return
@@ -186,15 +275,18 @@ local function blockRemaining(batch, first, reason)
     end
 end
 
--- Runs only from Click in production. Tests inject a non-equipping performer.
-function Actions:SubmitBatch(batch, perform, cursorOccupied)
-    cursorOccupied = cursorOccupied or GetCursorInfo
+-- Runs only from Click. Every protected API call remains in the hardware event.
+function Actions:SubmitBatch(batch)
     for index, record in ipairs(batch.records) do
+        record.attempted = true
         self.executingRecord = record
-        local ok, submitted, reason = pcall(perform, record.operation)
+        local ok, submitted, reason = pcall(WSGS.EquipmentExecution.Perform,
+            WSGS.EquipmentExecution, record.operation, index, batch.total)
         self.executingRecord = nil
         if not ok then
             record.status, record.reason = "FAILED", tostring(submitted)
+            WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d inv=%d luaError=%s",
+                index, record.operation.slotId, record.reason))
         elseif not submitted then
             record.status, record.reason = "BLOCKED", reason or "Client rejected the operation."
         elseif record.error then
@@ -203,7 +295,9 @@ function Actions:SubmitBatch(batch, perform, cursorOccupied)
             record.submission = reason
             self.lastSubmittedRecord = record
         end
-        if cursorOccupied() then
+        if GetCursorInfo() then
+            WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d cursor=%s reason=item remains on cursor",
+                index, cursorState()))
             blockRemaining(batch, index + 1, "An item remains on the cursor.")
             break
         end
@@ -212,34 +306,70 @@ function Actions:SubmitBatch(batch, perform, cursorOccupied)
     return self:OutcomeCounts()
 end
 
+function Actions:LogPlan(profile)
+    WSGS:Debug(string.format("[EQUIP][PLAN] click cursor=%s operations=%d unresolved=%d missing=%d blocked=%d",
+        cursorState(), #self.plan.operations, self.plan.unresolvedCount, #self.plan.missing, #self.plan.blocked))
+    local comparison = WSGS.EquipmentComparator:Compare(profile, self.snapshot)
+    local byTarget, missing = {}, {}
+    for index, operation in ipairs(self.plan.operations) do byTarget[operation.targetPosition] = index end
+    for _, item in ipairs(self.plan.missing) do missing[item.position] = item.id end
+    for position, target in ipairs(profile.equipment) do
+        local physical = comparison and comparison.assignments[position] or position
+        local current = self.snapshot.slots[physical]
+        local state = comparison and comparison.slots[position].fields.item.state or "UNKNOWN"
+        local decision = byTarget[position] and ("operation:" .. byTarget[position])
+            or missing[position] and "missing" or state == "MATCH" and "satisfied" or "excluded"
+        local reason = byTarget[position] and "source selected"
+            or missing[position] and "target instance not found"
+            or state == "MATCH" and "actual equipped item matches target"
+            or position >= 15 and "weapon operation excluded; see weapon decision and excluded reasons"
+            or "no safely executable source; see excluded reasons"
+        WSGS:Debug(string.format("[EQUIP][PLAN] pos=%d inv=%d name=%s physical=%d current=%s currentGUID=%s target=%s state=%s decision=%s reason=%s",
+            position, WSGS.equipmentSlots[position].id, WSGS.equipmentSlots[position].name, physical,
+            shown(current and current.id), shown(current and current.guid), shown(target and target.id), state, decision, reason))
+    end
+    for index, operation in ipairs(self.plan.operations) do
+        local source = operation.source
+        local sourceLocation = source.bag ~= nil and ("bag:" .. source.bag .. ":" .. source.bagSlot)
+            or ("equipped:" .. shown(source.position))
+        WSGS:Debug(string.format("[EQUIP][PLAN] order=%d kind=%s targetPos=%d inv=%d item=%s GUID=%s source=%s equipLoc=%s API=%s",
+            index, operation.kind, operation.targetPosition, operation.slotId, shown(operation.id), shown(source.guid),
+            sourceLocation, shown(source.equipLoc), operation.direct and "C_Item.EquipItemByName" or "cursor APIs"))
+    end
+    for _, item in ipairs(self.plan.missing) do
+        WSGS:Debug(string.format("[EQUIP][PLAN] excluded pos=%d inv=%d item=%s reason=not found in equipped gear or carried bags",
+            item.position, WSGS.equipmentSlots[item.position].id, shown(item.id)))
+    end
+    for _, reason in ipairs(self.plan.blocked) do WSGS:Debug("[EQUIP][PLAN] excluded reason=" .. reason) end
+    local grip = self.snapshot.context and self.snapshot.context.titansGrip and "yes" or "no"
+    for _, position in ipairs({15, 16}) do
+        local target = profile.equipment[position]
+        local current = self.snapshot.slots[position]
+        local targetLoc = target and target.id and target.id > 0 and select(4, C_Item.GetItemInfoInstant(target.id))
+        WSGS:Debug(string.format("[EQUIP][PLAN] weapon=%s inv=%d current=%s currentType=%s target=%s targetType=%s titansGrip=%s operation=%s",
+            position == 15 and "MH" or "OH", WSGS.equipmentSlots[position].id, shown(current.id),
+            shown(current.equipLoc), shown(target and target.id), shown(targetLoc), grip, shown(byTarget[position])))
+    end
+end
+
 function Actions:Click()
     -- A terminal batch may be retried; an overlapping pending batch may not.
     if self:PendingCount() > 0 then return end
     self.fault, self.batch, self.pending = nil, nil, nil
-    self:Refresh(WSGS:GetActiveSimulationProfile())
+    local profile = WSGS:GetActiveSimulationProfile()
+    self:Refresh(profile)
+    if profile then self:LogPlan(profile) end
     if self.state ~= "READY" then
         WSGS:Print("[EQUIP] " .. (self.state == "COMBAT" and "Cannot equip in combat." or self.plan.blocked[1] or "No available equipment changes."))
         return
     end
     if GetCursorInfo() then WSGS:Print("[EQUIP] Place the held cursor item first."); return end
-    for _, missing in ipairs(self.plan.missing) do
-        WSGS:Debug("[EQUIP] Missing: item " .. missing.id .. " for " .. WSGS.equipmentSlots[missing.position].name)
-    end
-    for _, reason in ipairs(self.plan.blocked) do WSGS:Debug("[EQUIP] Blocked: " .. reason) end
     local batch = self:BeginBatch(self.plan.operations, self.snapshot, GetTime())
-    WSGS:Debug("[EQUIP] Attempting batch: " .. batch.total .. " operations")
-    for _, record in ipairs(batch.records) do
-        local operation = record.operation
-        WSGS:Debug(string.format("[EQUIP] Planned: %s item %d -> inventory %d via %s",
-            operation.kind, operation.id, operation.slotId, operation.direct and "direct link" or "exact cursor"))
-    end
     if self.stateChanged then self.stateChanged() end
-    self:SubmitBatch(batch, function(operation)
-        return WSGS.EquipmentExecution:Perform(operation)
-    end)
+    self:SubmitBatch(batch)
     for _, record in ipairs(batch.records) do
         if record.status == "FAILED" or record.status == "BLOCKED" then
-            WSGS:Debug(string.format("[EQUIP] %s: inventory %d - %s",
+            WSGS:Debug(string.format("[EQUIP][BLOCK] status=%s inv=%d reason=%s",
                 record.status, record.operation.slotId, record.reason or "client rejection"))
         end
     end
@@ -248,6 +378,7 @@ function Actions:Click()
     self:Refresh(WSGS:GetActiveSimulationProfile())
     C_Timer.After(4, function()
         if self.batch == batch and self:PendingCount() > 0 then
+            WSGS:Debug(string.format("[EQUIP][EVENT] name=VERIFY_TIMEOUT pending=%d", self:PendingCount()))
             self.verificationEvent = "FINAL"
             if self.isVisible and self.isVisible() then self.refreshView()
             else self:Refresh(WSGS:GetActiveSimulationProfile()) end

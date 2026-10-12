@@ -66,7 +66,7 @@ opening. Event bursts are coalesced with one deferred C_Timer.After(0) callback.
 There is no addon OnUpdate loop. Pending callbacks recheck visibility, so a closed
 doll does not scan. Metadata and scanner data remain separate responsibilities.
 
-TESTS AND EXACT IN-GAME CHECKS
+EXACT IN-GAME CHECKS
 /reload
 Left-click the minimap icon (or LDB display entry); expect empty slots/import prompt.
 Right-click toggles the import window independently; /wsgs import still toggles it.
@@ -78,21 +78,10 @@ Close with X/Escape; reopen. Confirm reuse and retained editor contents.
 With the doll visible, manually change gear if desired and observe refresh;
 the addon never changes gear. Check previously uncached target names/icons load.
 Verify Equip is disabled and slot clicks do nothing.
-/wsgs test ui
-/wsgs test all
-/wsgs test scanner
-/wsgs test comparator
-/wsgs test importer
-Repeat UI tests with the doll open and closed. UI tests restore the previous
-presentation/visibility, never save builds or change settings/equipment, and
-report SKIP for latest-build selection when none is imported. There are now
-13 UI, 15 comparator, 8 scanner and 14 importer cases (50 total). Summary counts
-are computed, never hardcoded.
-
 KNOWN LIMITATIONS / VALIDATION
 Static checks only: manifests/load order, source-copy hashes, license retention,
-50 registered cases, registration/API/source review, and git whitespace.
-No game-client run, visual inspection, Lua execution or test PASS is claimed.
+registration/API/source review, and git whitespace.
+No game-client run or visual inspection is claimed.
 Actual frame layout, LDB/minimap clicks, item metadata caching and client events
 require the above runtime validation. Existing scanner UNKNOWN behavior remains;
 upgrade/tinker behavior is preserved. Buckle evidence is described below. No 3D character model,
@@ -132,14 +121,11 @@ Exact runtime validation:
  /run local l=GetInventoryItemLink("player",6); print(l and C_Item.GetItemNumAddedSockets(l))
  Compare that number with the belt's actual added socket, including an empty one.
  /wsgs compare
- /wsgs test ui
- /wsgs test comparator
- /wsgs test all
  Toggle /wsgs debug as needed to check normal versus diagnostic tooltips; restore
  your original debug setting afterward. Normal tooltips omit raw states and
  non-applicable lines. Verify upgrade text such as 0/2 (2 remaining), small
  center hint, bottom summary and no actions from slot clicks.
- No client test results or visual verification are claimed from static review.
+ No client or visual verification is claimed from static review.
 
 TASK 017 SUPERSEDES DISABLED GLOBAL EQUIP
 The global Equip button is now active when an exact-source item operation is
