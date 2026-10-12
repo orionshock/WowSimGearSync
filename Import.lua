@@ -44,6 +44,8 @@ function WSGS:ValidateEquipment(document)
     if type(document) ~= "table" then return nil, "Expected a top-level JSON object." end
     if document.apiVersion ~= 3 then return nil, "Only numeric apiVersion 3 is supported." end
     if type(document.player) ~= "table" then return nil, "Missing player object." end
+    -- Full simulation exports also contain buffs, rotations, encounter data,
+    -- talents, and other player options. Only equipment enters the stored build.
     local player = document.player
     if not ((type(player.class) == "string" and player.class:match("%S"))
         or (identifier(player.class) and player.class > 0)) then

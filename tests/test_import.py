@@ -145,6 +145,32 @@ result, reason = import_doc(fixture, 'x'*81)
 check(result is None and reason and count_profiles() == before, 'long names rejected atomically')
 value = decode('{"text":"\\uD83D\\uDE00"}')
 check(value.text == '\U0001f600', 'native Unicode surrogate decoding')
+# Exact gear supplied by the user, in a synthetic full-export envelope.
+user_gear = json.loads((ROOT/'tests/fixtures/user-paladin-equipment-v3.json').read_text(encoding='utf-8-sig'))
+full_export = copy.deepcopy(user_gear)
+full_export.update({'raidBuffs': {'bloodlust': True}, 'debuffs': {'weakenedArmor': True},
+                    'tanks': [{'type': 'Player'}], 'partyBuffs': {},
+                    'encounter': {'apiVersion': 3, 'duration': 620, 'targets': [{'id': 60999}]}})
+full_export['player'].update({'name': 'Player', 'race': 'RaceBloodElf', 'talentsString': '313232',
+    'glyphs': {'major1': 45744}, 'profession1': 'Engineering', 'profession2': 'Mining',
+    'consumables': {'potId': 76090}, 'bonusStats': {'stats': [0]*23},
+    'itemSwap': {'items': [{}]*16}, 'buffs': {'vigilanceCount': 2},
+    'protectionPaladin': {'options': {'classOptions': {'seal': 'Insight'}}},
+    'healingModel': {'hps': 58682},
+    'rotation': {'type': 'TypeAPL', 'priorityList': [{'action': {'castSpell': {'spellId': {'spellId': 20925}}}}]*100}})
+for text in [json.dumps(full_export, indent=2), json.dumps(full_export, separators=(',', ':'))]:
+    imported = wsgs.ImportEquipment(wsgs, text, 'User Paladin')
+    check(imported.metadata.entryCount == 16 and imported.metadata.equippedCount == 16, 'full export imports sixteen equipped items')
+    check(len(imported.metadata.warnings) == 0, 'unrelated export sections do not generate warnings')
+    for index, expected in enumerate(user_gear['player']['equipment']['items'], 1):
+        for key, value in expected.items():
+            actual = imported.equipment[index][key]
+            if isinstance(value, list):
+                actual = [actual[i] for i in range(1, len(actual)+1)]
+            check(actual == value, 'user gear modifications and order retained')
+    check(set(imported) == {'id', 'name', 'class', 'apiVersion', 'equipment', 'metadata'}, 'only gear and import identity retained')
+    for field in ['rotation', 'talentsString', 'glyphs', 'itemSwap', 'raidBuffs', 'encounter', 'consumables']:
+        check(imported[field] is None, 'non-equipment settings excluded')
 # Disabled SavedVariables means a reload starts with a new session database.
 lua.execute('WSGSDB = nil')
 core_frame.scripts.OnEvent(core_frame, 'ADDON_LOADED', 'WoWSimGearSync')
