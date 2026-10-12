@@ -10,7 +10,7 @@ local equipButtonLabels = {
     COMBAT = "Blocked",
     FAULT = "Blocked",
     BLOCKED = "Blocked",
-    COMPLETE = "Sync Set",
+    COMPLETE = "Sync Set"
 }
 -- Translate comparator states into presentation only; no item/modification
 -- comparison or interchangeable-slot assignment is performed here.
@@ -97,8 +97,7 @@ function UI:RenderPaperDoll(profile, snapshot, comparison, reason)
         button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
         local state = visualState(target, button.difference)
         button.visualState = state
-        button.miniState:SetText(Presentation:MiniStates(button.difference,
-            WSGS.SlotActions:ClickText(button.position)))
+        button.miniState:SetText(Presentation:MiniStates(button.difference, WSGS.SlotActions:ClickText(button.position)))
         local action = WSGS.SlotActions.controllers[position]
         local pending = action and action.state == "PENDING"
         button.icon:SetDesaturated(pending == true)
@@ -118,7 +117,7 @@ function UI:UpdateEquipButton()
     local actions = WSGS.EquipmentActions
     self.paperDoll.equipButton:SetText(equipButtonLabels[actions.state] or "Blocked")
     self.paperDoll.equipButton:SetEnabled(actions.state == "READY" or actions.state == "FAULT" or actions.state ==
-                                          "COMPLETE")
+                                              "COMPLETE")
     local plan = actions.plan
     local counts = actions.batch and actions:OutcomeCounts()
     local note = actions.state == "CURSOR" and "Place the held cursor item first." or actions.state == "COMBAT" and

@@ -2,20 +2,15 @@ local _, WSGS = ...
 local UI = WSGS:NewModule("UI", "AceEvent-3.0")
 WSGS.UI = UI
 
-local refreshEvents = {
-    "GET_ITEM_INFO_RECEIVED",
-    "ITEM_DATA_LOAD_RESULT",
-    "SKILL_LINES_CHANGED",
-}
+local refreshEvents = {"GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT", "SKILL_LINES_CHANGED"}
 
 function UI:RefreshEscapeWindow()
     if not self.escapeWindowRegistered then
         table.insert(UISpecialFrames, "WSGSEscapeWindow")
         self.escapeWindowRegistered = true
     end
-    _G.WSGSEscapeWindow = self.importDialog and self.importDialog:IsShown() and self.importDialog
-        or self.paperDoll and self.paperDoll:IsShown() and self.paperDoll
-        or nil
+    _G.WSGSEscapeWindow = self.importDialog and self.importDialog:IsShown() and self.importDialog or self.paperDoll and
+                              self.paperDoll:IsShown() and self.paperDoll or nil
 end
 
 function UI:CommitBuildName()
@@ -43,8 +38,8 @@ function UI:QueuePaperDollRefresh(event, itemId, success)
     if not self.paperDoll or not self.paperDoll:IsShown() then
         return
     end
-    if event ~= "PLAYER_EQUIPMENT_CHANGED" and event ~= "SKILL_LINES_CHANGED"
-        and (not success or not self.relevantItems[itemId]) then
+    if event ~= "PLAYER_EQUIPMENT_CHANGED" and event ~= "SKILL_LINES_CHANGED" and
+        (not success or not self.relevantItems[itemId]) then
         return
     end
     if self.refreshQueued then
