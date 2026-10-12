@@ -21,9 +21,17 @@ end
 function Planner:Build(position, profile, snapshot, comparison, bags)
     local target, difference = profile.equipment[position], comparison.slots[position]
     local current = snapshot.slots[difference.currentPosition]
-    local controller = { position = position, inventorySlot = difference.currentSlotId,
-        currentPosition = difference.currentPosition, target = target, difference = difference,
-        targetGuid = targetGuid(current), operations = {}, blocked = {}, unknown = {} }
+    local controller = {
+        position = position,
+        inventorySlot = difference.currentSlotId,
+        currentPosition = difference.currentPosition,
+        target = target,
+        difference = difference,
+        targetGuid = targetGuid(current),
+        operations = {},
+        blocked = {},
+        unknown = {}
+    }
     if difference.fields.item.state ~= "MATCH" then
         controller.state = "WAITING_FOR_ITEM"
         controller.reason = difference.fields.item.reason or "Equip the target item first"
@@ -34,7 +42,7 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
         return controller
     end
     local modificationsRemain = false
-    for _, field in ipairs({ "professionSocket", "buckle", "gems", "enchant", "tinker" }) do
+    for _, field in ipairs({"professionSocket", "buckle", "gems", "enchant", "tinker"}) do
         local observed = difference.fields[field]
         if observed and (observed.state == "MISMATCH" or observed.state == "UNKNOWN") then
             modificationsRemain = true
@@ -49,11 +57,17 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
         return controller
     end
 
-    local context = { position = position, inventorySlot = controller.inventorySlot, target = target,
-        fields = difference.fields, bags = bags, controller = controller }
-    context.additionalSocketMissing = difference.fields.professionSocket
-            and difference.fields.professionSocket.state == "MISMATCH"
-        or difference.fields.buckle and difference.fields.buckle.state == "MISMATCH"
+    local context = {
+        position = position,
+        inventorySlot = controller.inventorySlot,
+        target = target,
+        fields = difference.fields,
+        bags = bags,
+        controller = controller
+    }
+    context.additionalSocketMissing = difference.fields.professionSocket and difference.fields.professionSocket.state ==
+                                          "MISMATCH" or difference.fields.buckle and difference.fields.buckle.state ==
+                                          "MISMATCH"
     for _, handlerName in ipairs(WSGS.SlotActionHandlers:ForSlot(controller.inventorySlot)) do
         local handler = WSGS.SlotActionHandlers.handlers[handlerName]
         for _, operation in ipairs(handler:Check(context)) do

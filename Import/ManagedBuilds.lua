@@ -23,10 +23,16 @@ end
 
 function Import:RenameBuild(character, id, name)
     local build = character.simulationProfiles[id]
-    if not build then return nil, "Select a build before renaming." end
+    if not build then
+        return nil, "Select a build before renaming."
+    end
     name = type(name) == "string" and name:match("^%s*(.-)%s*$") or ""
-    if name == "" then return nil, "Build name cannot be empty." end
-    if #name > 80 then return nil, "Build names must be at most 80 bytes." end
+    if name == "" then
+        return nil, "Build name cannot be empty."
+    end
+    if #name > 80 then
+        return nil, "Build names must be at most 80 bytes."
+    end
     build.name, build.customName = name, true
     return build
 end

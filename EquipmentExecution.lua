@@ -3,19 +3,26 @@ local Execution = {}
 WSGS.EquipmentExecution = Execution
 
 local function pickup(source)
-    if source.bag ~= nil then C_Container.PickupContainerItem(source.bag, source.bagSlot)
-    else PickupInventoryItem(WSGS.equipmentSlots[source.position].id) end
+    if source.bag ~= nil then
+        C_Container.PickupContainerItem(source.bag, source.bagSlot)
+    else
+        PickupInventoryItem(WSGS.equipmentSlots[source.position].id)
+    end
 end
 
 local function destinationHasSource(operation)
-    if operation.kind ~= "EQUIP" or not operation.source.guid then return false end
+    if operation.kind ~= "EQUIP" or not operation.source.guid then
+        return false
+    end
     local location = ItemLocation:CreateFromEquipmentSlot(operation.slotId)
     local ok, guid = pcall(C_Item.GetItemGUID, location)
     return ok and guid == operation.source.guid
 end
 
 local function shown(value)
-    if value == nil or value == "" then return "nil" end
+    if value == nil or value == "" then
+        return "nil"
+    end
     return tostring(value)
 end
 
@@ -25,17 +32,17 @@ local function cursorState()
 end
 
 local function sourceLocation(source)
-    if source.bag ~= nil then return "bag:" .. source.bag .. ":" .. source.bagSlot end
+    if source.bag ~= nil then
+        return "bag:" .. source.bag .. ":" .. source.bagSlot
+    end
     return "equipped:" .. shown(source.position)
 end
 
 local function logResult(operation, index, ok, reason)
-    WSGS:Debug(string.format("[EQUIP][EXEC] op=%s result=%s reason=%s cursorAfter=%s itemAfter=%s",
-        shown(index), ok and "SUBMITTED" or "REJECTED", reason, cursorState(),
-        shown(GetInventoryItemID("player", operation.slotId))))
+    WSGS:Debug(string.format("[EQUIP][EXEC] op=%s result=%s reason=%s cursorAfter=%s itemAfter=%s", shown(index),
+        ok and "SUBMITTED" or "REJECTED", reason, cursorState(), shown(GetInventoryItemID("player", operation.slotId))))
     if not ok then
-        WSGS:Debug(string.format("[EQUIP][BLOCK] op=%s inv=%d reason=%s",
-            shown(index), operation.slotId, reason))
+        WSGS:Debug(string.format("[EQUIP][BLOCK] op=%s inv=%d reason=%s", shown(index), operation.slotId, reason))
     end
 end
 
@@ -44,14 +51,14 @@ end
 function Execution:Perform(operation, index, total)
     local source, before = operation.source, GetInventoryItemID("player", operation.slotId)
     local sourceInfo = source.bag ~= nil and C_Container.GetContainerItemInfo(source.bag, source.bagSlot)
-    local sourceLocked = source.bag ~= nil and (not sourceInfo or sourceInfo.isLocked)
-        or source.bag == nil and IsInventoryItemLocked(WSGS.equipmentSlots[source.position].id)
+    local sourceLocked = source.bag ~= nil and (not sourceInfo or sourceInfo.isLocked) or source.bag == nil and
+                             IsInventoryItemLocked(WSGS.equipmentSlots[source.position].id)
     local destinationLocked = IsInventoryItemLocked(operation.slotId)
-    WSGS:Debug(string.format("[EQUIP][EXEC] op=%s/%s kind=%s source=%s item=%s GUID=%s destInv=%d API=%s cursorBefore=%s itemBefore=%s sourceLocked=%s destLocked=%s",
+    WSGS:Debug(string.format(
+        "[EQUIP][EXEC] op=%s/%s kind=%s source=%s item=%s GUID=%s destInv=%d API=%s cursorBefore=%s itemBefore=%s sourceLocked=%s destLocked=%s",
         shown(index), shown(total), operation.kind, sourceLocation(source), shown(source.id or operation.id),
         shown(source.guid), operation.slotId, operation.direct and "C_Item.EquipItemByName" or "cursor APIs",
-        cursorState(), shown(before), shown(sourceLocked and true or false),
-        shown(destinationLocked and true or false)))
+        cursorState(), shown(before), shown(sourceLocked and true or false), shown(destinationLocked and true or false)))
 
     if InCombatLockdown() or UnitAffectingCombat("player") then
         local reason = "Cannot equip in combat."
@@ -80,16 +87,16 @@ function Execution:Perform(operation, index, total)
         return false, reason
     end
 
-    local location = source.bag ~= nil and ItemLocation:CreateFromBagAndSlot(source.bag, source.bagSlot)
-        or ItemLocation:CreateFromEquipmentSlot(WSGS.equipmentSlots[source.position].id)
+    local location = source.bag ~= nil and ItemLocation:CreateFromBagAndSlot(source.bag, source.bagSlot) or
+                         ItemLocation:CreateFromEquipmentSlot(WSGS.equipmentSlots[source.position].id)
     local guidOK, guid = pcall(C_Item.GetItemGUID, location)
     if source.guid and (not guidOK or guid ~= source.guid) then
         local reason = "Source instance changed; rescan required."
         logResult(operation, index, false, reason)
         return false, reason
     end
-    local link = source.bag ~= nil and C_Container.GetContainerItemLink(source.bag, source.bagSlot)
-        or GetInventoryItemLink("player", WSGS.equipmentSlots[source.position].id)
+    local link = source.bag ~= nil and C_Container.GetContainerItemLink(source.bag, source.bagSlot) or
+                     GetInventoryItemLink("player", WSGS.equipmentSlots[source.position].id)
     local decoded = WSGS.ItemLinkDecoder:Decode(link)
     if not decoded or decoded.payload ~= source.fingerprint then
         local reason = "Source link changed; rescan required."
@@ -98,8 +105,8 @@ function Execution:Perform(operation, index, total)
     end
 
     if operation.kind == "EQUIP" and operation.direct then
-        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=C_Item.EquipItemByName linkItem=%s destInv=%d",
-            shown(index), shown(operation.id), operation.slotId))
+        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=C_Item.EquipItemByName linkItem=%s destInv=%d", shown(index),
+            shown(operation.id), operation.slotId))
         C_Item.EquipItemByName(link, operation.slotId)
         logResult(operation, index, true, "SUBMITTED")
         return true, "SUBMITTED"
@@ -117,8 +124,8 @@ function Execution:Perform(operation, index, total)
             logResult(operation, index, false, reason)
             return false, reason
         end
-        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=PickupInventoryItem sourceInv=%d",
-            shown(index), WSGS.equipmentSlots[source.position].id))
+        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=PickupInventoryItem sourceInv=%d", shown(index),
+            WSGS.equipmentSlots[source.position].id))
         pickup(source)
         if not CursorHasItem() then
             local reason = "Client did not pick up the off-hand item."
@@ -129,9 +136,8 @@ function Execution:Perform(operation, index, total)
             shown(index), destination.bag, destination.bagSlot))
         C_Container.PickupContainerItem(destination.bag, destination.bagSlot)
     else
-        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=%s source=%s",
-            shown(index), source.bag ~= nil and "C_Container.PickupContainerItem" or "PickupInventoryItem",
-            sourceLocation(source)))
+        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=%s source=%s", shown(index),
+            source.bag ~= nil and "C_Container.PickupContainerItem" or "PickupInventoryItem", sourceLocation(source)))
         pickup(source)
         if not CursorHasItem() then
             local reason = "Client did not pick up the planned item."
@@ -144,10 +150,12 @@ function Execution:Perform(operation, index, total)
             logResult(operation, index, false, reason)
             return false, reason
         end
-        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=PickupInventoryItem destInv=%d",
-            shown(index), operation.slotId))
+        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=PickupInventoryItem destInv=%d", shown(index),
+            operation.slotId))
         PickupInventoryItem(operation.slotId)
-        if CursorHasItem() then pickup(source) end
+        if CursorHasItem() then
+            pickup(source)
+        end
     end
     if CursorHasItem() then
         local reason = "Item remains on cursor; place it in a bag before retrying."

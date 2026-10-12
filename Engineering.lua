@@ -3,26 +3,47 @@ local Engineering = {}
 WSGS.Engineering = Engineering
 
 -- Local MoP SpellItemEnchantment data; names/IDs are not inferred from tooltips.
-Engineering.defaults = { [10] = 4898, [15] = 4897, [6] = 4223 }
+Engineering.defaults = {
+    [10] = 4898,
+    [15] = 4897,
+    [6] = 4223
+}
 Engineering.effects = {
-    [10] = { [126734] = 4898, [108788] = 4697, [109076] = 4698 },
-    [15] = { [126389] = 4897 },
-    [6] = { [55004] = 4223, [131459] = 5000 },
+    [10] = {
+        [126734] = 4898,
+        [108788] = 4697,
+        [109076] = 4698
+    },
+    [15] = {
+        [126389] = 4897
+    },
+    [6] = {
+        [55004] = 4223,
+        [131459] = 5000
+    }
 }
 
 -- Some use spells establish that a different engineering effect is present
 -- without uniquely identifying its SpellItemEnchantment row. Keep that
 -- distinction explicit instead of guessing an enchant effect ID.
 Engineering.knownDifferentEffects = {
-    [15] = { [55001] = "Parachute" },
+    [15] = {
+        [55001] = "Parachute"
+    }
 }
 
 function Engineering:CharacterContext()
     local first, second = GetProfessions()
     local professions = {}
-    for _, index in pairs({ first, second }) do
+    for _, index in pairs({first, second}) do
         local name, _, rank, maxRank, _, _, skillLine = GetProfessionInfo(index)
-        if skillLine then professions[skillLine] = { name = name, rank = rank, maxRank = maxRank } end
+        if skillLine then
+            professions[skillLine] = {
+                name = name,
+                rank = rank,
+                maxRank = maxRank
+            }
+        end
     end
     local details = {}
     for skillLine, profession in pairs(professions) do
@@ -37,12 +58,17 @@ function Engineering:CharacterContext()
             signature ~= "" and signature or "none", tostring(professions[202] ~= nil),
             tostring(professions[164] ~= nil)))
     end
-    return { engineering = professions[202] ~= nil, blacksmithing = professions[164] ~= nil,
-        recommendedTinkers = WSGS.db.profile.recommendedEngineeringTinkers }
+    return {
+        engineering = professions[202] ~= nil,
+        blacksmithing = professions[164] ~= nil,
+        recommendedTinkers = WSGS.db.profile.recommendedEngineeringTinkers
+    }
 end
 
 function Engineering:Target(item, slotId, context)
-    if item.tinker ~= nil then return item.tinker, "SIMULATION" end
+    if item.tinker ~= nil then
+        return item.tinker, "SIMULATION"
+    end
     if context and context.engineering and context.recommendedTinkers then
         return self.defaults[slotId], self.defaults[slotId] and "RECOMMENDED" or nil
     end

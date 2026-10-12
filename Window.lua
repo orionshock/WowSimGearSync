@@ -8,8 +8,8 @@ function WSGS:RefreshEscapeWindow()
         self.escapeWindowRegistered = true
     end
     local doll = self.PaperDoll and self.PaperDoll.frame
-    _G.WSGSEscapeWindow = self.window and self.window:IsShown() and self.window
-        or doll and doll:IsShown() and doll or nil
+    _G.WSGSEscapeWindow = self.window and self.window:IsShown() and self.window or doll and doll:IsShown() and doll or
+                              nil
 end
 
 function WSGS:ToggleWindow()
@@ -43,7 +43,9 @@ function WSGS:CreateWindow()
     -- Keep the import dialog above the paper doll, which uses DIALOG.
     frame:SetFrameStrata("FULLSCREEN_DIALOG")
     frame:SetToplevel(true)
-    frame:SetScript("OnMouseDown", function(self) self:Raise() end)
+    frame:SetScript("OnMouseDown", function(self)
+        self:Raise()
+    end)
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -68,7 +70,9 @@ function WSGS:CreateWindow()
 
     frame.TitleContainer.TitleText:SetText("Import Equipment from WoWSims JSON")
     frame.PortraitContainer.portrait:SetTexture("Interface\\Icons\\INV_Misc_Note_01")
-    frame.CloseButton:SetScript("OnClick", function() frame:Hide() end)
+    frame.CloseButton:SetScript("OnClick", function()
+        frame:Hide()
+    end)
 
     local inputLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     inputLabel:SetPoint("TOPLEFT", 74, -48)
@@ -91,7 +95,9 @@ function WSGS:CreateWindow()
     input:SetMaxBytes(1048576 + 1)
     input:SetTextInsets(5, 5, 5, 5)
     scroll:SetScrollChild(input)
-    input:SetScript("OnEscapePressed", function() frame:Hide() end)
+    input:SetScript("OnEscapePressed", function()
+        frame:Hide()
+    end)
     ScrollingEdit_OnLoad(input)
     input:SetScript("OnCursorChanged", ScrollingEdit_OnCursorChanged)
     input:SetScript("OnUpdate", ScrollingEdit_OnUpdate)
@@ -124,7 +130,9 @@ function WSGS:CreateWindow()
     importButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 22)
     importButton:SetText("Import")
     importButton:SetScript("OnClick", function()
-        WSGS:SubmitImport(frame, function(text) return WSGS.Import:ImportEquipment(text) end)
+        WSGS:SubmitImport(frame, function(text)
+            return WSGS.Import:ImportEquipment(text)
+        end)
     end)
     frame:HookScript("OnHide", function()
         input:ClearFocus()
@@ -135,8 +143,10 @@ function WSGS:CreateWindow()
     frame.importInstruction = inputLabel
 
     -- Child controls consume mouse input; raise without replacing their handlers.
-    for _, control in ipairs({ input, scroll, scroll.ScrollBar, importButton }) do
-        control:HookScript("OnMouseDown", function() frame:Raise() end)
+    for _, control in ipairs({input, scroll, scroll.ScrollBar, importButton}) do
+        control:HookScript("OnMouseDown", function()
+            frame:Raise()
+        end)
     end
     self.window = frame
 end
