@@ -1,5 +1,5 @@
 local _, WSGS = ...
-local Actions = { controllers = {}, serial = 0 }
+local Actions = { controllers = {}, buttons = {}, serial = 0 }
 WSGS.SlotActions = Actions
 
 local colors = { WAITING_FOR_ITEM = "8cb3ff", READY = "4dff66", PENDING = "999999",
@@ -25,6 +25,7 @@ end
 function Actions:Refresh(profile, snapshot, comparison)
     if not profile or not snapshot or not comparison then
         self.controllers = {}
+        for position in pairs(self.buttons) do self:ConfigureButton(position) end
         return
     end
     local bags = WSGS.ModificationMaterials:ScanBags()
@@ -51,18 +52,6 @@ function Actions:Refresh(profile, snapshot, comparison)
                 built.timeoutScheduled = previous.timeoutScheduled
                 debug("VERIFY", string.format("slot=%d type=%s expected=%s result=STILL_PENDING reason=%s",
                     previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected), detail))
-            end
-        elseif previous and previous.continuation then
-            if previous.targetGuid ~= built.targetGuid then
-                built.state, built.lastFailed = "BLOCKED", previous.continuation
-                built.reason = "Target item instance changed before the prepared action was applied"
-            elseif previous.failure then
-                built.state, built.lastFailed = "BLOCKED", previous.continuation
-                built.reason = previous.failure
-            else
-                built.state, built.continuation = "READY", previous.continuation
-                built.prepared = previous.continuation
-                built.reason = "Click again to apply the prepared action to this equipped item"
             end
         elseif previous and previous.lastFailed and built.prepared then
             built.state, built.lastFailed = "BLOCKED", previous.lastFailed
@@ -92,7 +81,27 @@ function Actions:Refresh(profile, snapshot, comparison)
             if #built.blocked == 0 then debug("BLOCK", string.format("slot=%d reason=%s", built.inventorySlot,
                 built.reason or "unavailable")) end
         end
+        self:ConfigureButton(position)
     end
+end
+
+function Actions:RegisterButton(position, button)
+    self.buttons[position] = button
+    self:ConfigureButton(position)
+end
+
+function Actions:ConfigureButton(position)
+    local button = self.buttons[position]
+    if not button or InCombatLockdown() then return end
+    local controller = self.controllers[position]
+    local operation = controller and controller.state == "READY" and controller.prepared
+    local actionType = operation and operation.type ~= "GEM" and (operation.type == "TINKER" and "spell" or "item") or nil
+    button:SetAttribute("wsgs-type1", actionType)
+    button:SetAttribute("type1", actionType)
+    button:SetAttribute("item1", actionType == "item" and operation.material
+        and string.format("%d %d", operation.material.bag, operation.material.slot) or nil)
+    button:SetAttribute("spell1", actionType == "spell" and operation.spellID or nil)
+    button:SetAttribute("target-slot1", actionType and controller.inventorySlot or nil)
 end
 
 function Actions:Rescan(reason)
@@ -120,7 +129,7 @@ end
 
 function Actions:MarkPending(controller, operation, waitForSocketAccept)
     self.serial = self.serial + 1
-    controller.state, controller.pending, controller.continuation = "PENDING", operation, nil
+    controller.state, controller.pending, controller.submitting = "PENDING", operation, nil
     controller.startedAt, controller.serial = GetTime(), self.serial
     debug("EXEC", string.format("slot=%d type=%s submitted serial=%d; awaiting events",
         controller.inventorySlot, operation.type, controller.serial))
@@ -129,12 +138,13 @@ end
 
 function Actions:Fail(controller, operation, reason)
     controller.state, controller.reason, controller.lastFailed = "BLOCKED", reason, operation
-    controller.pending, controller.continuation = nil, nil
+    controller.pending, controller.submitting = nil, nil
     debug("BLOCK", string.format("slot=%d type=%s reason=%s", controller.inventorySlot, operation.type, reason))
     if self.refreshView then self.refreshView() end
 end
 
-function Actions:Click(position)
+function Actions:PreClick(position, button)
+    button.secureSubmission = nil
     local controller = self.controllers[position]
     if not controller then return end
     if controller.state == "BLOCKED" and controller.lastFailed then
@@ -147,15 +157,12 @@ function Actions:Click(position)
     if InCombatLockdown() then return self:Fail(controller, operation, "Action unavailable during combat lockdown") end
     if CursorHasItem() then return self:Fail(controller, operation, "Place the held cursor item first") end
     for otherPosition, other in pairs(self.controllers) do
-        if otherPosition ~= position and other.continuation then
-            return self:Fail(controller, operation, "Finish the prepared action on another slot first")
-        end
         if otherPosition ~= position and operation.type == "GEM"
             and other.pending and other.pending.type == "GEM" then
             return self:Fail(controller, operation, "Finish the active Blizzard Socketing interaction first")
         end
     end
-    if not controller.continuation and SpellIsTargeting() then
+    if SpellIsTargeting() then
         return self:Fail(controller, operation, "Finish or cancel the active item-targeting cursor first")
     end
     local id = GetInventoryItemID("player", controller.inventorySlot)
@@ -167,35 +174,55 @@ function Actions:Click(position)
     debug("EXEC", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s guid=%s phase=%s",
         controller.inventorySlot, operation.type, valueText(operation.materialItemID),
         valueText(operation.material and operation.material.guid), valueText(operation.spellID), valueText(controller.targetGuid),
-        controller.continuation and "target" or "prepare"))
+        operation.type == "GEM" and "socket" or "secure"))
 
-    if controller.continuation then
-        if not SpellIsTargeting() then return self:Fail(controller, operation, "Client item-targeting cursor is no longer active") end
-        local ok, problem = pcall(UseInventoryItem, controller.inventorySlot)
-        if not ok then return self:Fail(controller, operation, "UseInventoryItem failed: " .. tostring(problem)) end
-        self:MarkPending(controller, operation)
-    elseif operation.type == "GEM" then
+    if operation.type == "GEM" then
         local ok, problem = pcall(SocketInventoryItem, controller.inventorySlot)
         if not ok then return self:Fail(controller, operation, "SocketInventoryItem failed: " .. tostring(problem)) end
         self:MarkPending(controller, operation, true)
         controller.reason = string.format("Use Blizzard Socketing: place item %d in socket %d, then apply", operation.materialItemID, operation.socket)
-    elseif operation.type == "TINKER" then
-        local ok, problem = pcall(CastSpellByID, operation.spellID)
-        if not ok then return self:Fail(controller, operation, "CastSpellByID failed: " .. tostring(problem)) end
-        controller.continuation, controller.state = operation, "READY"
-        controller.reason = "Click this slot again while the item-targeting cursor is active"
+        if self.refreshView then self.refreshView() end
     else
-        local material = operation.material
-        if not material then return self:Fail(controller, operation, "Prepared material location is unavailable") end
-        local current = C_Container.GetContainerItemInfo(material.bag, material.slot)
-        if not current or current.itemID ~= material.itemID or current.isLocked then
-            return self:Fail(controller, operation, "Prepared material moved or became locked")
+        if operation.type ~= "TINKER" then
+            local material = operation.material
+            if not material then return self:Fail(controller, operation, "Prepared material location is unavailable") end
+            local current = C_Container.GetContainerItemInfo(material.bag, material.slot)
+            if not current or current.itemID ~= material.itemID or current.isLocked then
+                return self:Fail(controller, operation, "Prepared material moved or became locked")
+            end
+            local guidOK, currentGuid = pcall(C_Item.GetItemGUID,
+                ItemLocation:CreateFromBagAndSlot(material.bag, material.slot))
+            if material.guid and (not guidOK or currentGuid ~= material.guid) then
+                return self:Fail(controller, operation, "Prepared material instance moved; rescan before retrying")
+            end
         end
-        local ok, problem = pcall(C_Container.UseContainerItem, material.bag, material.slot)
-        if not ok then return self:Fail(controller, operation, "UseContainerItem failed: " .. tostring(problem)) end
-        controller.continuation, controller.state = operation, "READY"
-        controller.reason = "Click this slot again while the item-targeting cursor is active"
+        self:ConfigureButton(position)
+        local expectedType = operation.type == "TINKER" and "spell" or "item"
+        local expectedItem = operation.material
+            and string.format("%d %d", operation.material.bag, operation.material.slot) or nil
+        if button:GetAttribute("type1") ~= expectedType
+            or button:GetAttribute("target-slot1") ~= controller.inventorySlot
+            or expectedType == "item" and button:GetAttribute("item1") ~= expectedItem
+            or expectedType == "spell" and button:GetAttribute("spell1") ~= operation.spellID then
+            return self:Fail(controller, operation, "Secure action could not be prepared")
+        end
+        controller.submitting = operation
+        button.secureSubmission = { controller = controller, operation = operation }
+        debug("EXEC", string.format("slot=%d type=%s api=SecureActionButton:%s target-slot=%d",
+            controller.inventorySlot, operation.type, expectedType, controller.inventorySlot))
     end
+end
+
+function Actions:PostClick(position, button)
+    local submission = button.secureSubmission
+    button.secureSubmission = nil
+    if not submission then return end
+    local controller, operation = submission.controller, submission.operation
+    if controller.failure then
+        return self:Fail(controller, operation, controller.failure)
+    end
+    self:MarkPending(controller, operation)
+    self:ConfigureButton(position)
     if self.refreshView then self.refreshView() end
 end
 
@@ -222,9 +249,10 @@ function Actions:TooltipLines(position)
 end
 
 function Actions:OnEvent(event, ...)
-    local active
+    local active, submitting
     for _, controller in pairs(self.controllers) do
-        if controller.state == "PENDING" or controller.continuation then active = true; break end
+        if controller.state == "PENDING" or controller.submitting then active = true end
+        if controller.submitting then submitting = true end
     end
     if not active and not (self.isVisible and self.isVisible()) then return end
     if active and event:find("^SOCKET_INFO_") then
@@ -238,7 +266,7 @@ function Actions:OnEvent(event, ...)
         if unit ~= "player" then return end
         local relevant
         for _, controller in pairs(self.controllers) do
-            local operation = controller.pending or controller.continuation
+            local operation = controller.pending or controller.submitting
             if operation and operation.spellID == spellID then relevant = true; break end
         end
         if not relevant then return end
@@ -246,7 +274,7 @@ function Actions:OnEvent(event, ...)
         local inventorySlot = ...
         local relevant
         for _, controller in pairs(self.controllers) do
-            if (controller.pending or controller.continuation) and controller.inventorySlot == inventorySlot then
+            if (controller.pending or controller.submitting) and controller.inventorySlot == inventorySlot then
                 relevant = true; break
             end
         end
@@ -255,7 +283,24 @@ function Actions:OnEvent(event, ...)
     local args = {}
     for index = 1, select("#", ...) do args[index] = valueText(select(index, ...)) end
     if active then debug("EVENT", string.format("event=%s args=%s", event, table.concat(args, ","))) end
-    if event == "SOCKET_INFO_FAILURE" then
+    if event == "REPLACE_ENCHANT" or event == "BIND_ENCHANT" or event == "ACTION_WILL_BIND_ITEM" then
+        local controller, operation
+        for _, candidate in pairs(self.controllers) do
+            local candidateOperation = candidate.submitting
+            if candidateOperation and candidateOperation.type ~= "GEM" then
+                controller, operation = candidate, candidateOperation
+                break
+            end
+        end
+        if not operation then return end
+        local api = event == "REPLACE_ENCHANT" and C_Item.ReplaceEnchant
+            or event == "BIND_ENCHANT" and C_Item.BindEnchant or C_Item.ActionBindsItem
+        local ok, problem = pcall(api)
+        debug("EVENT", string.format("event=%s slot=%d type=%s confirm=%s", event,
+            controller.inventorySlot, operation.type, ok and "accepted" or "failed"))
+        if not ok then controller.failure = event .. " confirmation failed: " .. tostring(problem) end
+        return
+    elseif event == "SOCKET_INFO_FAILURE" then
         for _, controller in pairs(self.controllers) do
             if controller.pending and controller.pending.type == "GEM" then controller.failure = "Blizzard socketing reported failure" end
         end
@@ -273,13 +318,14 @@ function Actions:OnEvent(event, ...)
         local unit, _, spellID = ...
         if unit == "player" then
             for _, controller in pairs(self.controllers) do
-                local operation = controller.pending or controller.continuation
+                local operation = controller.pending or controller.submitting
                 if operation and operation.spellID == spellID then
                     controller.failure = "Client spell cast failed or was interrupted"
                 end
             end
         end
     end
+    if submitting then return end
     self:Rescan(event)
 end
 
@@ -290,6 +336,7 @@ function Actions:Initialize()
     for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED",
         "SOCKET_INFO_UPDATE", "SOCKET_INFO_ACCEPT", "SOCKET_INFO_SUCCESS", "SOCKET_INFO_FAILURE", "SOCKET_INFO_CLOSE",
         "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
+        "REPLACE_ENCHANT", "BIND_ENCHANT", "ACTION_WILL_BIND_ITEM",
         "PLAYER_REGEN_ENABLED" }) do frame:RegisterEvent(event) end
     frame:SetScript("OnEvent", function(_, ...) self:OnEvent(...) end)
 end

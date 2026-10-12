@@ -75,8 +75,10 @@ function Doll:Render(profile, snapshot, comparison, reason)
         local action = WSGS.SlotActions.controllers[position]
         local pending = action and action.state == "PENDING"
         button.icon:SetDesaturated(pending == true)
-        button:SetEnabled(action ~= nil and not pending and (action.state == "READY"
-            or action.state == "BLOCKED" and action.lastFailed ~= nil))
+        if not InCombatLockdown() then
+            button:SetEnabled(action ~= nil and not pending and (action.state == "READY"
+                or action.state == "BLOCKED" and action.lastFailed ~= nil))
+        end
     end
     if self.hovered and frame:IsShown() then self:ShowSlotTooltip(self.hovered) end
 end
@@ -213,7 +215,7 @@ function Doll:Create()
     WSGS.SlotActions.isVisible = function() return frame:IsShown() end
     frame.slots = {}
     for position, slot in ipairs(WSGS.equipmentSlots) do
-        local button = CreateFrame("Button", nil, frame)
+        local button = CreateFrame("Button", nil, frame, "SecureActionButtonTemplate,SecureHandlerStateTemplate")
         frame.slots[position] = button
         button.position = position
         button:SetSize(44, 44)
@@ -242,7 +244,17 @@ function Doll:Create()
         button:SetScript("OnEnter", function(b) self.hovered = b; self:ShowSlotTooltip(b) end)
         button:SetScript("OnLeave", function() self.hovered = nil; GameTooltip:Hide() end)
         button:RegisterForClicks("LeftButtonUp")
-        button:SetScript("OnClick", function(b) WSGS.SlotActions:Click(b.position) end)
+        button:SetAttribute("_onstate-combat", [[
+            if newstate == "combat" then
+                self:SetAttribute("type1", nil)
+            else
+                self:SetAttribute("type1", self:GetAttribute("wsgs-type1"))
+            end
+        ]])
+        RegisterStateDriver(button, "combat", "[combat] combat; nocombat")
+        button:SetScript("PreClick", function(b) WSGS.SlotActions:PreClick(b.position, b) end)
+        button:SetScript("PostClick", function(b) WSGS.SlotActions:PostClick(b.position, b) end)
+        WSGS.SlotActions:RegisterButton(position, button)
     end
     local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     legend:SetPoint("CENTER", 0, 20)
