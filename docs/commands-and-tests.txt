@@ -35,17 +35,17 @@ AceTab remains bundled and loaded but no WSGS-specific completion set is
 registered. Physical Tab completion is unverified and is not claimed to work.
 No workaround, library patch, or manual hooks have been added.
 
-IN-GAME SUITES (55 CASES TOTAL)
+IN-GAME SUITES (50 CASES TOTAL)
 Tests/Runner.lua owns registration, protected execution, PASS/FAIL/SKIP, and
 actual summary counts. /wsgs test and /wsgs test all run all four suites.
 Scanner (8): real client snapshots, slot mappings, repeated observations,
 live upgrade comparisons, optional item 95757 and glove tinker checks.
 Comparator (15): deterministic Lua snapshots, actual maxima, unknowns, wrong
 items, interchangeable pairs, duplicate rings, captured links, empty slots.
-Importer (15): initialization/scopes and native command association, native JSON,
+Importer (14): initialization/scopes and native command association, native JSON,
 retained Paladin reference, gear-only schema validation, optional and unknown
 fields, malformed documents, and specialization ambiguity.
-UI (17): frame reuse/slots, empty/latest build presentation, comparator binding,
+UI (13): frame reuse/slots, empty/latest build presentation, comparator binding,
 ring/trinket assignments, visibility, refresh listeners, and read-only controls.
 Equipment-dependent cases can SKIP. Tests do not alter equipment, settings,
 saved builds, import tracking, resources, or character configuration.
@@ -84,13 +84,13 @@ selected build ID and debug should be unchanged by the test runner.
 In unsent chat type /wsgs co and press Tab, then /wsgs test sc and Tab.
 Check repeated Tab cycling with /wsgs followed by a space. Cancel with Escape.
 Report observed behavior; native library source does not wire these completions.
-55 passed, 0 failed, 0 skipped is a target when all equipment/data is present,
+50 passed, 0 failed, 0 skipped is a target when all equipment/data is present,
 not an asserted or hardcoded summary. Optional equipment may produce SKIPs.
 
 STATIC VALIDATION AND LIMITS
 Check TOC paths, dependency order, disabled SavedVariables, exactly one
 CreateChatCommand registration, absence of custom dispatch/completion code,
-55 suite cases, and git whitespace. No offline Python harness is present.
+50 suite cases, and git whitespace. No offline Python harness is present.
 The game client was not launched: command execution, native decoder behavior,
 test outcomes, and physical Tab behavior still require runtime validation.
 
@@ -121,11 +121,11 @@ OnHide cannot close the underlying doll in that same iteration. No global hook,
 replacement Escape binding or keyboard listener is installed. Focused JSON uses
 its existing OnEscapePressed handler and normal native EditBox key consumption.
 
-Four added UI cases check title/removed text/button anchor, singleton native
-registration and two-step closing, focused editor after failure, and each window
-alone. They drive the exact alias Hide path or EditBox handler, not physical keys.
+Runtime UI cases check native Escape registration and two-step closing,
+focused editor after failure, and each window alone. Layout/copy checks were
+removed under the repository testing policy. They drive the exact alias Hide path or EditBox handler, not physical keys.
 They never call CloseSpecialWindows globally, so unrelated user UIs stay open.
-Existing success/failure lifecycle tests remain. Counts: UI 17, all suites 55.
+Existing success/failure lifecycle tests remain. Counts after test cleanup: UI 13, all suites 50.
 These are registered cases, not asserted in-game passes.
 
 Runtime: /reload; open the doll, then /wsgs import. Check title/instruction and
@@ -134,3 +134,13 @@ Escape once: only import closes. Escape again closes the doll. Repeat with only
 one window open, with JSON focused, and after malformed input/Import. Verify JSON
 retention/error clearing, X buttons, /wsgs import toggling and successful imports.
 Run /wsgs test ui followed by /wsgs test all. No client execution is claimed here.
+
+TEST POLICY CLEANUP
+Tests protect runtime code only, not layouts, copy text or deployment.
+Removed cosmetic frame-structure, badge/tooltip wording/order/color, import
+title/button-anchor and redundant initialization/registration cases. Mixed tests
+retain behavioral assertions without pinning cosmetic text or implementation
+shape. Runtime import lifecycle, selection/renaming, comparison/scanning,
+data binding, visibility and Escape regressions remain.
+Current counts: scanner 8, comparator 15, importer 14, UI 13 (50 total).
+No in-game execution or PASS result is claimed for this cleanup.

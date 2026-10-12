@@ -76,7 +76,7 @@ builds with a readable error; reopening clears old errors.
 The paper doll layout/status words/corner-free icons and disabled Equip remain.
 
 TESTS / EXACT RUNTIME VALIDATION
-51 registered in-game cases: scanner 8, comparator 15, importer 15, UI 13.
+50 registered in-game cases: scanner 8, comparator 15, importer 14, UI 13.
 16 new cases cover target priority/default slots, disabled/non-Engineer contexts,
 missing/unknown/wrong-item effects, buckle independence, live effect mappings,
 create/replace/rename/separate specs/invalid imports and both import UI outcomes.

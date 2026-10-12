@@ -86,12 +86,12 @@ Verify Equip is disabled and slot clicks do nothing.
 Repeat UI tests with the doll open and closed. UI tests restore the previous
 presentation/visibility, never save builds or change settings/equipment, and
 report SKIP for latest-build selection when none is imported. There are now
-17 UI, 15 comparator, 8 scanner and 15 importer cases (55 total). Summary counts
+13 UI, 15 comparator, 8 scanner and 14 importer cases (50 total). Summary counts
 are computed, never hardcoded.
 
 KNOWN LIMITATIONS / VALIDATION
 Static checks only: manifests/load order, source-copy hashes, license retention,
-55 registered cases, registration/API/source review, and git whitespace.
+50 registered cases, registration/API/source review, and git whitespace.
 No game-client run, visual inspection, Lua execution or test PASS is claimed.
 Actual frame layout, LDB/minimap clicks, item metadata caching and client events
 require the above runtime validation. Existing scanner UNKNOWN behavior remains;

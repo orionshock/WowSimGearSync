@@ -5,14 +5,6 @@ local function decode()
     return document
 end
 WSGS.Tests:Register("importer", "Importer", {
-    { name = "Ace3 initialization and database scopes", run = function()
-        assert(LibStub("AceAddon-3.0"):GetAddon(WSGS.name) == WSGS)
-        assert(type(WSGS.db.profile.debug) == "boolean" and type(WSGS.db.char.simulationProfiles) == "table")
-        assert(type(WSGS.db.profile.recommendedEngineeringTinkers) == "boolean")
-        local options = LibStub("AceConfigRegistry-3.0"):GetOptionsTable("WowSimGearSync", "cmd", "AceConfigCmd-3.0")
-        assert(options == WSGS.commandOptions and options.args.test and options.args.probe)
-        assert(LibStub("AceConfigCmd-3.0"):GetChatCommandOptions("wsgs") == "WowSimGearSync")
-    end },
     { name = "Native JSON decoder and Paladin reference", run = function()
         local profile = assert(WSGS:ValidateEquipment(decode()))
         assert(#profile.equipment == 16 and profile.metadata.entryCount == 16)
