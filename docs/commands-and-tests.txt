@@ -153,3 +153,11 @@ See equip-notes.txt for source evidence, safety boundaries and manual validation
 /wsgs test equip is a read-only planner/verification suite with 26 cases.
 Current registration counts: scanner 8, comparator 15, importer 14, UI 13, equip 26
 (76 total). No in-game execution or PASS results claimed.
+
+TASK 018 ONE-CLICK EQUIP
+Equip now submits the complete safely executable, instance-aware plan from one
+button callback and uses events plus one final scan only for verification. Weapon
+dependency ordering covers MH/OH swaps, one-hand/off-hand transitions, two-handed
+conflicts, Titans Grip, locked/missing items, and full bags. /wsgs test equip has
+37 read-only runtime cases; all suites register 87 cases. No in-game PASS result
+is claimed. See equip-notes.txt.

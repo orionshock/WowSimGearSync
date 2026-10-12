@@ -7,11 +7,21 @@ local function pickup(source)
     else PickupInventoryItem(WSGS.equipmentSlots[source.position].id) end
 end
 
+local function destinationHasSource(operation)
+    if operation.kind ~= "EQUIP" or not operation.source.guid then return false end
+    local location = ItemLocation:CreateFromEquipmentSlot(operation.slotId)
+    local ok, guid = pcall(C_Item.GetItemGUID, location)
+    return ok and guid == operation.source.guid
+end
+
 -- Called only synchronously by the Equip button's OnClick. Never from an event
 -- or timer. Native cursor restrictions/confirmation dialogs remain authoritative.
 function Execution:Perform(operation)
     if InCombatLockdown() or UnitAffectingCombat("player") then return false, "Cannot equip in combat." end
     if GetCursorInfo() then return false, "Place the held cursor item first." end
+    -- An earlier operation can complete a later one (notably a MH/OH swap).
+    -- The final scanner still verifies it independently.
+    if destinationHasSource(operation) then return true, "SATISFIED" end
     if IsInventoryItemLocked(operation.slotId) then return false, "Equipment slot is locked." end
     local source = operation.source
     if source.bag ~= nil then
@@ -47,5 +57,5 @@ function Execution:Perform(operation)
         if CursorHasItem() then pickup(source) end
     end
     if CursorHasItem() then return false, "Item remains on cursor; place it in a bag before retrying." end
-    return true -- submission only; this is never treated as success
+    return true, "SUBMITTED" -- submission only; this is never treated as success
 end

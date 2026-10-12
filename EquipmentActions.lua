@@ -36,45 +36,87 @@ function Actions:Verify(operation, snapshot, bags)
         and (not oldSource or oldSource.fingerprint ~= operation.source.fingerprint)
 end
 
+function Actions:BeginBatch(operations, snapshot, now)
+    local batch = { records = {}, deadline = now + 4, total = #operations }
+    for index, operation in ipairs(operations) do
+        batch.records[index] = { operation = operation, status = "STILL_PENDING",
+            beforeId = snapshot.slots[operation.position].id,
+            beforeGUID = snapshot.slots[operation.position].guid }
+    end
+    self.batch, self.state, self.fault = batch, "PENDING", nil
+    return batch
+end
+
+-- Retained as a narrow test seam for a one-operation batch.
 function Actions:Begin(operation, snapshot, now)
-    self.pending = { operation = operation, deadline = now + 4,
-        beforeId = snapshot.slots[operation.position].id,
-        beforeGUID = snapshot.slots[operation.position].guid }
-    self.nextClickAt, self.state = now + 0.4, "PENDING"
+    local batch = self:BeginBatch({ operation }, snapshot, now)
+    self.pending = batch.records[1]
     return self.pending
+end
+
+function Actions:PendingCount()
+    local count = 0
+    for _, record in ipairs(self.batch and self.batch.records or {}) do
+        if record.status == "STILL_PENDING" then count = count + 1 end
+    end
+    return count
+end
+
+function Actions:OutcomeCounts()
+    local counts = { VERIFIED=0, FAILED=0, BLOCKED=0, STILL_PENDING=0 }
+    for _, record in ipairs(self.batch and self.batch.records or {}) do
+        counts[record.status] = counts[record.status] + 1
+    end
+    return counts
+end
+
+local function wrongDestination(record, snapshot)
+    local operation = record.operation
+    if operation.kind == "UNEQUIP" then return false end
+    local destination = snapshot.slots[operation.position]
+    if destination.id and destination.id ~= record.beforeId and destination.id ~= operation.id then return true end
+    return operation.source.guid and destination.id == operation.id and destination.guid
+        and destination.guid ~= operation.source.guid and destination.guid ~= record.beforeGUID
 end
 
 -- Pure state transition used by live events and deterministic in-game tests.
 -- No equipment APIs, character DB writes, callbacks, or actions are issued here.
 function Actions:Reconcile(profile, snapshot, bags, combat, now, event)
-    local outcome
-    if self.pending then
-        local pending, operation = self.pending, self.pending.operation
-        if verificationEvents[event] and self:Verify(operation, snapshot, bags) then
-            self.pending, self.completedClick, outcome = nil, true, "VERIFIED"
-        elseif now >= pending.deadline then
-            self.pending = nil
-            self.fault = pending.error or "Equipment change could not be verified. Click to rescan; no automatic retry."
-            outcome = "FAILED"
-        elseif event == "PLAYER_EQUIPMENT_CHANGED" then
-            local destination = snapshot.slots[operation.position]
-            if destination.id and destination.id ~= pending.beforeId and destination.id ~= operation.id then
-                self.pending, self.fault, outcome = nil, "Unexpected equipment change; click to rescan.", "FAILED"
-            elseif operation.source.guid and destination.id == operation.id and destination.guid
-                and destination.guid ~= operation.source.guid and destination.guid ~= pending.beforeGUID then
-                self.pending, self.fault, outcome = nil, "A different item instance was equipped; click to rescan.", "FAILED"
+    local final = self.batch and (now >= self.batch.deadline or event == "FINAL")
+    if self.batch then
+        for _, record in ipairs(self.batch.records) do
+            if record.status ~= "VERIFIED" and (verificationEvents[event] or final)
+                and self:Verify(record.operation, snapshot, bags) then
+                record.status, record.reason = "VERIFIED", nil
+            elseif record.status == "STILL_PENDING" then
+                if record.error then
+                    record.status, record.reason = "FAILED", record.error
+                elseif verificationEvents[event] and wrongDestination(record, snapshot) then
+                    record.status, record.reason = "FAILED", "A different item instance occupied the destination."
+                elseif final then
+                    record.status, record.reason = "FAILED", "Equipment change could not be verified."
+                end
             end
+        end
+        if self:PendingCount() == 0 then
+            self.pending = nil
         end
     end
     self.plan = WSGS.EquipmentPlanner:Plan(profile, snapshot, bags)
-    if self.pending then self.state = "PENDING"
+    if self.batch and self:PendingCount() == 0 then
+        local counts = self:OutcomeCounts()
+        if counts.FAILED > 0 or counts.BLOCKED > 0 then
+            self.fault = string.format("%d target slot(s) unresolved; %d failed, %d blocked.",
+                self.plan.unresolvedCount, counts.FAILED, counts.BLOCKED)
+        else self.fault = nil end
+    end
+    if self:PendingCount() > 0 then self.state = "PENDING"
     elseif combat then self.state = "COMBAT"
     elseif self.fault then self.state = "FAULT"
-    elseif now < (self.nextClickAt or 0) then self.state = "COOLDOWN"
-    elseif #self.plan.operations > 0 then self.state = self.completedClick and "NEXT" or "READY"
-    elseif #self.plan.blocked > 0 then self.state = "BLOCKED"
+    elseif #self.plan.operations > 0 then self.state = "READY"
+    elseif #self.plan.blocked > 0 or #self.plan.missing > 0 then self.state = "BLOCKED"
     else self.state = "COMPLETE" end
-    return outcome
+    return self.batch and self:OutcomeCounts() or nil
 end
 
 function Actions:ReadNow()
@@ -87,19 +129,18 @@ function Actions:Refresh(profile, snapshot)
     local bags
     if snapshot then bags = WSGS.EquipmentInventory:Scan(snapshot)
     else snapshot, bags = self:ReadNow() end
-    local pending = self.pending
-    local outcome = self:Reconcile(profile, snapshot, bags,
+    local before = self.batch and self:OutcomeCounts()
+    local counts = self:Reconcile(profile, snapshot, bags,
         InCombatLockdown() or UnitAffectingCombat("player"), GetTime(), self.verificationEvent)
     self.verificationEvent = nil
-    self.snapshot = snapshot
-    if not self.pending and GetCursorInfo() and self.state ~= "COMBAT" and self.state ~= "FAULT" then
+    self.snapshot, self.bags = snapshot, bags
+    if self:PendingCount() == 0 and GetCursorInfo() and self.state ~= "COMBAT" and self.state ~= "FAULT" then
         self.state = "CURSOR"
     end
-    if outcome == "VERIFIED" then
-        WSGS:Debug("[EQUIP] Verified: item " .. pending.operation.id ..
-            (pending.operation.kind == "UNEQUIP" and " stored in bags" or " equipped"))
-        WSGS:Debug("[EQUIP] Remaining: " .. #self.plan.operations .. " operations")
-    elseif outcome == "FAILED" then WSGS:Print("[EQUIP] " .. self.fault) end
+    if counts and before and counts.VERIFIED > before.VERIFIED then
+        WSGS:Debug(string.format("[EQUIP] Verified: %d/%d; unresolved targets: %d",
+            counts.VERIFIED, self.batch.total, self.plan.unresolvedCount))
+    end
     if self.stateChanged then self.stateChanged() end
     return self.plan
 end
@@ -115,7 +156,7 @@ function Actions:QueueRefresh(event)
     C_Timer.After(0, function()
         self.refreshQueued = false
         if self.isVisible and self.isVisible() then self.refreshView()
-        elseif self.pending then self:Refresh(WSGS:GetActiveSimulationProfile()) end
+        elseif self:PendingCount() > 0 then self:Refresh(WSGS:GetActiveSimulationProfile()) end
     end)
 end
 
@@ -125,48 +166,77 @@ function Actions:Initialize()
     for _, event in ipairs(self.events) do listener:RegisterEvent(event) end
     listener:SetScript("OnEvent", function(_, event, _, message)
         if event == "UI_ERROR_MESSAGE" then
-            if self.pending then self.pending.error = type(message) == "string" and message or "Client rejected the operation." end
+            local record = self.executingRecord or self.lastSubmittedRecord
+            if record and record.status == "STILL_PENDING" then
+                record.error = type(message) == "string" and message or "Client rejected the operation."
+                self:QueueRefresh(event)
+            end
             return
         end
-        if self.pending or self.isVisible and self.isVisible() then self:QueueRefresh(event) end
+        if self:PendingCount() > 0 or self.isVisible and self.isVisible() then self:QueueRefresh(event) end
     end)
 end
 
-function Actions:Click()
-    -- Double clicks cannot submit a second operation while one is pending.
-    if self.pending or GetTime() < (self.nextClickAt or 0) then return end
-    if self.fault then
-        self.fault = nil
-        self:Refresh(WSGS:GetActiveSimulationProfile())
-        WSGS:Print("[EQUIP] Rescanned. Review the plan and click again to equip.")
-        return
+local function blockRemaining(batch, first, reason)
+    for index = first, #batch.records do
+        local record = batch.records[index]
+        if record.status == "STILL_PENDING" then
+            record.status, record.reason = "BLOCKED", reason
+        end
     end
+end
+
+-- Runs only from Click in production. Tests inject a non-equipping performer.
+function Actions:SubmitBatch(batch, perform, cursorOccupied)
+    cursorOccupied = cursorOccupied or GetCursorInfo
+    for index, record in ipairs(batch.records) do
+        self.executingRecord = record
+        local ok, submitted, reason = pcall(perform, record.operation)
+        self.executingRecord = nil
+        if not ok then
+            record.status, record.reason = "FAILED", tostring(submitted)
+        elseif not submitted then
+            record.status, record.reason = "BLOCKED", reason or "Client rejected the operation."
+        elseif record.error then
+            record.status, record.reason = "FAILED", record.error
+        else
+            record.submission = reason
+            self.lastSubmittedRecord = record
+        end
+        if cursorOccupied() then
+            blockRemaining(batch, index + 1, "An item remains on the cursor.")
+            break
+        end
+    end
+    self.executingRecord = nil
+    return self:OutcomeCounts()
+end
+
+function Actions:Click()
+    -- A terminal batch may be retried; an overlapping pending batch may not.
+    if self:PendingCount() > 0 then return end
+    self.fault, self.batch, self.pending = nil, nil, nil
     self:Refresh(WSGS:GetActiveSimulationProfile())
-    if self.state ~= "READY" and self.state ~= "NEXT" then
+    if self.state ~= "READY" then
         WSGS:Print("[EQUIP] " .. (self.state == "COMBAT" and "Cannot equip in combat." or self.plan.blocked[1] or "No available equipment changes."))
         return
     end
     if GetCursorInfo() then WSGS:Print("[EQUIP] Place the held cursor item first."); return end
-    local operation = self.plan.operations[1]
     for _, missing in ipairs(self.plan.missing) do
         WSGS:Debug("[EQUIP] Missing: item " .. missing.id .. " for " .. WSGS.equipmentSlots[missing.position].name)
     end
-    WSGS:Debug("[EQUIP] Planned: " .. #self.plan.operations .. " operations")
-    if operation.source.bag ~= nil then
-        WSGS:Debug("[EQUIP] Target found: item " .. operation.id .. " in bag " .. operation.source.bag .. " slot " .. operation.source.bagSlot)
-    end
-    local pending = self:Begin(operation, self.snapshot, GetTime())
+    local batch = self:BeginBatch(self.plan.operations, self.snapshot, GetTime())
+    WSGS:Debug("[EQUIP] Attempting batch: " .. batch.total .. " operations")
     if self.stateChanged then self.stateChanged() end
-    WSGS:Debug("[EQUIP] Attempting: inventory slot " .. operation.slotId)
-    local ok, submitted, reason = pcall(WSGS.EquipmentExecution.Perform, WSGS.EquipmentExecution, operation)
-    if not ok or not submitted then
-        pending.error = ok and reason or tostring(submitted)
-        WSGS:Print("[EQUIP] " .. pending.error)
-    end
-    -- Single-shot observation/debounce deadlines. Neither callback equips.
-    C_Timer.After(0.4, function() self:QueueRefresh("DEBOUNCE") end)
+    self:SubmitBatch(batch, function(operation)
+        return WSGS.EquipmentExecution:Perform(operation)
+    end)
+    -- This immediate rescan only observes. Every protected action above ran in
+    -- the original button callback.
+    self:Refresh(WSGS:GetActiveSimulationProfile())
     C_Timer.After(4, function()
-        if self.pending == pending then
+        if self.batch == batch and self:PendingCount() > 0 then
+            self.verificationEvent = "FINAL"
             if self.isVisible and self.isVisible() then self.refreshView()
             else self:Refresh(WSGS:GetActiveSimulationProfile()) end
         end

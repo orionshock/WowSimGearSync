@@ -105,3 +105,58 @@ Debug examples (illustrative only):
 [WSGS][EQUIP] Attempting: inventory slot 10
 [WSGS][EQUIP] Verified: item 99002 equipped
 [WSGS][EQUIP] Remaining: 2 operations
+
+TASK 018: ONE-CLICK BATCH AND WEAPON CORRECTION
+
+Root cause
+Task 017 intentionally selected only plan.operations[1], submitted it, and held
+the rest behind event verification plus another hardware click. The weapon policy
+also removed every weapon operation when a two-handed transition needed the off
+hand cleared, leaving only that UNEQUIP for the click, and removed off-hand work
+while a two-handed main hand was equipped. MH/OH were therefore deferred or
+deleted by WSGS planning/state policy; MoP Classic did not exclude slots 16/17.
+
+MoP Classic Blizzard_FrameXML/Wrath/EquipmentManager.lua confirms the supported
+exact-location path: C_Container.PickupContainerItem or PickupInventoryItem,
+CursorCanGoInSlot, IsInventoryItemLocked, then PickupInventoryItem(destination).
+The native C_EquipmentSet.UseEquipmentSet batch requires a saved server-side set
+and does not expose WSGS's imported instance assignment, so WSGS uses the same
+cursor primitives directly. C_Item.GetItemGUID(ItemLocation) guards each source.
+
+One Equip OnClick now snapshots equipped gear and carried bags, builds the full
+instance-aware plan, and loops over every operation synchronously in that same
+callback. No timer or event callback equips anything. Immediate API return values
+remain submissions only. Each record starts STILL_PENDING; precondition rejection
+becomes BLOCKED and Lua/client rejection becomes FAILED. Independent operations
+continue unless an item remains on the cursor, in which case later records block.
+
+Ordinary slots run before weapons. Weapon dependencies then order an off-hand
+removal before a target two-hander, a replacement main hand before a new off hand,
+and an equipped main-hand instance into the off hand before its old slot is
+overwritten. A first swap that already satisfies a later operation is recognized
+by GUID and still verified by the final scan. Non-Titans-Grip two-hander/off-hand
+targets block explicitly. Missing, locked, unreadable, and full-bag cases remain
+visible and do not silently choose another item.
+
+PLAYER_EQUIPMENT_CHANGED, BAG_UPDATE_DELAYED, and ITEM_LOCK_CHANGED trigger fresh
+scans that independently match each destination GUID or conservative fingerprint
+evidence. One four-second final scan resolves remaining records to VERIFIED or
+FAILED; it never issues an equipment action. A click is ignored while any record
+is STILL_PENDING. After terminal failure/blocking, the next click rescans and
+retries the currently unresolved plan in the same click. The UI shows verified
+batch progress and the count of target slots still unresolved.
+
+/wsgs test equip registers 37 read-only runtime cases. Added coverage includes
+multi-operation submission, exact duplicate assignment, explicit MH/OH changes,
+one-hand/shield and two-one-hand transitions, two-handed dependencies, equipped
+weapon movement, partial outcomes, FAILED/BLOCKED/STILL_PENDING classification,
+final verification, and retry. The suite injects a non-equipping performer when
+testing batch submission and never calls EquipmentExecution or Click.
+
+Runtime validation remains required in MoP Classic:
+  /reload
+  /wsgs test equip
+  /wsgs test all
+Then import a build and exercise one-click multi-slot, duplicate-instance, MH/OH,
+two-hander, full-bag, locked-item, partial-failure, and retry scenarios. No live
+client PASS result is claimed by static repository validation.

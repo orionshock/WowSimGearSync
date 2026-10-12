@@ -57,6 +57,44 @@ WSGS.Tests:Register("equip", "Equipment planning and verification", {
         local p = plan(b, s, bags)
         assert(#p.operations == 1 and p.operations[1].source == candidate and p.operations[1].slotId == 10)
     end },
+    { name = "Multiple equipment changes are planned as one batch", run = function()
+        local b, s, bags = scenario()
+        replace(s, 6, nil)
+        replace(s, 7, nil)
+        bag(bags, 1006, "INVTYPE_WRIST")
+        bag(bags, 1007, "INVTYPE_HAND")
+        local p = plan(b, s, bags)
+        assert(#p.operations == 2 and p.operations[1].position == 6 and p.operations[2].position == 7)
+    end },
+    { name = "One batch submission attempts every operation synchronously", run = function()
+        local b, s, bags = scenario()
+        replace(s, 6, nil)
+        replace(s, 7, nil)
+        bag(bags, 1006, "INVTYPE_WRIST")
+        bag(bags, 1007, "INVTYPE_HAND")
+        local a, attempted = WSGS.EquipmentActions:New(), {}
+        local batch = a:BeginBatch(plan(b, s, bags).operations, s, 10)
+        local counts = a:SubmitBatch(batch, function(operation)
+            attempted[#attempted + 1] = operation.position
+            return true, "SUBMITTED"
+        end, function() return false end)
+        assert(#attempted == 2 and attempted[1] == 6 and attempted[2] == 7)
+        assert(counts.STILL_PENDING == 2 and counts.VERIFIED == 0)
+    end },
+    { name = "Batch submission distinguishes failed and blocked operations", run = function()
+        local b, s, bags = scenario()
+        replace(s, 6, nil)
+        replace(s, 7, nil)
+        bag(bags, 1006, "INVTYPE_WRIST")
+        bag(bags, 1007, "INVTYPE_HAND")
+        local a = WSGS.EquipmentActions:New()
+        local batch = a:BeginBatch(plan(b, s, bags).operations, s, 10)
+        local counts = a:SubmitBatch(batch, function(operation)
+            if operation.position == 6 then error("executor fault") end
+            return false, "locked"
+        end, function() return false end)
+        assert(counts.FAILED == 1 and counts.BLOCKED == 1 and counts.STILL_PENDING == 0)
+    end },
     { name = "Unavailable target is missing, never substituted", run = function()
         local b, s, bags = scenario()
         replace(s, 7, 999)
@@ -122,7 +160,8 @@ WSGS.Tests:Register("equip", "Equipment planning and verification", {
         bag(bags, 99, "INVTYPE_2HWEAPON")
         bags.free[1] = { bag = 0, bagSlot = 9 }
         local p = plan(b, s, bags)
-        assert(#p.operations == 1 and p.operations[1].kind == "UNEQUIP" and p.operations[1].slotId == 17)
+        assert(#p.operations == 2 and p.operations[1].kind == "UNEQUIP" and p.operations[1].slotId == 17)
+        assert(p.operations[2].kind == "EQUIP" and p.operations[2].position == 15)
         replace(s, 16, nil)
         p = plan(b, s, bags)
         assert(#p.operations == 1 and p.operations[1].position == 15)
@@ -150,10 +189,51 @@ WSGS.Tests:Register("equip", "Equipment planning and verification", {
         bag(bags, 1015, "INVTYPE_WEAPONMAINHAND")
         bag(bags, 1016, "INVTYPE_SHIELD")
         local p = plan(b, s, bags)
-        assert(#p.operations == 1 and p.operations[1].position == 15)
+        assert(#p.operations == 2 and p.operations[1].position == 15 and p.operations[2].position == 16)
         replace(s, 15, 1015, "INVTYPE_WEAPONMAINHAND")
         p = plan(b, s, bags)
         assert(#p.operations == 1 and p.operations[1].position == 16)
+    end },
+    { name = "Main-hand replacement is planned", run = function()
+        local b, s, bags = scenario()
+        replace(s, 15, 77, "INVTYPE_WEAPONMAINHAND")
+        local candidate = bag(bags, 1015, "INVTYPE_WEAPONMAINHAND")
+        local p = plan(b, s, bags)
+        assert(#p.operations == 1 and p.operations[1].position == 15 and p.operations[1].source == candidate)
+    end },
+    { name = "Off-hand replacement is planned", run = function()
+        local b, s, bags = scenario()
+        replace(s, 16, 77, "INVTYPE_SHIELD")
+        local candidate = bag(bags, 1016, "INVTYPE_SHIELD")
+        local p = plan(b, s, bags)
+        assert(#p.operations == 1 and p.operations[1].position == 16 and p.operations[1].source == candidate)
+    end },
+    { name = "One-hand and shield transition replaces main before off hand", run = function()
+        local b, s, bags = scenario()
+        replace(s, 15, 77, "INVTYPE_2HWEAPON")
+        replace(s, 16, nil)
+        bag(bags, 1015, "INVTYPE_WEAPONMAINHAND")
+        bag(bags, 1016, "INVTYPE_SHIELD")
+        local p = plan(b, s, bags)
+        assert(#p.operations == 2 and p.operations[1].position == 15 and p.operations[2].position == 16)
+    end },
+    { name = "Two one-handed weapons are planned for main and off hand", run = function()
+        local b, s, bags = scenario()
+        b.equipment[15], b.equipment[16] = { id = 91 }, { id = 92 }
+        bag(bags, 91, "INVTYPE_WEAPON")
+        bag(bags, 92, "INVTYPE_WEAPON")
+        local p = plan(b, s, bags)
+        assert(#p.operations == 2 and p.operations[1].position == 15 and p.operations[2].position == 16)
+    end },
+    { name = "Equipped main-hand instance moves before its slot is replaced", run = function()
+        local b, s, bags = scenario()
+        replace(s, 15, 92, "INVTYPE_WEAPON")
+        replace(s, 16, 77, "INVTYPE_WEAPON")
+        b.equipment[15], b.equipment[16] = { id = 91 }, { id = 92 }
+        bag(bags, 91, "INVTYPE_WEAPON")
+        local p = plan(b, s, bags)
+        assert(#p.operations == 2 and p.operations[1].position == 16 and p.operations[1].source.position == 15)
+        assert(p.operations[2].position == 15 and p.operations[2].source.bag == 0)
     end },
     { name = "Known Titans Grip permits a two-handed pair", run = function()
         local b, s, bags = scenario()
@@ -166,12 +246,13 @@ WSGS.Tests:Register("equip", "Equipment planning and verification", {
     { name = "Submission alone never advances pending work", run = function()
         local b, s, bags, candidate, a = pendingScenario()
         equipped(s, bags, candidate)
-        assert(a:Reconcile(b, s, bags, false, 11, "DEBOUNCE") == nil and a.state == "PENDING")
+        local counts = a:Reconcile(b, s, bags, false, 11, "DEBOUNCE")
+        assert(counts.STILL_PENDING == 1 and a.state == "PENDING")
     end },
     { name = "Equipment event verifies intended GUID and completes", run = function()
         local b, s, bags, candidate, a = pendingScenario()
         equipped(s, bags, candidate)
-        assert(a:Reconcile(b, s, bags, false, 11, "PLAYER_EQUIPMENT_CHANGED") == "VERIFIED")
+        assert(a:Reconcile(b, s, bags, false, 11, "PLAYER_EQUIPMENT_CHANGED").VERIFIED == 1)
         assert(not a.pending and a.state == "COMPLETE")
     end },
     { name = "Bag event re-arms only after verified equipment", run = function()
@@ -181,24 +262,58 @@ WSGS.Tests:Register("equip", "Equipment planning and verification", {
         local remaining = bags.items[2]
         equipped(s, bags, candidate)
         bags.items[1] = remaining
-        assert(a:Reconcile(b, s, bags, false, 11, "BAG_UPDATE_DELAYED") == "VERIFIED")
-        assert(a.state == "NEXT" and #a.plan.operations == 1)
+        assert(a:Reconcile(b, s, bags, false, 11, "BAG_UPDATE_DELAYED").VERIFIED == 1)
+        assert(a.state == "READY" and #a.plan.operations == 1)
     end },
     { name = "Different instance with same ID is not verified", run = function()
         local b, s, bags, _, a = pendingScenario()
         s.slots[7] = item(1007, "wrong-guid", "INVTYPE_HAND")
-        assert(a:Reconcile(b, s, bags, false, 11, "PLAYER_EQUIPMENT_CHANGED") == "FAILED")
+        assert(a:Reconcile(b, s, bags, false, 11, "PLAYER_EQUIPMENT_CHANGED").FAILED == 1)
         assert(a.state == "FAULT")
     end },
     { name = "Unexpected equipment change stops the operation", run = function()
         local b, s, bags, _, a = pendingScenario()
         replace(s, 7, 999)
-        assert(a:Reconcile(b, s, bags, false, 11, "PLAYER_EQUIPMENT_CHANGED") == "FAILED")
+        assert(a:Reconcile(b, s, bags, false, 11, "PLAYER_EQUIPMENT_CHANGED").FAILED == 1)
     end },
     { name = "Timeout requires rescan instead of automatic retry", run = function()
         local b, s, bags, _, a = pendingScenario()
-        assert(a:Reconcile(b, s, bags, false, 15, "DEADLINE") == "FAILED")
+        assert(a:Reconcile(b, s, bags, false, 15, "DEADLINE").FAILED == 1)
         assert(a.state == "FAULT" and not a.pending and #a.plan.operations == 1)
+    end },
+    { name = "Final rescan verifies changes without an equipment event", run = function()
+        local b, s, bags, candidate, a = pendingScenario()
+        equipped(s, bags, candidate)
+        local counts = a:Reconcile(b, s, bags, false, 15, "DEADLINE")
+        assert(counts.VERIFIED == 1 and counts.FAILED == 0 and a.state == "COMPLETE")
+    end },
+    { name = "Partial batch records outcomes and retry completes unresolved work", run = function()
+        local b, s, bags = scenario()
+        replace(s, 6, nil)
+        replace(s, 7, nil)
+        local wrist = bag(bags, 1006, "INVTYPE_WRIST")
+        local hands = bag(bags, 1007, "INVTYPE_HAND")
+        local p = plan(b, s, bags)
+        local a = WSGS.EquipmentActions:New()
+        local batch = a:BeginBatch(p.operations, s, 10)
+        s.slots[6] = wrist
+        wrist.position, wrist.bag, wrist.bagSlot = 6, nil, nil
+        bags.items = { hands }
+        batch.records[2].status, batch.records[2].reason = "BLOCKED", "locked"
+        local counts = a:Reconcile(b, s, bags, false, 11, "PLAYER_EQUIPMENT_CHANGED")
+        assert(counts.VERIFIED == 1 and counts.BLOCKED == 1 and a.state == "FAULT")
+        local retry = a:BeginBatch(a.plan.operations, s, 12)
+        s.slots[7] = hands
+        hands.position, hands.bag, hands.bagSlot = 7, nil, nil
+        bags.items = {}
+        counts = a:Reconcile(b, s, bags, false, 13, "PLAYER_EQUIPMENT_CHANGED")
+        assert(retry.total == 1 and counts.VERIFIED == 1 and a.state == "COMPLETE")
+    end },
+    { name = "Client rejection marks only its operation failed", run = function()
+        local b, s, bags, _, a = pendingScenario()
+        a.batch.records[1].error = "rejected"
+        local counts = a:Reconcile(b, s, bags, false, 11, "UI_ERROR_MESSAGE")
+        assert(counts.FAILED == 1 and counts.BLOCKED == 0 and a.state == "FAULT")
     end },
     { name = "Combat blocks actionable plans", run = function()
         local b, s, bags = scenario()

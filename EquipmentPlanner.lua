@@ -30,9 +30,12 @@ local function cost(target, candidate, position)
 end
 
 function Planner:Plan(profile, snapshot, inventory)
-    local plan = { operations = {}, missing = {}, blocked = {}, assignments = {} }
+    local plan = { operations = {}, missing = {}, blocked = {}, assignments = {}, unresolvedCount = 0 }
     local comparison, reason = WSGS.EquipmentComparator:Compare(profile, snapshot)
     if not comparison then plan.blocked[1] = reason; return plan end
+    for _, slot in ipairs(comparison.slots) do
+        if slot.fields.item.state ~= "MATCH" then plan.unresolvedCount = plan.unresolvedCount + 1 end
+    end
     local used, candidates, counts, groups = {}, {}, {}, {}
     for position, item in ipairs(snapshot.slots) do
         item.position = position
@@ -116,24 +119,64 @@ function Planner:Plan(profile, snapshot, inventory)
             end
         end
     end
-    table.sort(plan.operations, function(a,b) return a.position < b.position end)
     local main, off = profile.equipment[15], profile.equipment[16]
-    local mainLoc -- supplied metadata only; no client calls in planner
-    for _, item in ipairs(candidates) do
-        if present(main) and item.id == main.id and item.equipLoc then mainLoc = item.equipLoc; break end
-    end
-    local mainAvailable = snapshot.slots[15].id == (main and main.id)
+    local mainLoc, mainOperation -- supplied metadata only; no client calls in planner
     for _, operation in ipairs(plan.operations) do
-        if operation.position == 15 then mainAvailable = true end
+        if operation.targetPosition == 15 then
+            mainLoc, mainOperation = operation.source.equipLoc, operation
+            break
+        end
+    end
+    if not mainLoc and present(main) and snapshot.slots[15].id == main.id then
+        mainLoc = snapshot.slots[15].equipLoc
+    end
+    local freeIndex = 1
+    for position, target in ipairs(profile.equipment) do
+        if not present(target) then
+            local current = snapshot.slots[position]
+            if current.observations.item.status ~= "KNOWN" then
+                plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[position].name .. ": equipped identity is unavailable."
+            elseif current.id then
+                local destination = inventory.free[freeIndex]
+                if current.locked or not (current.guid or current.fingerprint) then
+                    plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[position].name .. ": equipped item is locked or unreadable."
+                elseif not destination then
+                    plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[position].name .. ": no empty general bag slot is available."
+                else
+                    freeIndex = freeIndex + 1
+                    plan.operations[#plan.operations + 1] = { kind = "UNEQUIP", source = current,
+                        destination = destination, position = position, targetPosition = position,
+                        slotId = WSGS.equipmentSlots[position].id, id = current.id }
+                end
+            end
+        end
     end
     local grip = snapshot.context and snapshot.context.titansGrip
     local currentMain, currentOff = snapshot.slots[15], snapshot.slots[16]
+    local offUnequip
+    for _, operation in ipairs(plan.operations) do
+        if operation.kind == "UNEQUIP" and operation.position == 16 then offUnequip = operation; break end
+    end
+    local mainReady = present(main) and currentMain.id == main.id or mainOperation
+    if not present(off) and currentOff.id and not mainReady then
+        for index = #plan.operations, 1, -1 do
+            if plan.operations[index].kind == "UNEQUIP" and plan.operations[index].position == 16 then
+                table.remove(plan.operations, index)
+                plan.blocked[#plan.blocked + 1] = "Off hand waits until the target main hand is available."
+            end
+        end
+    end
     local weaponWork
     for _, operation in ipairs(plan.operations) do
         if operation.position >= 15 then weaponWork = true end
     end
-    if weaponWork and (mainLoc == "INVTYPE_2HWEAPON" and currentOff.observations.item.status ~= "KNOWN"
-        or present(off) and (currentMain.observations.item.status ~= "KNOWN"
+    if mainLoc == "INVTYPE_2HWEAPON" and not present(off) and currentOff.id and not offUnequip then
+        for index = #plan.operations, 1, -1 do
+            if plan.operations[index].position >= 15 then table.remove(plan.operations, index) end
+        end
+        plan.blocked[#plan.blocked + 1] = "Two-handed main hand waits until the off hand can be stored."
+    elseif weaponWork and (mainLoc == "INVTYPE_2HWEAPON" and currentOff.observations.item.status ~= "KNOWN"
+        or present(off) and not mainOperation and (currentMain.observations.item.status ~= "KNOWN"
             or currentMain.id and not currentMain.equipLoc)) then
         for index = #plan.operations, 1, -1 do
             if plan.operations[index].position >= 15 then table.remove(plan.operations, index) end
@@ -144,21 +187,31 @@ function Planner:Plan(profile, snapshot, inventory)
             if plan.operations[index].position >= 15 then table.remove(plan.operations, index) end
         end
         plan.blocked[#plan.blocked + 1] = "Two-handed target conflicts with a non-empty off-hand target."
-    elseif mainLoc == "INVTYPE_2HWEAPON" and not present(off) and currentOff.id and mainAvailable then
+    elseif present(off) and currentMain.equipLoc == "INVTYPE_2HWEAPON" and not grip and not mainOperation then
         for index = #plan.operations, 1, -1 do
-            if plan.operations[index].position >= 15 then table.remove(plan.operations, index) end
+            if plan.operations[index].position == 16 then table.remove(plan.operations, index) end
         end
-        if inventory.free[1] and not currentOff.locked and (currentOff.guid or currentOff.fingerprint) then
-            table.insert(plan.operations, 1, { kind = "UNEQUIP", source = currentOff, destination = inventory.free[1],
-                position = 16, slotId = 17, id = currentOff.id })
-        else plan.blocked[#plan.blocked + 1] = "Clear off hand first: an unlocked item and empty general bag slot are required." end
-    elseif currentMain.equipLoc == "INVTYPE_2HWEAPON" and not grip then
-        for index = #plan.operations, 1, -1 do
-            if plan.operations[index].position == 16 then
-                table.remove(plan.operations, index)
-                plan.blocked[#plan.blocked + 1] = "Off hand waits until the two-handed main hand is replaced."
-            end
-        end
+        plan.blocked[#plan.blocked + 1] = "Off hand waits until the two-handed main hand can be replaced."
     end
+    -- Ordinary slots go first so a weapon rejection cannot prevent independent
+    -- changes. For weapons, clear an unwanted off hand before a two-hander;
+    -- otherwise replace the main hand before attempting the off hand.
+    local offOperation
+    for _, operation in ipairs(plan.operations) do
+        if operation.kind == "EQUIP" and operation.position == 16 then offOperation = operation; break end
+    end
+    local offUsesMain = offOperation and offOperation.source.bag == nil and offOperation.source.position == 15
+        and not (mainOperation and mainOperation.source.bag == nil and mainOperation.source.position == 16)
+    local function order(operation)
+        if operation.position < 15 then return operation.position end
+        if operation.kind == "UNEQUIP" and operation.position == 16 and mainLoc == "INVTYPE_2HWEAPON" then return 20 end
+        if operation == offOperation and offUsesMain then return 20 end
+        if operation.position == 15 then return 21 end
+        return 22
+    end
+    table.sort(plan.operations, function(a, b)
+        local first, second = order(a), order(b)
+        return first == second and a.position < b.position or first < second
+    end)
     return plan
 end
