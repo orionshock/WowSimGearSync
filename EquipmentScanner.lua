@@ -30,7 +30,7 @@ function Scanner:Scan(onlyPosition)
             observations.item = unknown("Inventory identity unavailable or inconsistent")
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
-        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "tinker", "instance" }) do
+        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "upgradeRemaining", "upgradeState", "tinker", "instance" }) do
             observations[field] = empty and { status = "NOT_APPLICABLE", reason = "Empty inventory slot" }
                 or unknown("No verified equipped-item observation for this field")
         end
@@ -46,6 +46,9 @@ function Scanner:Scan(onlyPosition)
                 observations.enchant = decoded.enchant
                 observations.gems = decoded.gems
                 observations.reforging = decoded.reforging
+                for field, observed in pairs(WSGS.EquipmentInspector:Inspect(slot.id, current.link)) do
+                    observations[field] = observed
+                end
             else
                 local problem = reason or "Item link and inventory item identity do not agree"
                 for _, field in ipairs({ "enchant", "gems", "reforging" }) do

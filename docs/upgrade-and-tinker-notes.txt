@@ -1,0 +1,106 @@
+Task 006: Upgrade and engineering tinker inspection — MoP Classic only
+
+REFERENCE IMPLEMENTATIONS (read-only inspection; no reference files modified)
+1. C:\WoWAddons\WowSimsExporter\Shared.lua:318
+   Env.GetItemUpgradeLevel(unit, itemSlot) clears WSEScanningTooltip, calls
+   SetInventoryItem(unit,itemSlot), inspects FontString regions, and captures
+   numbers using ITEM_UPGRADE_TOOLTIP_FORMAT. Returns current level or -1.
+   It discards the captured maximum. Its initial text:find(format) check is
+   questionable when the format contains literal %d placeholders. Our code
+   compiles and matches the client format directly, escaping literal punctuation.
+2. Shared.lua:341, Env.GetHandTinker(unit) scans INVSLOT_HAND tooltip text
+   starting with localized ITEM_SPELL_TRIGGER_ONUSE and recognizes stat amounts:
+   1920 -> 4898, 2880 -> 4697, 42000-63000 -> 4698. Returns 0 if unrecognized.
+   This is locale/format-dependent; absence or failure is not proof of no tinker.
+   We do not copy the amount heuristic or its zero fallback.
+3. Actual stats-addon folder: C:\WoWAddons\CharacterStatsPaneImproved.
+   newstats.lua:123 ScanSlotTooltip(slot,lookFor,plain) uses a hidden
+   GameTooltip:SetInventoryItem("player",slot); returns captures and matched
+   line, or false. It inspects only left lines 2-8.
+   newstats.lua:656-675 private.countUpgrades(slot) compiles the localized
+   format, caches current progress, returns total; its fallback English
+   punctuation and default-zero assumptions are not adopted.
+   newstats.lua:737-765,855 recognizes engineering use spell IDs returned by
+   GetItemSpell(GetInventoryItemLink("player",slot)). We call C_Item.GetItemSpell
+   directly, without its global/namespaced compatibility wrapper.
+4. C:\WoWAddons\TipTac\libs\LibFroznFunctions-1.0\tables\
+   LFF_ENCHANTID_TO_SPELLID_LOOKUP.MoPC.lua:728,729,748:
+   MoP build 5.5.3.65746 SpellItemEnchantment data gives
+   enchant 4898 -> effect spell 126734 (Synapse Springs),
+   enchant 4697 -> effect spell 108788 (Phase Fingers),
+   enchant 4698 -> effect spell 109076 (Incendiary Fireworks).
+   C:\WoWAddons\NAG\mists\data\enchants.lua independently contains those
+   names and effectType=7/effectArg mappings. Only these factual ID associations
+   are used; no reference library code is copied or bundled.
+
+BLIZZARD CONTRACTS
+Source root: C:\WoWAddons\BlizzardInterfaceCode\Interface\AddOns
+Blizzard_APIDocumentationGenerated/ItemUpgradeDocumentation.lua documents:
+- C_ItemUpgrade.CanUpgradeItem(baseItem: ItemLocation) -> boolean.
+  The only located UI calls are Mainline item-selection filters. This does not
+  establish whether false means non-upgradeable, capped, vendor-restricted, or
+  unavailable for an equipped MoP item. Not used to classify scanner eligibility.
+- GetItemUpgradeItemInfo() -> nil or table with currUpgrade,maxUpgrade,
+  itemUpgradeable,upgradeLevelInfos, etc.; NO equipped-item argument.
+- GetItemHyperlink() -> selected item link or no value.
+- GetItemUpgradeEffect(effectIndex[,numUpgradeLevels]) -> two display strings;
+  GetNumItemUpgradeEffects() -> count. These concern the selected vendor item.
+- ClearItemUpgrade(), CloseItemUpgrade(), SetItemUpgradeFromCursorItem(),
+  UpgradeItem([numUpgrades=1]) affect vendor selection/transactions; never called.
+Blizzard_ItemUpgradeUI/Mists/Blizzard_ItemUpgradeUI.lua:65-100 reads the
+selected item's currUpgrade/maxUpgrade and indexes upgradeLevelInfos at
+currUpgrade+1. Selection/update events drive the NPC frame. This is not an
+API for arbitrary equipped slots. Outside selected-NPC context no usable table
+is assumed. C_APIDocumentation and unavailable legacy globals are never called.
+
+ItemDocumentation.lua:674 documents C_Item.GetItemSpell(itemInfo) ->
+spellName,spellID or no value. The actual equipped link, not just item ID, is
+passed so the instance's use effect can be observed. A returned mapped effect
+on gloves establishes its tinker independently of link enchant field 2.
+No return or an unmapped effect stays UNKNOWN (cache or unsupported effect).
+A spell ID is also retained for targeted diagnostics; names are not matched.
+
+IMPLEMENTATION
+EquipmentInspector.lua owns one lazily created hidden GameTooltip. Each scan
+clears lines, calls SetInventoryItem("player",slotId), requires hasItem and an
+identical decoded tooltip/link payload, scans all FontString regions, then hides
+it. Error/uncached/stale data cannot reuse the previous item's upgrade progress.
+Only the client-supplied localized ITEM_UPGRADE_TOOLTIP_FORMAT is compiled;
+no English fallback. %d and positional %1$d/%2$d work; color markers are removed.
+Two consistent integer captures establish current>=0, maximum>0, current<=max.
+Remaining=max-current. Conflicting/invalid lines stay UNKNOWN. A valid line
+establishes eligibility even at 0/max; no line does NOT establish ineligibility.
+Known non-upgradeable normalized observations yield NOT_APPLICABLE in the
+comparator, but the scanner currently cannot prove this classification live.
+
+Observation fields: upgradeEligibility,upgradeStep,upgradeMaximum,
+upgradeRemaining,upgradeState,tinker. Known observations include method source.
+Upgrade states: FULLY_UPGRADED,PARTIALLY_UPGRADED,UNUPGRADED; uncertain observations
+use UNKNOWN. Maximum-upgrade comparison ignores exported upgradeStep. Known
+current maximum can differ from two. Wrong target item still blocks all
+modification MATCH claims. Ring/trinket logic and link decoder are unchanged.
+Settings remain db.profile; builds db.char; SavedVariables stays disabled.
+
+LIVE VERIFICATION REQUIRED
+/reload; reimport Paladin build; /wsgs debug; /wsgs probe 7; /wsgs compare.
+Expect enchant 4430 and tinker 4898 independently if those gloves are equipped.
+Use /wsgs probe 3 or 4 on upgradeable armor: confirm reported current/max and
+remaining against the visible tooltip. Test 0/max, partial, full, and other
+maxima when available. No upgrades or currency spending are needed by this addon.
+Focused read-only probes (run separately):
+/run print(ITEM_UPGRADE_TOOLTIP_FORMAT)
+/run local l=GetInventoryItemLink("player",10); if l then print(C_Item.GetItemSpell(l)) end
+/run local ok,v=pcall(C_ItemUpgrade.CanUpgradeItem,ItemLocation:CreateFromEquipmentSlot(10)); print(ok,v)
+/run local v=C_ItemUpgrade.GetItemUpgradeItemInfo(); print(v and v.currUpgrade,v and v.maxUpgrade)
+For the last two, compare outside NPC context and with an item manually selected
+at the upgrade NPC. Do not click Upgrade. Return results before assigning any
+meaning to CanUpgradeItem=false or using vendor-selected data in the scanner.
+Also return glove spell ID if it is not one of the three supported mappings.
+
+TESTING
+python tests/test_import.py --runtime-path C:\Windows\Temp\wsgs-lua-test
+Tests exercise real addon code under Lua 5.1 with synthetic tooltip translations
+of the documented format and mocked source-backed APIs. They do not claim live
+API confirmation. Non-upgradeable and positively absent-tinker fixtures exercise
+normalized comparator contracts only; missing live observations stay UNKNOWN.
+No game-client testing was performed by the agent.

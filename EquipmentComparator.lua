@@ -48,6 +48,8 @@ local function compareSlot(target, current, position, currentPosition)
                 if maximum and maximum.status == "KNOWN" and type(maximum.value) == "number" and maximum.value > 0 then
                     difference = scalar(maximum.value, observations.upgradeStep)
                     difference.policy = "MAXIMUM"
+                    difference.remaining = observations.upgradeRemaining and observations.upgradeRemaining.value
+                    difference.progressState = observations.upgradeState and observations.upgradeState.value
                 else
                     difference.reason = "Upgradeable item maximum is unknown (normally 2)"
                 end

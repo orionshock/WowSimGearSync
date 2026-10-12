@@ -46,14 +46,16 @@ Source root: C:\WoWAddons\BlizzardInterfaceCode\Interface\AddOns
 
 UPGRADE POLICY AND REMAINING UNKNOWNS
 Every nonempty target is evaluated under policy=MAXIMUM independently of
-export upgradeStep. This is a conditional target, not proof of eligibility.
-Normally maximum is 2, recorded as an informational hint, never assumed as
-an observation. Scanner returns UNKNOWN upgradeEligibility, upgradeMaximum,
-and upgradeStep. Known ineligible items would be NOT_APPLICABLE. If eligibility
-and maximum are positively established in a normalized snapshot, comparator
-uses that maximum; unreadable progress remains UNKNOWN. No upgrade operations.
-Tinker decoding is UNKNOWN pending targeted evidence. API documentation for
-GUID is available, but its live MoP return behavior still needs confirmation.
+export upgradeStep. EquipmentInspector.lua reads current/maximum only from
+GameTooltip:SetInventoryItem using ITEM_UPGRADE_TOOLTIP_FORMAT, derives remaining
+and FULLY_UPGRADED/PARTIALLY_UPGRADED/UNUPGRADED, and never hardcodes the maximum.
+Missing, inconsistent, stale, or uncached tooltip information stays UNKNOWN;
+absence does not prove non-upgradeability. Empty slots are NOT_APPLICABLE.
+Glove use effects from C_Item.GetItemSpell map to tinkers 4898, 4697, and 4698
+using corroborated local MoP SpellItemEnchantment data. Missing/unmapped use
+spells stay UNKNOWN. Neither tooltip inspection nor item-use-spell queries
+change equipment or invoke vendor operations. See upgrade-and-tinker-notes.txt
+for complete reference evidence, restrictions, and live validation commands.
 
 STRUCTURES AND RULES
 Snapshot: {capturedAt, slots[1..16]}; each slot includes position, slotId,
@@ -94,7 +96,7 @@ These probe arguments are export positions, not inventory IDs. Probes print
 raw payload, decoded enchant/reforge, four gem positions, upgrade/tinker and
 GUID status. If actual gear still matches the captured links, comparison must
 show cloak gem MISMATCH and shoulders reforge MISMATCH. Supply glove probe 7
-plus its engineering-use tooltip text for further tinker research. No unverified
+plus its returned engineering spell ID and tooltip text for live confirmation. No unverified
 fields will be decoded from field 11 or from unrelated colon positions.
 
 TESTING

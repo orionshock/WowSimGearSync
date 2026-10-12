@@ -24,6 +24,9 @@ function WSGS:CompareLatestEquipment()
             for _, field in ipairs({ "item", "gems", "enchant", "reforging", "upgradeStep", "tinker" }) do
                 local difference = slot.fields[field]
                 local detail = difference.actual ~= nil and " (observed " .. tostring(difference.actual) .. ")" or ""
+                if difference.source then detail = detail .. " via " .. difference.source end
+                if difference.progressState then detail = detail .. " " .. difference.progressState end
+                if difference.remaining then detail = detail .. " remaining=" .. difference.remaining end
                 if difference.reason then detail = detail .. " - " .. difference.reason end
                 self:Debug(prefix .. labels[field] .. ": " .. difference.state .. detail)
             end
@@ -38,10 +41,22 @@ function WSGS:ProbeEquipment(position)
     local current = self.EquipmentScanner:Scan(position).slots[position]
     self:Print("[PROBE] " .. current.slotName .. " inventory=" .. current.slotId .. " item=" .. tostring(current.id))
     self:Print("[PROBE] Raw link: " .. (current.link and (current.link:match("|H(item:[^|]+)|h") or current.link) or "unavailable"))
-    for _, field in ipairs({ "enchant", "reforging", "upgradeEligibility", "upgradeStep", "tinker" }) do
+    for _, field in ipairs({ "enchant", "reforging", "tinker" }) do
         local observed = current.observations[field]
-        self:Print("[PROBE] " .. (labels[field] or field) .. ": " .. observed.status .. " " .. tostring(observed.value))
+        self:Print("[PROBE] " .. (labels[field] or field) .. ": " .. observed.status .. " " .. tostring(observed.value) .. (self.db.profile.debug and observed.source and " via " .. observed.source or ""))
     end
+    local observations = current.observations
+    local upgrade = observations.upgradeStep
+    self:Print("[PROBE] Upgrade: " .. upgrade.status .. " " .. tostring(upgrade.value) .. "/" ..
+        tostring(observations.upgradeMaximum.value) .. " remaining=" .. tostring(observations.upgradeRemaining.value) ..
+        " eligibility=" .. tostring(observations.upgradeEligibility.value) .. " state=" .. tostring(observations.upgradeState.value))
+    if self.db.profile.debug then
+        self:Debug("[PROBE] Upgrade method: " .. (upgrade.source or upgrade.reason or "Empty slot"))
+    end
+    if current.observations.tinker.spellId then
+        self:Print("[PROBE] Item use spell: " .. current.observations.tinker.spellId .. " " .. tostring(current.observations.tinker.spellName))
+    end
+    self:Debug("[PROBE] Upgrade format: " .. tostring(ITEM_UPGRADE_TOOLTIP_FORMAT))
     for index, gem in ipairs(current.observations.gems.values or {}) do
         self:Print("[PROBE] Gem " .. index .. ": " .. gem.status .. " " .. tostring(gem.value))
     end
