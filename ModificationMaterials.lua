@@ -229,36 +229,37 @@ Materials.directSockets = {
 }
 
 -- SpellItemEnchantment ID -> profession recipe and required carried reagents.
+-- spellID is the application recipe, not the use spell observed after application.
 Materials.tinkerRecipes = {
-    [4223] = {
-        spellID = 55016,
+    [4223] = { -- Nitro Boosts (waist); equipped use spell 55004.
+        spellID = 55016, -- Engineering recipe: Nitro Boosts.
         reagents = {
-            [39690] = 6,
-            [39681] = 6
+            [39690] = 6, -- Volatile Blasting Trigger.
+            [39681] = 6 -- Handful of Cobalt Bolts.
         }
     },
-    [4697] = {
-        spellID = 108789,
+    [4697] = { -- Phase Fingers (hands); equipped use spell 108788.
+        spellID = 108789, -- Engineering recipe: Phase Fingers.
         reagents = {
-            [90146] = 1
+            [90146] = 1 -- Tinker's Kit.
         }
     },
-    [4698] = {
-        spellID = 109077,
+    [4698] = { -- Incendiary Fireworks Launcher (hands); equipped use spell 109076.
+        spellID = 109077, -- Engineering recipe: Incendiary Fireworks Launcher.
         reagents = {
-            [90146] = 1
+            [90146] = 1 -- Tinker's Kit.
         }
     },
-    [4897] = {
-        spellID = 126392,
+    [4897] = { -- Goblin Glider (back); equipped use spell 126389.
+        spellID = 126392, -- Engineering recipe: Goblin Glider.
         reagents = {
-            [90146] = 1
+            [90146] = 1 -- Tinker's Kit.
         }
     },
-    [4898] = {
-        spellID = 126731,
+    [4898] = { -- Synapse Springs (hands); equipped use spell 126734.
+        spellID = 126731, -- Engineering recipe: Synapse Springs.
         reagents = {
-            [90146] = 1
+            [90146] = 1 -- Tinker's Kit.
         }
     }
 }
