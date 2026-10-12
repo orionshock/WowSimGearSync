@@ -392,7 +392,7 @@ function Actions:ClickText(position)
     return "No action needed"
 end
 
-function Actions:OnEvent(event, ...)
+function Actions:ActiveState()
     local active, submitting
     for _, controller in pairs(self.controllers) do
         if controller.state == "PENDING" or controller.submitting then
@@ -402,131 +402,212 @@ function Actions:OnEvent(event, ...)
             submitting = true
         end
     end
-    if not active then
-        return
-    end
-    if active and event:find("^SOCKET_INFO_") then
-        local socketing
-        for _, controller in pairs(self.controllers) do
-            if controller.pending and controller.pending.type == "GEM" then
-                socketing = true;
-                break
-            end
-        end
-        if not socketing then
-            return
-        end
-    elseif active and event:find("^UNIT_SPELLCAST_") then
-        local unit, _, spellID = ...
-        if unit ~= "player" then
-            return
-        end
-        local relevant
-        for _, controller in pairs(self.controllers) do
-            local operation = controller.pending or controller.submitting
-            if operation and operation.spellID == spellID then
-                relevant = true;
-                break
-            end
-        end
-        if not relevant then
-            return
-        end
-    elseif active and event == "PLAYER_EQUIPMENT_CHANGED" then
-        local inventorySlot = ...
-        local relevant
-        for _, controller in pairs(self.controllers) do
-            if (controller.pending or controller.submitting) and controller.inventorySlot == inventorySlot then
-                relevant = true;
-                break
-            end
-        end
-        if not relevant then
-            return
-        end
-    end
+    return active, submitting
+end
+
+function Actions:LogEvent(event, ...)
     local args = {}
     for index = 1, select("#", ...) do
         args[index] = valueText(select(index, ...))
     end
-    if active then
-        debug("EVENT", string.format("event=%s args=%s", event, table.concat(args, ",")))
-    end
-    if event == "UNIT_SPELLCAST_SUCCEEDED" then
-        local unit, _, spellID = ...
-        if unit == "player" then
-            for _, controller in pairs(self.controllers) do
-                local operation = controller.pending or controller.submitting
-                if operation and operation.nativeProfession and operation.spellID == spellID then
-                    if TradeSkillFrame and TradeSkillFrame:IsShown() then
-                        HideUIPanel(TradeSkillFrame)
-                        debug("EVENT",
-                            string.format("event=%s slot=%d type=%s profession=%s tradeskill=closed", event,
-                                controller.inventorySlot, operation.type, operation.professionName))
-                    end
-                    break
-                end
-            end
-        end
-    end
-    if event == "REPLACE_ENCHANT" or event == "BIND_ENCHANT" or event == "ACTION_WILL_BIND_ITEM" then
-        local controller, operation
-        for _, candidate in pairs(self.controllers) do
-            local candidateOperation = candidate.submitting
-            if candidateOperation and candidateOperation.type ~= "GEM" then
-                controller, operation = candidate, candidateOperation
-                break
-            end
-        end
-        if not operation then
-            return
-        end
-        local api = event == "REPLACE_ENCHANT" and C_Item.ReplaceEnchant or event == "BIND_ENCHANT" and
-                        C_Item.BindEnchant or C_Item.ActionBindsItem
-        local ok, problem = pcall(api)
-        if ok then
-            StaticPopup_Hide(event)
-        end
-        debug("EVENT",
-            string.format("event=%s slot=%d type=%s confirm=%s", event, controller.inventorySlot, operation.type,
-                ok and "accepted" or "failed"))
-        if not ok then
-            controller.failure = event .. " confirmation failed: " .. tostring(problem)
-        end
-        return
-    elseif event == "SOCKET_INFO_FAILURE" then
-        for _, controller in pairs(self.controllers) do
-            if controller.pending and controller.pending.type == "GEM" then
-                controller.failure = "Blizzard socketing reported failure"
-            end
-        end
-    elseif event == "SOCKET_INFO_ACCEPT" then
-        for _, controller in pairs(self.controllers) do
-            if controller.pending and controller.pending.type == "GEM" then
-                self:ScheduleTimeout(controller)
-            end
-        end
-    elseif event == "SOCKET_INFO_CLOSE" then
-        for _, controller in pairs(self.controllers) do
-            if controller.pending and controller.pending.type == "GEM" and not controller.timeoutScheduled then
-                controller.failure = "Blizzard Socketing closed before the change was submitted"
-            end
-        end
-    elseif event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_INTERRUPTED" then
-        local unit, _, spellID = ...
-        if unit == "player" then
-            for _, controller in pairs(self.controllers) do
-                local operation = controller.pending or controller.submitting
-                if operation and operation.spellID == spellID then
-                    controller.failure = "Client spell cast failed or was interrupted"
-                end
-            end
-        end
-    end
+    debug("EVENT", string.format("event=%s args=%s", event, table.concat(args, ",")))
+end
+
+function Actions:FinishEvent(event, submitting, ...)
+    self:LogEvent(event, ...)
     if submitting then
         return
     end
     self:Rescan(event)
+end
+
+function Actions:HandleActiveEvent(event, ...)
+    local active, submitting = self:ActiveState()
+    if not active then
+        return
+    end
+    self:FinishEvent(event, submitting, ...)
+end
+
+function Actions:HasPendingGem()
+    for _, controller in pairs(self.controllers) do
+        if controller.pending and controller.pending.type == "GEM" then
+            return true
+        end
+    end
+    return false
+end
+
+function Actions:HandleSocketEvent(event, ...)
+    local active, submitting = self:ActiveState()
+    if not active or not self:HasPendingGem() then
+        return
+    end
+    self:FinishEvent(event, submitting, ...)
+end
+
+function Actions:PLAYER_EQUIPMENT_CHANGED(event, inventorySlot, ...)
+    local active, submitting = self:ActiveState()
+    if not active then
+        return
+    end
+    local relevant
+    for _, controller in pairs(self.controllers) do
+        if (controller.pending or controller.submitting) and controller.inventorySlot == inventorySlot then
+            relevant = true
+            break
+        end
+    end
+    if not relevant then
+        return
+    end
+    self:FinishEvent(event, submitting, inventorySlot, ...)
+end
+
+function Actions:BAG_UPDATE_DELAYED(event, ...)
+    self:HandleActiveEvent(event, ...)
+end
+
+function Actions:ITEM_LOCK_CHANGED(event, ...)
+    self:HandleActiveEvent(event, ...)
+end
+
+function Actions:TRADE_SKILL_SHOW(event, ...)
+    self:HandleActiveEvent(event, ...)
+end
+
+function Actions:TRADE_SKILL_UPDATE(event, ...)
+    self:HandleActiveEvent(event, ...)
+end
+
+function Actions:PLAYER_REGEN_ENABLED(event, ...)
+    self:HandleActiveEvent(event, ...)
+end
+
+function Actions:SOCKET_INFO_UPDATE(event, ...)
+    self:HandleSocketEvent(event, ...)
+end
+
+function Actions:SOCKET_INFO_SUCCESS(event, ...)
+    self:HandleSocketEvent(event, ...)
+end
+
+function Actions:SOCKET_INFO_ACCEPT(event, ...)
+    local active, submitting = self:ActiveState()
+    if not active or not self:HasPendingGem() then
+        return
+    end
+    for _, controller in pairs(self.controllers) do
+        if controller.pending and controller.pending.type == "GEM" then
+            self:ScheduleTimeout(controller)
+        end
+    end
+    self:FinishEvent(event, submitting, ...)
+end
+
+function Actions:SOCKET_INFO_FAILURE(event, ...)
+    local active, submitting = self:ActiveState()
+    if not active or not self:HasPendingGem() then
+        return
+    end
+    for _, controller in pairs(self.controllers) do
+        if controller.pending and controller.pending.type == "GEM" then
+            controller.failure = "Blizzard socketing reported failure"
+        end
+    end
+    self:FinishEvent(event, submitting, ...)
+end
+
+function Actions:SOCKET_INFO_CLOSE(event, ...)
+    local active, submitting = self:ActiveState()
+    if not active or not self:HasPendingGem() then
+        return
+    end
+    for _, controller in pairs(self.controllers) do
+        if controller.pending and controller.pending.type == "GEM" and not controller.timeoutScheduled then
+            controller.failure = "Blizzard Socketing closed before the change was submitted"
+        end
+    end
+    self:FinishEvent(event, submitting, ...)
+end
+
+function Actions:HandleSpellcastResult(event, failed, unit, castGUID, spellID, ...)
+    local active, submitting = self:ActiveState()
+    if not active or unit ~= "player" then
+        return
+    end
+    local relevant, tradeSkillClosed
+    for _, controller in pairs(self.controllers) do
+        local operation = controller.pending or controller.submitting
+        if operation and operation.spellID == spellID then
+            relevant = true
+            if failed then
+                controller.failure = "Client spell cast failed or was interrupted"
+            elseif not tradeSkillClosed and operation.nativeProfession and TradeSkillFrame and
+                TradeSkillFrame:IsShown() then
+                HideUIPanel(TradeSkillFrame)
+                tradeSkillClosed = true
+                debug("EVENT", string.format("event=%s slot=%d type=%s profession=%s tradeskill=closed", event,
+                    controller.inventorySlot, operation.type, operation.professionName))
+            end
+        end
+    end
+    if not relevant then
+        return
+    end
+    self:FinishEvent(event, submitting, unit, castGUID, spellID, ...)
+end
+
+function Actions:UNIT_SPELLCAST_SUCCEEDED(event, unit, castGUID, spellID, ...)
+    self:HandleSpellcastResult(event, false, unit, castGUID, spellID, ...)
+end
+
+function Actions:UNIT_SPELLCAST_FAILED(event, unit, castGUID, spellID, ...)
+    self:HandleSpellcastResult(event, true, unit, castGUID, spellID, ...)
+end
+
+function Actions:UNIT_SPELLCAST_INTERRUPTED(event, unit, castGUID, spellID, ...)
+    self:HandleSpellcastResult(event, true, unit, castGUID, spellID, ...)
+end
+
+function Actions:ConfirmApplication(event, api, ...)
+    local active = self:ActiveState()
+    if not active then
+        return
+    end
+    local controller, operation
+    for _, candidate in pairs(self.controllers) do
+        local candidateOperation = candidate.submitting
+        if candidateOperation and candidateOperation.type ~= "GEM" then
+            controller, operation = candidate, candidateOperation
+            break
+        end
+    end
+    if not operation then
+        return
+    end
+    self:LogEvent(event, ...)
+    local ok, problem = pcall(api)
+    if ok then
+        StaticPopup_Hide(event)
+    end
+    debug("EVENT", string.format("event=%s slot=%d type=%s confirm=%s", event, controller.inventorySlot,
+        operation.type, ok and "accepted" or "failed"))
+    if not ok then
+        controller.failure = event .. " confirmation failed: " .. tostring(problem)
+    end
+end
+
+function Actions:REPLACE_ENCHANT(event, ...)
+    self:ConfirmApplication(event, C_Item.ReplaceEnchant, ...)
+end
+
+function Actions:BIND_ENCHANT(event, ...)
+    self:ConfirmApplication(event, C_Item.BindEnchant, ...)
+end
+
+function Actions:ACTION_WILL_BIND_ITEM(event, ...)
+    self:ConfirmApplication(event, C_Item.ActionBindsItem, ...)
 end
 
 function Actions:OnEnable()
@@ -536,6 +617,6 @@ function Actions:OnEnable()
                             "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
                             "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE", "REPLACE_ENCHANT", "BIND_ENCHANT",
                             "ACTION_WILL_BIND_ITEM", "PLAYER_REGEN_ENABLED"}) do
-        self:RegisterEvent(event, "OnEvent")
+        self:RegisterEvent(event)
     end
 end
