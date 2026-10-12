@@ -10,7 +10,7 @@ hard-embedding at https://www.wowace.com/projects/libdatabroker-1-1.
 No missing upstream license grant is invented.
 
 LAUNCHER AND DATABASE
-Launcher.lua registers the WowSimGearSync LDB launcher, with the existing WoW
+Core.lua registers the WowSimGearSync LDB object with type "launcher", with the existing WoW
 INV_Chest_Plate04 texture. Left-click toggles PaperDoll; right-click toggles the
 existing import window. Tooltip shows active/latest build and mouse actions.
 LibDBIcon registers the same object. db.profile.minimap stores hide=false and
