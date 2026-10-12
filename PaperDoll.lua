@@ -1,5 +1,6 @@
 local _, WSGS = ...
-local Doll = { events = { "PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT", "SKILL_LINES_CHANGED" } }
+local Doll = WSGS:NewModule("UI", "AceEvent-3.0")
+Doll.events = { "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT", "SKILL_LINES_CHANGED" }
 WSGS.PaperDoll = Doll
 local fields = WSGS.SlotPresentation.fields
 -- Translate comparator states into presentation only; no item/modification
@@ -126,7 +127,7 @@ function Doll:Refresh()
 end
 
 function Doll:QueueRefresh(event, itemId, success)
-    if not self.frame:IsShown() then return end
+    if not self.frame or not self.frame:IsShown() then return end
     if event ~= "PLAYER_EQUIPMENT_CHANGED" and event ~= "SKILL_LINES_CHANGED" and (not success or not self.relevantItems[itemId]) then return end
     if self.refreshQueued then return end
     self.refreshQueued = true
@@ -134,6 +135,34 @@ function Doll:QueueRefresh(event, itemId, success)
         self.refreshQueued = false
         self:Refresh()
     end)
+end
+
+function Doll:OnUIEvent(event, ...)
+    self:QueueRefresh(event, ...)
+end
+
+function Doll:OnBuildImported()
+    if self.frame and self.frame:IsShown() then self:Refresh() end
+end
+
+function Doll:OnActionsChanged()
+    self:QueueRefresh("PLAYER_EQUIPMENT_CHANGED")
+end
+
+function Doll:OnEquipmentStateChanged()
+    self:UpdateEquipButton()
+end
+
+function Doll:OnEquipmentRefreshRequested()
+    self:QueueRefresh("PLAYER_EQUIPMENT_CHANGED")
+end
+
+function Doll:OnEnable()
+    for _, event in ipairs(self.events) do self:RegisterEvent(event, "OnUIEvent") end
+    self:RegisterMessage("WSGS_BUILD_IMPORTED", "OnBuildImported")
+    self:RegisterMessage("WSGS_ACTIONS_CHANGED", "OnActionsChanged")
+    self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED", "OnEquipmentStateChanged")
+    self:RegisterMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", "OnEquipmentRefreshRequested")
 end
 
 function Doll:Toggle()
@@ -204,13 +233,6 @@ function Doll:Create()
     note:SetWidth(440)
     note:SetJustifyH("RIGHT")
     frame.equipNote = note
-    local actions = WSGS.EquipmentActions
-    actions.isVisible = function() return frame:IsShown() end
-    actions.queueViewRefresh = function() self:QueueRefresh("PLAYER_EQUIPMENT_CHANGED") end
-    actions.refreshView = function() self:Refresh() end
-    actions.stateChanged = function() self:UpdateEquipButton() end
-    WSGS.SlotActions.refreshView = function() self:Refresh() end
-    WSGS.SlotActions.isVisible = function() return frame:IsShown() end
     frame.slots = {}
     for position, slot in ipairs(WSGS.equipmentSlots) do
         local button = CreateFrame("Button", nil, frame, "SecureActionButtonTemplate,SecureHandlerStateTemplate")
@@ -263,18 +285,15 @@ function Doll:Create()
     frame.summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.summary:SetPoint("BOTTOM", 0, 30)
     frame.summary:SetWidth(610)
-    frame:SetScript("OnEvent", function(_, ...) self:QueueRefresh(...) end)
     frame:SetScript("OnShow", function()
         WSGS:RefreshEscapeWindow()
         self.requestedItems = {}
-        for _, event in ipairs(self.events) do frame:RegisterEvent(event) end
         self:Refresh()
     end)
     frame:SetScript("OnHide", function()
         frame:StopMovingOrSizing()
         frame.buildName:ClearFocus()
         WSGS:RefreshEscapeWindow()
-        frame:UnregisterAllEvents()
         if self.hovered then GameTooltip:Hide(); self.hovered = nil end
     end)
     return frame

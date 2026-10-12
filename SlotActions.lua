@@ -1,9 +1,10 @@
 local _, WSGS = ...
-local Actions = { controllers = {}, buttons = {}, serial = 0 }
+local Actions = WSGS:NewModule("Actions", "AceEvent-3.0")
+Actions.controllers, Actions.buttons, Actions.serial = {}, {}, 0
 WSGS.SlotActions = Actions
 
 local colors = { WAITING_FOR_ITEM = "8cb3ff", READY = "4dff66", PENDING = "999999",
-    BLOCKED = "ffb326", COMPLETE = "4dff66" }
+    UNKNOWN = "8cb3ff", BLOCKED = "ffb326", COMPLETE = "4dff66" }
 local labels = { BUCKLE = "belt buckle", GEM = "gem", ENCHANT = "enchant",
     PROFESSION_ENCHANT = "profession enhancement", PROFESSION_SOCKET = "Blacksmithing socket",
     TINKER = "Engineering tinker" }
@@ -17,12 +18,7 @@ local function valueText(value)
 end
 
 local function operationSatisfied(operation, difference)
-    if not difference or difference.fields.item.state ~= "MATCH" then return false, "target item no longer equipped" end
-    local field = difference.fields[operation.field]
-    if operation.type == "GEM" then field = field and field.sockets and field.sockets[operation.socket] end
-    if not field then return false, "comparison field unavailable" end
-    return field.state == "MATCH", field.state .. (field.reason and ": " .. field.reason or ""),
-        field.actualCount or field.actual
+    return operation.handler:Verify({ operation = operation, difference = difference })
 end
 
 function Actions:Refresh(profile, snapshot, comparison)
@@ -39,16 +35,19 @@ function Actions:Refresh(profile, snapshot, comparison)
             local sameInstance = previous.targetGuid == built.targetGuid
             local satisfied, detail, actual = operationSatisfied(previous.pending, comparison.slots[position])
             if sameInstance and satisfied then
-                debug("VERIFY", string.format("slot=%d type=%s expected=%s actual=%s guid=%s result=MATCH",
-                    previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected),
+                debug("VERIFY", string.format("slot=%d handler=%s type=%s expected=%s actual=%s guid=%s result=MATCH",
+                    previous.inventorySlot, previous.pending.handlerName, previous.pending.type,
+                    valueText(previous.pending.expected),
                     valueText(actual), valueText(previous.targetGuid)))
-                debug("DONE", string.format("slot=%d type=%s verified", previous.inventorySlot, previous.pending.type))
+                debug("DONE", string.format("slot=%d handler=%s type=%s verified", previous.inventorySlot,
+                    previous.pending.handlerName, previous.pending.type))
             elseif previous.failure or not sameInstance then
                 built.state = "BLOCKED"
                 built.reason = previous.failure or "Target item instance changed before verification"
                 built.lastFailed = previous.pending
-                debug("VERIFY", string.format("slot=%d type=%s expected=%s result=FAILED reason=%s",
-                    previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected), built.reason))
+                debug("VERIFY", string.format("slot=%d handler=%s type=%s expected=%s result=FAILED reason=%s",
+                    previous.inventorySlot, previous.pending.handlerName, previous.pending.type,
+                    valueText(previous.pending.expected), built.reason))
             else
                 built.state, built.pending, built.startedAt = "PENDING", previous.pending, previous.startedAt
                 built.reason = "Awaiting client verification: " .. detail
@@ -56,8 +55,9 @@ function Actions:Refresh(profile, snapshot, comparison)
                 built.timeoutScheduled = previous.timeoutScheduled
                 built.lastVerificationDetail = detail
                 if previous.lastVerificationDetail ~= detail then
-                    debug("VERIFY", string.format("slot=%d type=%s expected=%s actual=%s result=STILL_PENDING reason=%s",
-                        previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected),
+                    debug("VERIFY", string.format("slot=%d handler=%s type=%s expected=%s actual=%s result=STILL_PENDING reason=%s",
+                        previous.inventorySlot, previous.pending.handlerName, previous.pending.type,
+                        valueText(previous.pending.expected),
                         valueText(actual), detail))
                 end
             end
@@ -66,31 +66,38 @@ function Actions:Refresh(profile, snapshot, comparison)
             built.reason = previous.reason
         end
         self.controllers[position] = built
-        local op = built.prepared or built.blocked[1]
+        local op = built.prepared or built.unknown[1] or built.blocked[1]
         local signature = table.concat({ valueText(built.inventorySlot), built.state, op and op.type or "none",
             op and valueText(op.expected) or "nil", valueText(built.targetGuid), built.reason or op and op.reason or "none",
             valueText(op and op.material and op.material.bag), valueText(op and op.material and op.material.slot),
             valueText(op and op.targetSource) }, ":")
         local changed = self.planSignatures[position] ~= signature
         self.planSignatures[position] = signature
-        if changed then debug("PLAN", string.format("slot=%d actualSlot=%d state=%s next=%s expected=%s guid=%s reason=%s",
-            WSGS.equipmentSlots[position].id, built.inventorySlot, built.state, op and op.type or "none",
+        if changed then debug("PLAN", string.format("slot=%d actualSlot=%d state=%s handler=%s next=%s expected=%s guid=%s reason=%s",
+            WSGS.equipmentSlots[position].id, built.inventorySlot, built.state,
+            op and op.handlerName or "none", op and op.type or "none",
             op and valueText(op.expected) or "nil", valueText(built.targetGuid), built.reason or op and op.reason or "none")) end
         if changed and built.state == "READY" then
-            debug("READY", string.format("slot=%d type=%s material=%s materialGuid=%s profession=%s recipe=%s spellName=%s professionSpell=%s effect=%s guid=%s source=%s",
-                built.inventorySlot, built.prepared.type, valueText(built.prepared.materialItemID),
+            debug("READY", string.format("slot=%d handler=%s type=%s material=%s materialGuid=%s profession=%s recipe=%s spellName=%s professionSpell=%s effect=%s guid=%s source=%s",
+                built.inventorySlot, built.prepared.handlerName, built.prepared.type,
+                valueText(built.prepared.materialItemID),
                 valueText(built.prepared.material and built.prepared.material.guid),
                 valueText(built.prepared.professionName), valueText(built.prepared.spellID),
                 valueText(built.prepared.spellName), valueText(built.prepared.professionSpellIndex),
                 valueText(built.prepared.expected), valueText(built.targetGuid), valueText(built.prepared.targetSource)))
         elseif changed and built.state == "BLOCKED" then
             for _, blocked in ipairs(built.blocked) do
-                debug("BLOCK", string.format("slot=%d type=%s profession=%s recipe=%s expected=%s reason=%s",
-                    built.inventorySlot, blocked.type, valueText(blocked.professionName or blocked.professionSkillLine),
+                debug("BLOCK", string.format("slot=%d handler=%s type=%s profession=%s recipe=%s expected=%s reason=%s",
+                    built.inventorySlot, blocked.handlerName, blocked.type,
+                    valueText(blocked.professionName or blocked.professionSkillLine),
                     valueText(blocked.spellID), valueText(blocked.expected), blocked.reason or "unavailable"))
             end
             if #built.blocked == 0 then debug("BLOCK", string.format("slot=%d reason=%s", built.inventorySlot,
                 built.reason or "unavailable")) end
+        end
+        if changed and built.state == "UNKNOWN" then
+            debug("PLAN", string.format("slot=%d handler=%s result=UNKNOWN reason=%s",
+                built.inventorySlot, op and op.handlerName or "none", built.reason or "incomplete client data"))
         end
         self:ConfigureButton(position)
     end
@@ -123,7 +130,7 @@ function Actions:Rescan(reason)
     local snapshot = WSGS.EquipmentScanner:Scan()
     local comparison = WSGS.EquipmentComparator:Compare(profile, snapshot)
     if comparison then self:Refresh(profile, snapshot, comparison, reason) end
-    if self.refreshView then self.refreshView() end
+    self:SendMessage("WSGS_ACTIONS_CHANGED", reason)
 end
 
 function Actions:ScheduleTimeout(controller)
@@ -153,14 +160,60 @@ function Actions:Fail(controller, operation, reason)
     controller.state, controller.reason, controller.lastFailed = "BLOCKED", reason, operation
     controller.pending, controller.submitting = nil, nil
     debug("BLOCK", string.format("slot=%d type=%s reason=%s", controller.inventorySlot, operation.type, reason))
-    if self.refreshView then self.refreshView() end
+    self:SendMessage("WSGS_ACTIONS_CHANGED", "FAILED")
+end
+
+function Actions:ApplyPrepared(context)
+    local controller, operation, button = context.controller, context.operation, context.button
+    if operation.method == "GEM" then
+        local ok, problem = pcall(SocketInventoryItem, controller.inventorySlot)
+        if not ok then self:Fail(controller, operation, "SocketInventoryItem failed: " .. tostring(problem)); return end
+        self:MarkPending(controller, operation, true)
+        controller.reason = string.format("Use Blizzard Socketing: place item %d in socket %d, then apply",
+            operation.materialItemID, operation.socket)
+        self:SendMessage("WSGS_ACTIONS_CHANGED", "SOCKET_OPENED")
+        return
+    end
+    if operation.method == "PROFESSION" then
+        controller.submitting = operation
+        button.secureSubmission = { controller = controller, operation = operation }
+        debug("EXEC", string.format("slot=%d handler=%s api=native-click profession=%s recipe=%s effect=%s",
+            controller.inventorySlot, operation.handlerName, valueText(operation.professionName),
+            valueText(operation.spellID), valueText(operation.expected)))
+        WSGS.ProfessionEnhancementExecution:Submit(controller, operation)
+        return
+    end
+    local material = operation.material
+    if not material then self:Fail(controller, operation, "Prepared material location is unavailable"); return end
+    local current = C_Container.GetContainerItemInfo(material.bag, material.slot)
+    if not current or current.itemID ~= material.itemID or current.isLocked then
+        self:Fail(controller, operation, "Prepared material moved or became locked")
+        return
+    end
+    local guidOK, currentGuid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(material.bag, material.slot))
+    if material.guid and (not guidOK or currentGuid ~= material.guid) then
+        self:Fail(controller, operation, "Prepared material instance moved; rescan before retrying")
+        return
+    end
+    self:ConfigureButton(controller.position)
+    local expectedItem = string.format("%d %d", material.bag, material.slot)
+    if button:GetAttribute("type1") ~= "item"
+        or button:GetAttribute("target-slot1") ~= controller.inventorySlot
+        or button:GetAttribute("item1") ~= expectedItem then
+        self:Fail(controller, operation, "Secure action could not be prepared")
+        return
+    end
+    controller.submitting = operation
+    button.secureSubmission = { controller = controller, operation = operation }
+    debug("EXEC", string.format("slot=%d handler=%s api=SecureActionButton:item action=%s target-slot=%d",
+        controller.inventorySlot, operation.handlerName, expectedItem, controller.inventorySlot))
 end
 
 function Actions:PreClick(position, button)
     button.secureSubmission = nil
     local controller = self.controllers[position]
     if not controller then return end
-    if controller.state == "BLOCKED" then
+    if controller.state == "BLOCKED" or controller.state == "UNKNOWN" then
         controller.lastFailed = nil
         self:Rescan("RETRY_CLICK")
         controller = self.controllers[position]
@@ -190,43 +243,9 @@ function Actions:PreClick(position, button)
         valueText(operation.spellName), valueText(controller.targetGuid),
         operation.type == "GEM" and "socket" or operation.nativeProfession and "native" or "secure"))
 
-    if operation.type == "GEM" then
-        local ok, problem = pcall(SocketInventoryItem, controller.inventorySlot)
-        if not ok then return self:Fail(controller, operation, "SocketInventoryItem failed: " .. tostring(problem)) end
-        self:MarkPending(controller, operation, true)
-        controller.reason = string.format("Use Blizzard Socketing: place item %d in socket %d, then apply", operation.materialItemID, operation.socket)
-        if self.refreshView then self.refreshView() end
-    elseif operation.nativeProfession then
-        controller.submitting = operation
-        button.secureSubmission = { controller = controller, operation = operation }
-        debug("EXEC", string.format("slot=%d type=%s api=native-click target-slot=%d profession=%s recipe=%s effect=%s",
-            controller.inventorySlot, operation.type, controller.inventorySlot,
-            valueText(operation.professionName), valueText(operation.spellID), valueText(operation.expected)))
-        WSGS.ProfessionEnhancementExecution:Submit(controller, operation)
-    else
-        local material = operation.material
-        if not material then return self:Fail(controller, operation, "Prepared material location is unavailable") end
-        local current = C_Container.GetContainerItemInfo(material.bag, material.slot)
-        if not current or current.itemID ~= material.itemID or current.isLocked then
-            return self:Fail(controller, operation, "Prepared material moved or became locked")
-        end
-        local guidOK, currentGuid = pcall(C_Item.GetItemGUID,
-            ItemLocation:CreateFromBagAndSlot(material.bag, material.slot))
-        if material.guid and (not guidOK or currentGuid ~= material.guid) then
-            return self:Fail(controller, operation, "Prepared material instance moved; rescan before retrying")
-        end
-        self:ConfigureButton(position)
-        local expectedItem = string.format("%d %d", operation.material.bag, operation.material.slot)
-        if button:GetAttribute("type1") ~= "item"
-            or button:GetAttribute("target-slot1") ~= controller.inventorySlot
-            or button:GetAttribute("item1") ~= expectedItem then
-            return self:Fail(controller, operation, "Secure action could not be prepared")
-        end
-        controller.submitting = operation
-        button.secureSubmission = { controller = controller, operation = operation }
-        debug("EXEC", string.format("slot=%d type=%s api=SecureActionButton:item action=%s target-slot=%d",
-            controller.inventorySlot, operation.type, expectedItem, controller.inventorySlot))
-    end
+    debug("EXEC", string.format("slot=%d handler=%s check=READY method=%s",
+        controller.inventorySlot, operation.handlerName, operation.method))
+    operation.handler:Apply({ actions = self, controller = controller, operation = operation, button = button })
 end
 
 function Actions:PostClick(position, button)
@@ -239,7 +258,7 @@ function Actions:PostClick(position, button)
     end
     self:MarkPending(controller, operation)
     self:ConfigureButton(position)
-    if self.refreshView then self.refreshView() end
+    self:SendMessage("WSGS_ACTIONS_CHANGED", "PENDING")
 end
 
 function Actions:TooltipLines(position)
@@ -247,10 +266,11 @@ function Actions:TooltipLines(position)
     if not controller then return {} end
     local color = colors[controller.state] or "ffffff"
     local lines = { " ", "|cff" .. color .. "Action: " .. controller.state:gsub("_", " ") .. "|r" }
-    local operation = controller.prepared or controller.pending or controller.blocked[1]
+    local operation = controller.prepared or controller.pending or controller.unknown[1] or controller.blocked[1]
     if operation then
         local text = "Next: " .. labels[operation.type]
-        if operation.type == "GEM" then text = text .. string.format(" %d in socket %d", operation.expected, operation.socket)
+        if operation.type == "GEM" and operation.expected and operation.socket then
+            text = text .. string.format(" %d in socket %d", operation.expected, operation.socket)
         elseif operation.expected then text = text .. " " .. tostring(operation.expected) end
         if operation.targetSource == "RECOMMENDED" then text = text .. " (recommended)"
         elseif operation.targetSource == "SIMULATION" then text = text .. " (simulation target)" end
@@ -269,10 +289,12 @@ end
 function Actions:ClickText(position)
     local controller = self.controllers[position]
     if not controller or controller.state == "WAITING_FOR_ITEM" then return nil end
-    local operation = controller.prepared or controller.pending or controller.lastFailed or controller.blocked[1]
+    local operation = controller.prepared or controller.pending or controller.lastFailed
+        or controller.unknown[1] or controller.blocked[1]
     local action = operation and labels[operation.type]
     if controller.state == "READY" and action then return "Click to apply " .. action end
     if controller.state == "PENDING" and action then return "Applying " .. action .. "..." end
+    if controller.state == "UNKNOWN" then return "Click to recheck" end
     if controller.state == "BLOCKED" and controller.lastFailed and action then return "Click to retry " .. action end
     if controller.state == "BLOCKED" and action then return "Cannot apply " .. action end
     return "No action needed"
@@ -284,7 +306,7 @@ function Actions:OnEvent(event, ...)
         if controller.state == "PENDING" or controller.submitting then active = true end
         if controller.submitting then submitting = true end
     end
-    if not active and not (self.isVisible and self.isVisible()) then return end
+    if not active then return end
     if active and event:find("^SOCKET_INFO_") then
         local socketing
         for _, controller in pairs(self.controllers) do
@@ -377,15 +399,13 @@ function Actions:OnEvent(event, ...)
     self:Rescan(event)
 end
 
-function Actions:Initialize()
+function Actions:OnEnable()
     self.planSignatures = {}
-    local frame = CreateFrame("Frame")
-    self.frame = frame
     for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED",
         "SOCKET_INFO_UPDATE", "SOCKET_INFO_ACCEPT", "SOCKET_INFO_SUCCESS", "SOCKET_INFO_FAILURE", "SOCKET_INFO_CLOSE",
         "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
         "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE",
-        "REPLACE_ENCHANT", "BIND_ENCHANT", "ACTION_WILL_BIND_ITEM",
-        "PLAYER_REGEN_ENABLED" }) do frame:RegisterEvent(event) end
-    frame:SetScript("OnEvent", function(_, ...) self:OnEvent(...) end)
+        "REPLACE_ENCHANT", "BIND_ENCHANT", "ACTION_WILL_BIND_ITEM", "PLAYER_REGEN_ENABLED" }) do
+        self:RegisterEvent(event, "OnEvent")
+    end
 end

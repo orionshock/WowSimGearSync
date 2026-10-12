@@ -37,6 +37,7 @@ EquipmentExecution.lua
 EquipmentSetSync.lua
 EquipmentActions.lua
 ModificationMaterials.lua
+SlotActionHandlers.lua
 SlotActionPlanner.lua
 ProfessionEnhancementExecution.lua
 SlotActions.lua

@@ -2,21 +2,19 @@ local _, WSGS = ...
 local Planner = {}
 WSGS.SlotActionPlanner = Planner
 
-local function valueText(value)
-    return value == nil and "nil" or tostring(value)
-end
-
 local function targetGuid(current)
     local observed = current and current.observations and current.observations.instance
     return observed and observed.status == "KNOWN" and observed.value or nil
 end
 
-local function addOperation(controller, operation, reason)
-    if reason then
-        operation.reason = reason
-        controller.blocked[#controller.blocked + 1] = operation
+local function classify(controller, operation, prepared, reason, retryable)
+    operation.reason = reason
+    if prepared then
+        controller.operations[#controller.operations + 1] = prepared
+    elseif retryable then
+        controller.unknown[#controller.unknown + 1] = operation
     else
-        controller.operations[#controller.operations + 1] = operation
+        controller.blocked[#controller.blocked + 1] = operation
     end
 end
 
@@ -25,7 +23,7 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
     local current = snapshot.slots[difference.currentPosition]
     local controller = { position = position, inventorySlot = difference.currentSlotId,
         currentPosition = difference.currentPosition, target = target, difference = difference,
-        targetGuid = targetGuid(current), operations = {}, blocked = {} }
+        targetGuid = targetGuid(current), operations = {}, blocked = {}, unknown = {} }
     if difference.fields.item.state ~= "MATCH" then
         controller.state = "WAITING_FOR_ITEM"
         controller.reason = difference.fields.item.reason or "Equip the target item first"
@@ -35,10 +33,9 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
         controller.state = "COMPLETE"
         return controller
     end
-    local fields = difference.fields
     local modificationsRemain = false
     for _, field in ipairs({ "professionSocket", "buckle", "gems", "enchant", "tinker" }) do
-        local observed = fields[field]
+        local observed = difference.fields[field]
         if observed and (observed.state == "MISMATCH" or observed.state == "UNKNOWN") then
             modificationsRemain = true
         end
@@ -48,98 +45,32 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
         return controller
     end
     if not controller.targetGuid then
-        controller.state, controller.reason = "BLOCKED", "Equipped item instance could not be verified"
+        controller.state, controller.reason = "UNKNOWN", "Equipped item instance is not available yet"
         return controller
     end
 
-    local professionSocketMissing = fields.professionSocket and fields.professionSocket.state == "MISMATCH"
-    if professionSocketMissing then
-        local socketRecipe = WSGS.ModificationMaterials.directSockets[controller.inventorySlot]
-        local recipe, reason, recipeName, professionName, professionSpellIndex =
-            WSGS.ModificationMaterials:SocketAvailability(bags, controller.inventorySlot)
-        addOperation(controller, { type = "PROFESSION_SOCKET", field = "professionSocket", expected = true,
-            spellID = recipe and (recipe.spellID or recipe.spellIDs and recipe.spellIDs[1]),
-            recipeSpellIDs = recipe and recipe.spellIDs,
-            spellName = recipeName, professionName = professionName,
-            professionSkillLine = socketRecipe and socketRecipe.profession,
-            professionSpellIndex = professionSpellIndex, nativeProfession = true }, reason)
-    elseif fields.professionSocket and fields.professionSocket.state == "UNKNOWN" then
-        addOperation(controller, { type = "PROFESSION_SOCKET", field = "professionSocket", expected = true },
-            fields.professionSocket.reason or "Profession socket state is unknown")
-    end
-
-    local buckleMissing = position == 8 and fields.buckle and fields.buckle.state == "MISMATCH"
-    if buckleMissing then
-        local material = WSGS.ModificationMaterials:ForBuckle(bags)
-        addOperation(controller, { type = "BUCKLE", field = "buckle", expected = true, material = material,
-            materialItemID = WSGS.ModificationMaterials.beltBuckleItemID, spellID = material and material.spellID },
-            not material and "Living Steel Belt Buckle (item 90046) is not in carried bags"
-                or material.locked and "Belt buckle is locked")
-    elseif fields.buckle and fields.buckle.state == "UNKNOWN" then
-        addOperation(controller, { type = "BUCKLE", field = "buckle", expected = true },
-            fields.buckle.reason or "Buckle state is unknown")
-    end
-
-    local gemField = fields.gems
-    if gemField and gemField.sockets then
-        for socket, observed in ipairs(gemField.sockets) do
-            if observed.state == "MISMATCH" then
-                local gemID = observed.expected
-                local material, count = WSGS.ModificationMaterials:ForGem(bags, gemID)
-                local reason = (not gemID or gemID == 0) and "An installed gem cannot be removed without a replacement"
-                    or professionSocketMissing and "Required Blacksmithing socket must be applied first"
-                    or buckleMissing and "Required belt buckle must be applied first"
-                    or not material and string.format("Gem item %s is not in carried bags", valueText(gemID))
-                    or material.locked and "Gem is locked" or nil
-                addOperation(controller, { type = "GEM", field = "gems", socket = socket,
-                    expected = gemID, material = material, materialItemID = gemID, available = count }, reason)
-            elseif observed.state == "UNKNOWN" then
-                addOperation(controller, { type = "GEM", field = "gems", socket = socket,
-                    expected = observed.expected }, observed.reason or "Socket state is unknown")
-            end
+    local context = { position = position, inventorySlot = controller.inventorySlot, target = target,
+        fields = difference.fields, bags = bags, controller = controller }
+    context.additionalSocketMissing = difference.fields.professionSocket
+            and difference.fields.professionSocket.state == "MISMATCH"
+        or difference.fields.buckle and difference.fields.buckle.state == "MISMATCH"
+    for _, handlerName in ipairs(WSGS.SlotActionHandlers:ForSlot(controller.inventorySlot)) do
+        local handler = WSGS.SlotActionHandlers.handlers[handlerName]
+        for _, operation in ipairs(handler:Check(context)) do
+            local prepared, reason, retryable = handler:Prepare(context, operation)
+            classify(controller, operation, prepared, reason, retryable)
         end
-    elseif gemField and gemField.state == "UNKNOWN" then
-        addOperation(controller, { type = "GEM", field = "gems" }, gemField.reason or "Gem state is unknown")
-    end
-
-    if fields.enchant and fields.enchant.state == "MISMATCH" then
-        local enchantID = fields.enchant.expected
-        local direct = WSGS.ModificationMaterials.directEnhancements[enchantID]
-        if direct then
-            local recipe, reason, recipeName, professionName, professionSpellIndex =
-                WSGS.ModificationMaterials:DirectEnhancementAvailability(bags, enchantID, controller.inventorySlot)
-            addOperation(controller, { type = "PROFESSION_ENCHANT", field = "enchant", expected = enchantID,
-                spellID = recipe and recipe.spellID, spellName = recipeName,
-                professionName = professionName, professionSpellIndex = professionSpellIndex,
-                professionSkillLine = direct.profession, nativeProfession = true }, reason)
-        else
-            local material, fixedItemID, spellID = WSGS.ModificationMaterials:ForEnchant(bags, enchantID)
-            local reason = not WSGS.ModificationMaterials.enchantItems[enchantID]
-                    and not WSGS.ModificationMaterials.enchantApplications[enchantID]
-                    and "No confirmed material mapping for enchant " .. valueText(enchantID)
-                or not material and "Required enchant material is not in carried bags"
-                or material.locked and "Enchant material is locked" or nil
-            addOperation(controller, { type = "ENCHANT", field = "enchant", expected = enchantID,
-                material = material, materialItemID = fixedItemID or material and material.itemID,
-                spellID = spellID or material and material.spellID }, reason)
-        end
-    elseif fields.enchant and fields.enchant.state == "UNKNOWN" then
-        addOperation(controller, { type = "ENCHANT", field = "enchant", expected = fields.enchant.expected },
-            fields.enchant.reason or "Enchant state is unknown")
-    end
-
-    if fields.tinker and (fields.tinker.state == "MISMATCH" or fields.tinker.state == "UNKNOWN") then
-        local recipe, reason, recipeName, professionName, professionSpellIndex =
-            WSGS.ModificationMaterials:TinkerAvailability(bags, fields.tinker.expected)
-        addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,
-            spellID = recipe and recipe.spellID, spellName = recipeName, professionName = professionName,
-            professionSkillLine = 202, professionSpellIndex = professionSpellIndex, nativeProfession = true,
-            targetSource = fields.tinker.targetSource }, reason)
     end
 
     controller.prepared = controller.operations[1]
-    if controller.prepared then controller.state = "READY"
-    elseif #controller.blocked > 0 then controller.state, controller.reason = "BLOCKED", controller.blocked[1].reason
-    else controller.state = "COMPLETE" end
+    if controller.prepared then
+        controller.state = "READY"
+    elseif #controller.unknown > 0 then
+        controller.state, controller.reason = "UNKNOWN", controller.unknown[1].reason
+    elseif #controller.blocked > 0 then
+        controller.state, controller.reason = "BLOCKED", controller.blocked[1].reason
+    else
+        controller.state = "COMPLETE"
+    end
     return controller
 end

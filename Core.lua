@@ -21,10 +21,6 @@ function WSGS:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
     self:RegisterCommands()
     self:InitializeLauncher()
-    self.EquipmentSetSync:Initialize()
-    self.EquipmentActions:Initialize()
-    self.SlotActions:Initialize()
-    self:RegisterMessage("WSGS_BUILD_IMPORTED", function() self.PaperDoll:Refresh() end)
     self:Debug("Loaded version " .. self.version .. ".")
 end
 

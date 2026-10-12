@@ -1,7 +1,8 @@
 local _, WSGS = ...
-local Actions = { events = { "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED",
+local Actions = WSGS:NewModule("Equipment", "AceEvent-3.0")
+Actions.events = { "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED",
     "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "UI_ERROR_MESSAGE", "GET_ITEM_INFO_RECEIVED",
-    "ITEM_DATA_LOAD_RESULT", "SPELLS_CHANGED", "CURSOR_CHANGED" } }
+    "ITEM_DATA_LOAD_RESULT", "SPELLS_CHANGED", "CURSOR_CHANGED" }
 WSGS.EquipmentActions = Actions
 local verificationEvents = { PLAYER_EQUIPMENT_CHANGED=true, BAG_UPDATE_DELAYED=true, ITEM_LOCK_CHANGED=true }
 
@@ -19,10 +20,6 @@ local function eventArguments(...)
     local values = {}
     for index = 1, select("#", ...) do values[index] = shown(select(index, ...)) end
     return #values > 0 and table.concat(values, ",") or "none"
-end
-
-function Actions:New()
-    return setmetatable({}, { __index = self })
 end
 
 local function sourceAt(operation, snapshot, bags)
@@ -227,47 +224,43 @@ function Actions:Refresh(profile, snapshot)
             counts.VERIFIED, self.batch.total, self.plan.unresolvedCount))
     end
     self:LogDone(profile, snapshot)
-    if self.stateChanged then self.stateChanged() end
+    self:SendMessage("WSGS_EQUIPMENT_STATE_CHANGED")
     return self.plan
 end
 
 function Actions:QueueRefresh(event)
     if verificationEvents[event] then self.verificationEvent = event end
-    if self.isVisible and self.isVisible() and self.queueViewRefresh then
-        self.queueViewRefresh()
-        return
-    end
+    self:SendMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", event)
+    if self:PendingCount() == 0 then return end
     if self.refreshQueued then return end
     self.refreshQueued = true
     C_Timer.After(0, function()
         self.refreshQueued = false
-        if self.isVisible and self.isVisible() then self.refreshView()
-        elseif self:PendingCount() > 0 then self:Refresh(WSGS:GetActiveSimulationProfile()) end
+        if self:PendingCount() > 0 then self:Refresh(WSGS:GetActiveSimulationProfile()) end
     end)
 end
 
-function Actions:Initialize()
-    local listener = CreateFrame("Frame")
-    self.listener = listener
-    for _, event in ipairs(self.events) do listener:RegisterEvent(event) end
-    listener:SetScript("OnEvent", function(_, event, ...)
-        local active = self.batch and self:PendingCount() > 0
-        if active and (verificationEvents[event] or event == "UI_ERROR_MESSAGE") then
-            WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
+function Actions:OnRuntimeEvent(event, ...)
+    local active = self.batch and self:PendingCount() > 0
+    if active and (verificationEvents[event] or event == "UI_ERROR_MESSAGE") then
+        WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
+    end
+    if event == "UI_ERROR_MESSAGE" then
+        local _, message = ...
+        local record = self.executingRecord or self.lastSubmittedRecord
+        if record and record.status == "STILL_PENDING" then
+            record.error = type(message) == "string" and message or "Client rejected the operation."
+            WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d inv=%d reason=%s",
+                record.index, record.operation.slotId, record.error))
+            self:QueueRefresh(event)
         end
-        if event == "UI_ERROR_MESSAGE" then
-            local _, message = ...
-            local record = self.executingRecord or self.lastSubmittedRecord
-            if record and record.status == "STILL_PENDING" then
-                record.error = type(message) == "string" and message or "Client rejected the operation."
-                WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d inv=%d reason=%s",
-                    record.index, record.operation.slotId, record.error))
-                self:QueueRefresh(event)
-            end
-            return
-        end
-        if self:PendingCount() > 0 or self.isVisible and self.isVisible() then self:QueueRefresh(event) end
-    end)
+        return
+    end
+    self:QueueRefresh(event)
+end
+
+function Actions:OnEnable()
+    for _, event in ipairs(self.events) do self:RegisterEvent(event, "OnRuntimeEvent") end
 end
 
 local function blockRemaining(batch, first, reason)
@@ -373,7 +366,7 @@ function Actions:Click()
     end
     if GetCursorInfo() then WSGS:Print("[EQUIP] Place the held cursor item first."); return end
     local batch = self:BeginBatch(self.plan.operations, self.snapshot, GetTime())
-    if self.stateChanged then self.stateChanged() end
+    self:SendMessage("WSGS_EQUIPMENT_STATE_CHANGED")
     self:SubmitBatch(batch)
     for _, record in ipairs(batch.records) do
         if record.status == "FAILED" or record.status == "BLOCKED" then
@@ -388,8 +381,7 @@ function Actions:Click()
         if self.batch == batch and self:PendingCount() > 0 then
             WSGS:Debug(string.format("[EQUIP][EVENT] name=VERIFY_TIMEOUT pending=%d", self:PendingCount()))
             self.verificationEvent = "FINAL"
-            if self.isVisible and self.isVisible() then self.refreshView()
-            else self:Refresh(WSGS:GetActiveSimulationProfile()) end
+            self:Refresh(WSGS:GetActiveSimulationProfile())
         end
     end)
 end

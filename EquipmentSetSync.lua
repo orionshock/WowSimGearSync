@@ -1,5 +1,5 @@
 local _, WSGS = ...
-local Sync = {}
+local Sync = WSGS:NewModule("EquipmentSets", "AceEvent-3.0")
 WSGS.EquipmentSetSync = Sync
 
 local function shown(value)
@@ -247,15 +247,14 @@ function Sync:Synchronize(profile, snapshot, batch)
     return result, reason
 end
 
-function Sync:Initialize()
-    local listener = CreateFrame("Frame")
-    self.listener = listener
-    listener:RegisterEvent("EQUIPMENT_SETS_CHANGED")
-    listener:SetScript("OnEvent", function()
-        if self.active then
-            self.active.eventSeen = true
-            WSGS:Debug(string.format("[SET][VERIFY] build=%s setID=%s event=EQUIPMENT_SETS_CHANGED action=%s",
-                shown(self.active.name), shown(self.active.setID), shown(self.active.action)))
-        end
-    end)
+function Sync:OnEquipmentSetsChanged()
+    if self.active then
+        self.active.eventSeen = true
+        WSGS:Debug(string.format("[SET][VERIFY] build=%s setID=%s event=EQUIPMENT_SETS_CHANGED action=%s",
+            shown(self.active.name), shown(self.active.setID), shown(self.active.action)))
+    end
+end
+
+function Sync:OnEnable()
+    self:RegisterEvent("EQUIPMENT_SETS_CHANGED", "OnEquipmentSetsChanged")
 end
