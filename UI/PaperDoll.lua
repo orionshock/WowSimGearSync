@@ -1,8 +1,17 @@
 local _, WSGS = ...
-local Doll = WSGS:NewModule("UI", "AceEvent-3.0")
-Doll.events = {"GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT", "SKILL_LINES_CHANGED"}
-WSGS.PaperDoll = Doll
-local fields = WSGS.SlotPresentation.fields
+local UI = WSGS.UI
+
+local Presentation = UI.SlotPresentation
+local fields = Presentation.fields
+local equipButtonLabels = {
+    READY = "Equip",
+    PENDING = "Equipping",
+    CURSOR = "Blocked",
+    COMBAT = "Blocked",
+    FAULT = "Blocked",
+    BLOCKED = "Blocked",
+    COMPLETE = "Sync Set",
+}
 -- Translate comparator states into presentation only; no item/modification
 -- comparison or interchangeable-slot assignment is performed here.
 local function visualState(target, difference)
@@ -24,9 +33,9 @@ local function visualState(target, difference)
     return mismatch and "CONFIGURATION" or unknown and "UNKNOWN" or "MATCH", unknown
 end
 
-function Doll:ShowSlotTooltip(button)
+function UI:ShowSlotTooltip(button)
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-    for _, line in ipairs(WSGS.SlotPresentation:TooltipLines(button, WSGS.db.profile.debug)) do
+    for _, line in ipairs(Presentation:TooltipLines(button, WSGS.db.profile.debug)) do
         GameTooltip:AddLine(line, 1, 1, 1, true)
     end
     for _, line in ipairs(WSGS.SlotActions:TooltipLines(button.position)) do
@@ -35,10 +44,9 @@ function Doll:ShowSlotTooltip(button)
     GameTooltip:Show()
 end
 
-function Doll:Render(profile, snapshot, comparison, reason)
-    local frame = self:Create()
+function UI:RenderPaperDoll(profile, snapshot, comparison, reason)
+    local frame = self:CreatePaperDoll()
     self.profile, self.snapshot, self.comparison, self.error = profile, snapshot, comparison, reason
-    WSGS.SlotActions:Refresh(profile, snapshot, comparison)
     if not frame.buildName:HasFocus() or frame.buildName.buildId ~= (profile and profile.id) then
         frame.buildName:SetText(profile and profile.name or "No active build")
     end
@@ -89,7 +97,7 @@ function Doll:Render(profile, snapshot, comparison, reason)
         button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
         local state = visualState(target, button.difference)
         button.visualState = state
-        button.miniState:SetText(WSGS.SlotPresentation:MiniStates(button.difference,
+        button.miniState:SetText(Presentation:MiniStates(button.difference,
             WSGS.SlotActions:ClickText(button.position)))
         local action = WSGS.SlotActions.controllers[position]
         local pending = action and action.state == "PENDING"
@@ -103,22 +111,13 @@ function Doll:Render(profile, snapshot, comparison, reason)
     end
 end
 
-function Doll:UpdateEquipButton()
-    if not self.frame then
+function UI:UpdateEquipButton()
+    if not self.paperDoll then
         return
     end
     local actions = WSGS.EquipmentActions
-    local labels = {
-        READY = "Equip",
-        PENDING = "Equipping",
-        CURSOR = "Blocked",
-        COMBAT = "Blocked",
-        FAULT = "Blocked",
-        BLOCKED = "Blocked",
-        COMPLETE = "Sync Set"
-    }
-    self.frame.equipButton:SetText(labels[actions.state] or "Blocked")
-    self.frame.equipButton:SetEnabled(actions.state == "READY" or actions.state == "FAULT" or actions.state ==
+    self.paperDoll.equipButton:SetText(equipButtonLabels[actions.state] or "Blocked")
+    self.paperDoll.equipButton:SetEnabled(actions.state == "READY" or actions.state == "FAULT" or actions.state ==
                                           "COMPLETE")
     local plan = actions.plan
     local counts = actions.batch and actions:OutcomeCounts()
@@ -128,103 +127,15 @@ function Doll:UpdateEquipButton()
             actions.batch.total, plan and plan.unresolvedCount or counts.STILL_PENDING) or plan and
                      (#plan.missing > 0 and ("Missing target items: " .. #plan.missing) or plan.blocked[1] or
                          plan.unresolvedCount > 0 and (plan.unresolvedCount .. " target slot(s) unresolved.")) or ""
-    self.frame.equipNote:SetText(note)
+    self.paperDoll.equipNote:SetText(note)
 end
 
-function Doll:CommitBuildName(character)
-    local input = self.frame.buildName
-    local build, reason = WSGS.Import:RenameBuild(character, input.buildId, input:GetText())
-    if build then
-        self.profile = build
-        input:SetText(build.name)
-    else
-        input:SetText(self.profile and self.profile.name or "No active build")
-    end
-    input:ClearFocus()
-    return build, reason
-end
-
-function Doll:Refresh()
-    if not self.frame or not self.frame:IsShown() then
-        return
-    end
-    local profile = WSGS:GetActiveSimulationProfile()
-    if not profile then
-        WSGS.EquipmentActions:Refresh(nil)
-        self:Render(nil)
-        return
-    end
-    local snapshot = WSGS.EquipmentScanner:Scan()
-    local comparison, reason = WSGS.EquipmentComparator:Compare(profile, snapshot)
-    WSGS.EquipmentActions:Refresh(profile, snapshot)
-    self:Render(profile, snapshot, comparison, reason)
-end
-
-function Doll:QueueRefresh(event, itemId, success)
-    if not self.frame or not self.frame:IsShown() then
-        return
-    end
-    if event ~= "PLAYER_EQUIPMENT_CHANGED" and event ~= "SKILL_LINES_CHANGED" and
-        (not success or not self.relevantItems[itemId]) then
-        return
-    end
-    if self.refreshQueued then
-        return
-    end
-    self.refreshQueued = true
-    C_Timer.After(0, function()
-        self.refreshQueued = false
-        self:Refresh()
-    end)
-end
-
-function Doll:OnUIEvent(event, ...)
-    self:QueueRefresh(event, ...)
-end
-
-function Doll:OnBuildImported()
-    if self.frame and self.frame:IsShown() then
-        self:Refresh()
-    end
-end
-
-function Doll:OnActionsChanged()
-    self:QueueRefresh("PLAYER_EQUIPMENT_CHANGED")
-end
-
-function Doll:OnEquipmentStateChanged()
-    self:UpdateEquipButton()
-end
-
-function Doll:OnEquipmentRefreshRequested()
-    self:QueueRefresh("PLAYER_EQUIPMENT_CHANGED")
-end
-
-function Doll:OnEnable()
-    for _, event in ipairs(self.events) do
-        self:RegisterEvent(event, "OnUIEvent")
-    end
-    self:RegisterMessage("WSGS_BUILD_IMPORTED", "OnBuildImported")
-    self:RegisterMessage("WSGS_ACTIONS_CHANGED", "OnActionsChanged")
-    self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED", "OnEquipmentStateChanged")
-    self:RegisterMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", "OnEquipmentRefreshRequested")
-end
-
-function Doll:Toggle()
-    local frame = self:Create()
-    if frame:IsShown() then
-        frame:Hide()
-    else
-        frame:Show()
-    end
-end
-
-function Doll:Create()
-    if self.frame then
-        return self.frame
+function UI:CreatePaperDoll()
+    if self.paperDoll then
+        return self.paperDoll
     end
     local frame = CreateFrame("Frame", "WSGSPaperDoll", UIParent, "PortraitFrameTemplate")
-    self.frame, self.requestedItems, self.relevantItems = frame, {}, {}
+    self.paperDoll, self.requestedItems, self.relevantItems = frame, {}, {}
     frame:Hide()
     frame:SetSize(650, 690)
     frame:SetPoint("CENTER")
@@ -260,7 +171,7 @@ function Doll:Create()
         GameTooltip:Hide()
     end)
     frame.buildName:SetScript("OnEnterPressed", function()
-        local build, reason = self:CommitBuildName(WSGS.db.char)
+        local build, reason = self:CommitBuildName()
         if not build then
             WSGS:Print(reason)
         end
@@ -277,11 +188,7 @@ function Doll:Create()
     import:SetPoint("TOPLEFT", 70, -62)
     import:SetText("Import")
     import:SetScript("OnClick", function()
-        if not WSGS.window then
-            WSGS:CreateWindow()
-        end
-        WSGS.window:Show()
-        WSGS.window:Raise()
+        self:ShowImportDialog()
     end)
     frame.importButton = import
     local equip = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
@@ -299,7 +206,7 @@ function Doll:Create()
     note:SetJustifyH("RIGHT")
     frame.equipNote = note
     frame.slots = {}
-    for position, slot in ipairs(WSGS.equipmentSlots) do
+    for position in ipairs(WSGS.equipmentSlots) do
         local button = CreateFrame("Button", nil, frame, "SecureActionButtonTemplate,SecureHandlerStateTemplate")
         frame.slots[position] = button
         button.position = position
@@ -361,14 +268,14 @@ function Doll:Create()
     frame.summary:SetPoint("BOTTOM", 0, 30)
     frame.summary:SetWidth(610)
     frame:SetScript("OnShow", function()
-        WSGS:RefreshEscapeWindow()
+        self:RefreshEscapeWindow()
         self.requestedItems = {}
-        self:Refresh()
+        self:RefreshPaperDoll()
     end)
     frame:SetScript("OnHide", function()
         frame:StopMovingOrSizing()
         frame.buildName:ClearFocus()
-        WSGS:RefreshEscapeWindow()
+        self:RefreshEscapeWindow()
         if self.hovered then
             GameTooltip:Hide();
             self.hovered = nil

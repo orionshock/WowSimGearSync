@@ -88,8 +88,9 @@ Settings: db.profile.debug. Builds and latest/sequence tracking: db.char.
 SavedVariables remains disabled. Reimport after each /reload.
 Scanner.rescanEvents lists PLAYER_EQUIPMENT_CHANGED (PaperDollInfoDocumentation:
 209 and Cata/PaperDollFrame.lua:2522), GET_ITEM_INFO_RECEIVED and
-ITEM_DATA_LOAD_RESULT (ItemDocumentation.lua:1119,1130). PaperDoll.lua listens while visible and coalesces relevant events with C_Timer.After.
-There is no OnUpdate polling; closed windows unregister their listeners.
+ITEM_DATA_LOAD_RESULT (ItemDocumentation.lua:1119,1130). UI/Module.lua filters
+these events to the visible paper doll and coalesces relevant refreshes with C_Timer.After.
+There is no OnUpdate polling; handlers ignore hidden windows.
 
 RUNTIME VERIFICATION
 /reload; import the supplied Paladin export; /wsgs debug; /wsgs compare.

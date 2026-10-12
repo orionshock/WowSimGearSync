@@ -21,10 +21,12 @@ Active means db.char.latestSimulationProfileId, as in compare; importing selects
 the specialization-managed build. No build selector or persistence is introduced. Slash registration/dispatch is unchanged.
 
 PAPER DOLL
-PaperDoll.lua owns frame lifecycle and binding. SlotPresentation.lua owns
-compact badges and player-facing tooltip translation. No scanner
-or comparator logic is copied. Opening calls the existing scanner and comparator
-once; Render binds their exact targets, snapshot slots, differences and assignment
+UI/Module.lua owns frame lifecycle and event binding. UI/PaperDoll.lua owns
+paper-doll construction and rendering; UI/SlotPresentation.lua owns compact
+status text and player-facing tooltip translation. No scanner or comparator
+logic is copied. Opening calls Equipment:RefreshCurrentBuild, which invokes the
+existing scanner and comparator once; rendering binds their exact targets,
+snapshot slots, differences and assignment
 objects. Empty/selected builds share the same 16 reusable buttons. Import sends an
 AceEvent message after saving; visible paper dolls refresh immediately.
 Two equipment columns, with Main Hand then Off Hand below Wrist on the left,

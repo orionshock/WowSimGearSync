@@ -1,32 +1,26 @@
-local addonName, WSGS = ...
+local _, WSGS = ...
+local UI = WSGS.UI
 
--- Blizzard closes every visible UISpecialFrames entry. One alias resolves to
--- our topmost open window; changing it during Hide does not add another entry.
-function WSGS:RefreshEscapeWindow()
-    if not self.escapeWindowRegistered then
-        table.insert(UISpecialFrames, "WSGSEscapeWindow")
-        self.escapeWindowRegistered = true
-    end
-    local doll = self.PaperDoll and self.PaperDoll.frame
-    _G.WSGSEscapeWindow = self.window and self.window:IsShown() and self.window or doll and doll:IsShown() and doll or
-                              nil
+function UI:ShowImportDialog()
+    local frame = self:CreateImportDialog()
+    frame:Show()
+    frame:Raise()
 end
 
-function WSGS:ToggleWindow()
-    if not self.window then
-        self:CreateWindow()
+function UI:ToggleImportDialog()
+    if not self.importDialog then
+        self:CreateImportDialog()
     end
-    if self.window:IsShown() then
-        self.window:Hide()
+    if self.importDialog:IsShown() then
+        self.importDialog:Hide()
     else
-        self.window:Show()
+        self.importDialog:Show()
     end
 end
 
--- The import callback owns storage/notifications; this dialog owns presentation.
-function WSGS:SubmitImport(frame, import)
+function UI:SubmitImport(frame)
     frame.importInput:ClearFocus()
-    local profile, reason = import(frame.importInput:GetText())
+    local profile, reason = WSGS.Import:ImportEquipment(frame.importInput:GetText())
     if not profile then
         frame.importStatus:SetText("Import failed: " .. reason)
         return nil, reason
@@ -35,8 +29,11 @@ function WSGS:SubmitImport(frame, import)
     return profile
 end
 
-function WSGS:CreateWindow()
-    local frame = CreateFrame("Frame", "WSGSMainWindow", UIParent, "PortraitFrameTemplate")
+function UI:CreateImportDialog()
+    if self.importDialog then
+        return self.importDialog
+    end
+    local frame = CreateFrame("Frame", "WSGSImportDialog", UIParent, "PortraitFrameTemplate")
     frame:Hide()
     frame:SetSize(640, 550)
     frame:SetPoint("CENTER")
@@ -58,14 +55,14 @@ function WSGS:CreateWindow()
     end)
     frame:SetScript("OnShow", function(self)
         self:Raise()
-        WSGS:RefreshEscapeWindow()
+        UI:RefreshEscapeWindow()
         self.importStatus:SetText("")
-        WSGS:Debug("Window opened.")
+        WSGS:Debug("Import dialog opened.")
     end)
     frame:SetScript("OnHide", function(self)
         self:StopMovingOrSizing()
-        WSGS:RefreshEscapeWindow()
-        WSGS:Debug("Window closed.")
+        UI:RefreshEscapeWindow()
+        WSGS:Debug("Import dialog closed.")
     end)
 
     frame.TitleContainer.TitleText:SetText("Import Equipment from WoWSims JSON")
@@ -130,9 +127,7 @@ function WSGS:CreateWindow()
     importButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 22)
     importButton:SetText("Import")
     importButton:SetScript("OnClick", function()
-        WSGS:SubmitImport(frame, function(text)
-            return WSGS.Import:ImportEquipment(text)
-        end)
+        UI:SubmitImport(frame)
     end)
     frame:HookScript("OnHide", function()
         input:ClearFocus()
@@ -148,5 +143,6 @@ function WSGS:CreateWindow()
             frame:Raise()
         end)
     end
-    self.window = frame
+    self.importDialog = frame
+    return frame
 end

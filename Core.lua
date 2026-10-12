@@ -29,7 +29,7 @@ local commandOptions = {
             desc = "Toggle the WoW Sims import screen.",
             order = 0,
             func = function()
-                WSGS:ToggleWindow()
+                WSGS.UI:ToggleImportDialog()
             end
         },
         debug = {
@@ -83,7 +83,7 @@ local commandOptions = {
             end,
             set = function(_, enabled)
                 WSGS.db.profile.recommendedEngineeringTinkers = enabled
-                WSGS.PaperDoll:Refresh()
+                WSGS.UI:RefreshPaperDoll()
             end
         }
     }
@@ -96,9 +96,9 @@ local ldbObjectDefinition = {
     icon = "Interface\\Icons\\INV_Chest_Plate04",
     OnClick = function(_, button)
         if button == "LeftButton" then
-            WSGS.PaperDoll:Toggle()
+            WSGS.UI:TogglePaperDoll()
         elseif button == "RightButton" then
-            WSGS:ToggleWindow()
+            WSGS.UI:ToggleImportDialog()
         end
     end,
     OnTooltipShow = function(tooltip)

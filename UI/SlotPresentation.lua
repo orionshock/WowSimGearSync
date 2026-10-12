@@ -1,7 +1,7 @@
 local _, WSGS = ...
 -- Owns player-facing translation only. Scanner/comparator remain authoritative.
 local Presentation = {}
-WSGS.SlotPresentation = Presentation
+WSGS.UI.SlotPresentation = Presentation
 Presentation.fields = {"item", "upgradeStep", "professionSocket", "gems", "enchant", "buckle", "tinker", "reforging"}
 local labels = {
     item = "Item",
