@@ -6,31 +6,62 @@ local LibDBIcon = LibStub("LibDBIcon-1.0")
 WSGS.version = "0.3.0"
 
 local defaults = {
-    profile = { recommendedEngineeringTinkers = true, debug = true, minimap = { hide = true, minimapPos = 225 } },
-    char = { simulationProfiles = {} },
+    profile = {
+        recommendedEngineeringTinkers = true,
+        debug = true,
+        minimap = {
+            hide = true,
+            minimapPos = 225
+        }
+    },
+    char = {
+        simulationProfiles = {}
+    }
 }
 
 local commandOptions = {
-    type = "group", name = "WowSimGearSync", args = {
+    type = "group",
+    name = "WowSimGearSync",
+    args = {
         import = {
-            type = "execute", name = "Import", desc = "Toggle the WoW Sims import screen.", order = 0,
-            func = function() WSGS:ToggleWindow() end,
+            type = "execute",
+            name = "Import",
+            desc = "Toggle the WoW Sims import screen.",
+            order = 0,
+            func = function()
+                WSGS:ToggleWindow()
+            end
         },
         debug = {
-            type = "toggle", name = "Debug", desc = "Toggle diagnostic output.", order = 1,
-            get = function() return WSGS.db.profile.debug end,
+            type = "toggle",
+            name = "Debug",
+            desc = "Toggle diagnostic output.",
+            order = 1,
+            get = function()
+                return WSGS.db.profile.debug
+            end,
             set = function(_, enabled)
                 WSGS.db.profile.debug = enabled
                 WSGS:Print("Debug " .. (enabled and "enabled." or "disabled."))
-            end,
+            end
         },
         compare = {
-            type = "execute", name = "Compare", desc = "Compare the latest imported build.", order = 2,
-            func = function() WSGS:CompareLatestEquipment() end,
+            type = "execute",
+            name = "Compare",
+            desc = "Compare the latest imported build.",
+            order = 2,
+            func = function()
+                WSGS:CompareLatestEquipment()
+            end
         },
         probe = {
-            type = "input", name = "Probe", desc = "Inspect an export position (1-16).", order = 3,
-            get = function() return "" end,
+            type = "input",
+            name = "Probe",
+            desc = "Inspect an export position (1-16).",
+            order = 3,
+            get = function()
+                return ""
+            end,
             validate = function(_, value)
                 local position = tonumber(value)
                 if not position or position ~= math.floor(position) or position < 1 or position > 16 then
@@ -38,18 +69,24 @@ local commandOptions = {
                 end
                 return true
             end,
-            set = function(_, value) WSGS:ProbeEquipment(tonumber(value)) end,
+            set = function(_, value)
+                WSGS:ProbeEquipment(tonumber(value))
+            end
         },
         engineering = {
-            type = "toggle", name = "Engineering defaults", order = 5,
+            type = "toggle",
+            name = "Engineering defaults",
+            order = 5,
             desc = "Recommend glove, cloak and waist tinkers when the export omits them.",
-            get = function() return WSGS.db.profile.recommendedEngineeringTinkers end,
+            get = function()
+                return WSGS.db.profile.recommendedEngineeringTinkers
+            end,
             set = function(_, enabled)
                 WSGS.db.profile.recommendedEngineeringTinkers = enabled
                 WSGS.PaperDoll:Refresh()
-            end,
-        },
-    },
+            end
+        }
+    }
 }
 
 local ldbObjectName = "WowSimGearSync"
@@ -58,8 +95,11 @@ local ldbObjectDefinition = {
     label = ldbObjectName,
     icon = "Interface\\Icons\\INV_Chest_Plate04",
     OnClick = function(_, button)
-        if button == "LeftButton" then WSGS.PaperDoll:Toggle()
-        elseif button == "RightButton" then WSGS:ToggleWindow() end
+        if button == "LeftButton" then
+            WSGS.PaperDoll:Toggle()
+        elseif button == "RightButton" then
+            WSGS:ToggleWindow()
+        end
     end,
     OnTooltipShow = function(tooltip)
         local build = WSGS:GetActiveSimulationProfile()
@@ -67,7 +107,7 @@ local ldbObjectDefinition = {
         tooltip:AddLine("Active build: " .. (build and build.name or "None"), 1, 1, 1)
         tooltip:AddLine("Left-click: Toggle equipment view", 0.8, 0.8, 0.8)
         tooltip:AddLine("Right-click: Toggle import window", 0.8, 0.8, 0.8)
-    end,
+    end
 }
 
 function WSGS:Print(message)
@@ -76,7 +116,9 @@ function WSGS:Print(message)
 end
 
 function WSGS:Debug(message)
-    if self.db and self.db.profile.debug then self:Print(message) end
+    if self.db and self.db.profile.debug then
+        self:Print(message)
+    end
 end
 
 function WSGS:RegisterAceConfig()
