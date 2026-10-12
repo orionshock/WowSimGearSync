@@ -225,12 +225,24 @@ function Actions:Click()
     for _, missing in ipairs(self.plan.missing) do
         WSGS:Debug("[EQUIP] Missing: item " .. missing.id .. " for " .. WSGS.equipmentSlots[missing.position].name)
     end
+    for _, reason in ipairs(self.plan.blocked) do WSGS:Debug("[EQUIP] Blocked: " .. reason) end
     local batch = self:BeginBatch(self.plan.operations, self.snapshot, GetTime())
     WSGS:Debug("[EQUIP] Attempting batch: " .. batch.total .. " operations")
+    for _, record in ipairs(batch.records) do
+        local operation = record.operation
+        WSGS:Debug(string.format("[EQUIP] Planned: %s item %d -> inventory %d via %s",
+            operation.kind, operation.id, operation.slotId, operation.direct and "direct link" or "exact cursor"))
+    end
     if self.stateChanged then self.stateChanged() end
     self:SubmitBatch(batch, function(operation)
         return WSGS.EquipmentExecution:Perform(operation)
     end)
+    for _, record in ipairs(batch.records) do
+        if record.status == "FAILED" or record.status == "BLOCKED" then
+            WSGS:Debug(string.format("[EQUIP] %s: inventory %d - %s",
+                record.status, record.operation.slotId, record.reason or "client rejection"))
+        end
+    end
     -- This immediate rescan only observes. Every protected action above ran in
     -- the original button callback.
     self:Refresh(WSGS:GetActiveSimulationProfile())

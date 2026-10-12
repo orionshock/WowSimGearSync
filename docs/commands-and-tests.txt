@@ -159,5 +159,5 @@ Equip now submits the complete safely executable, instance-aware plan from one
 button callback and uses events plus one final scan only for verification. Weapon
 dependency ordering covers MH/OH swaps, one-hand/off-hand transitions, two-handed
 conflicts, Titans Grip, locked/missing items, and full bags. /wsgs test equip has
-37 read-only runtime cases; all suites register 87 cases. No in-game PASS result
+39 read-only runtime cases; all suites register 89 cases. No in-game PASS result
 is claimed. See equip-notes.txt.

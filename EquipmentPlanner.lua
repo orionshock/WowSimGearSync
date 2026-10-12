@@ -108,7 +108,8 @@ function Planner:Plan(profile, snapshot, inventory)
                 if item then
                     used[identity(item)] = true
                     plan.operations[#plan.operations + 1] = { kind = "EQUIP", source = item, position = target.physical,
-                        targetPosition = target.position, slotId = WSGS.equipmentSlots[target.physical].id, id = id }
+                        targetPosition = target.position, slotId = WSGS.equipmentSlots[target.physical].id, id = id,
+                        direct = counts[item.fingerprint] == 1 }
                 elseif shortage > 0 then
                     shortage = shortage - 1
                     plan.missing[#plan.missing + 1] = { position = target.position, id = id }

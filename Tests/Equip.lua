@@ -81,6 +81,24 @@ WSGS.Tests:Register("equip", "Equipment planning and verification", {
         assert(#attempted == 2 and attempted[1] == 6 and attempted[2] == 7)
         assert(counts.STILL_PENDING == 2 and counts.VERIFIED == 0)
     end },
+    { name = "Unique fingerprints use the direct native equip path", run = function()
+        local b, s, bags = scenario()
+        replace(s, 15, 77, "INVTYPE_WEAPON")
+        replace(s, 16, 78, "INVTYPE_WEAPON")
+        bag(bags, 1015, "INVTYPE_WEAPON")
+        bag(bags, 1016, "INVTYPE_WEAPON")
+        local p = plan(b, s, bags)
+        assert(#p.operations == 2 and p.operations[1].direct and p.operations[2].direct)
+    end },
+    { name = "Indistinguishable duplicate fingerprints retain exact cursor selection", run = function()
+        local b, s, bags = scenario()
+        replace(s, 7, nil)
+        local first = bag(bags, 1007, "INVTYPE_HAND")
+        local second = bag(bags, 1007, "INVTYPE_HAND")
+        first.fingerprint, second.fingerprint = "identical", "identical"
+        local p = plan(b, s, bags)
+        assert(#p.operations == 1 and not p.operations[1].direct)
+    end },
     { name = "Batch submission distinguishes failed and blocked operations", run = function()
         local b, s, bags = scenario()
         replace(s, 6, nil)

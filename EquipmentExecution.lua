@@ -22,7 +22,6 @@ function Execution:Perform(operation)
     -- An earlier operation can complete a later one (notably a MH/OH swap).
     -- The final scanner still verifies it independently.
     if destinationHasSource(operation) then return true, "SATISFIED" end
-    if IsInventoryItemLocked(operation.slotId) then return false, "Equipment slot is locked." end
     local source = operation.source
     if source.bag ~= nil then
         local info = C_Container.GetContainerItemInfo(source.bag, source.bagSlot)
@@ -38,6 +37,15 @@ function Execution:Perform(operation)
         or GetInventoryItemLink("player", WSGS.equipmentSlots[source.position].id)
     local decoded = WSGS.ItemLinkDecoder:Decode(link)
     if not decoded or decoded.payload ~= source.fingerprint then return false, "Source link changed; rescan required." end
+    -- Secure item actions and /equipslot use this native direct path. A full
+    -- link identifies the planned payload, and Planner enables it only when
+    -- that fingerprint has one physical candidate. Unlike a cursor swap, the
+    -- client can accept consecutive MH/OH requests from the same hardware click.
+    if operation.kind == "EQUIP" and operation.direct then
+        C_Item.EquipItemByName(link, operation.slotId)
+        return true, "SUBMITTED"
+    end
+    if IsInventoryItemLocked(operation.slotId) then return false, "Equipment slot is locked." end
     if operation.kind == "UNEQUIP" then
         local destination = operation.destination
         if C_Container.GetContainerItemID(destination.bag, destination.bagSlot) then return false, "Bag space changed." end

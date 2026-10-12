@@ -120,12 +120,19 @@ MoP Classic Blizzard_FrameXML/Wrath/EquipmentManager.lua confirms the supported
 exact-location path: C_Container.PickupContainerItem or PickupInventoryItem,
 CursorCanGoInSlot, IsInventoryItemLocked, then PickupInventoryItem(destination).
 The native C_EquipmentSet.UseEquipmentSet batch requires a saved server-side set
-and does not expose WSGS's imported instance assignment, so WSGS uses the same
-cursor primitives directly. C_Item.GetItemGUID(ItemLocation) guards each source.
+and does not expose WSGS's imported instance assignment. Secure item actions and
+/equipslot use C_Item.EquipItemByName(itemLink, destination). WSGS uses that direct
+native request for a unique full-link fingerprint and retains the exact cursor
+path when identical fingerprints require GUID selection. C_Item.GetItemGUID guards
+every source location before either path.
 
 One Equip OnClick now snapshots equipped gear and carried bags, builds the full
 instance-aware plan, and loops over every operation synchronously in that same
-callback. No timer or event callback equips anything. Immediate API return values
+callback. Repeating cursor swaps was insufficient for MH/OH because the first
+weapon transaction can lock the paired weapon slots before the second request.
+Unique fingerprints therefore use consecutive direct full-link requests, which
+the client accepts like /equipslot commands. No timer or event callback equips
+anything. Immediate API return values
 remain submissions only. Each record starts STILL_PENDING; precondition rejection
 becomes BLOCKED and Lua/client rejection becomes FAILED. Independent operations
 continue unless an item remains on the cursor, in which case later records block.
@@ -146,11 +153,11 @@ is STILL_PENDING. After terminal failure/blocking, the next click rescans and
 retries the currently unresolved plan in the same click. The UI shows verified
 batch progress and the count of target slots still unresolved.
 
-/wsgs test equip registers 37 read-only runtime cases. Added coverage includes
+/wsgs test equip registers 39 read-only runtime cases. Added coverage includes
 multi-operation submission, exact duplicate assignment, explicit MH/OH changes,
 one-hand/shield and two-one-hand transitions, two-handed dependencies, equipped
 weapon movement, partial outcomes, FAILED/BLOCKED/STILL_PENDING classification,
-final verification, and retry. The suite injects a non-equipping performer when
+direct-link eligibility, cursor fallback, final verification, and retry. The suite injects a non-equipping performer when
 testing batch submission and never calls EquipmentExecution or Click.
 
 Runtime validation remains required in MoP Classic:
