@@ -364,6 +364,23 @@ function Actions:OnEvent(event, ...)
     local args = {}
     for index = 1, select("#", ...) do args[index] = valueText(select(index, ...)) end
     if active then debug("EVENT", string.format("event=%s args=%s", event, table.concat(args, ","))) end
+    if event == "UNIT_SPELLCAST_SUCCEEDED" then
+        local unit, _, spellID = ...
+        if unit == "player" then
+            for _, controller in pairs(self.controllers) do
+                local operation = controller.pending or controller.submitting
+                if operation and operation.type == "TINKER" and operation.spellID == spellID then
+                    if TradeSkillFrame and TradeSkillFrame:IsShown() then
+                        HideUIPanel(TradeSkillFrame)
+                        debug("EVENT", string.format(
+                            "event=%s slot=%d type=TINKER tradeskill=closed",
+                            event, controller.inventorySlot))
+                    end
+                    break
+                end
+            end
+        end
+    end
     if event == "REPLACE_ENCHANT" or event == "BIND_ENCHANT" or event == "ACTION_WILL_BIND_ITEM" then
         local controller, operation
         for _, candidate in pairs(self.controllers) do
