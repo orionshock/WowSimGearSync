@@ -102,7 +102,7 @@ meaning to CanUpgradeItem=false or using vendor-selected data in the scanner.
 Also return glove spell ID if it is not one of the three supported mappings.
 
 TASK 014 UPDATE
-Engineering.lua now maps cloak use spell 126389 -> Goblin Glider 4897 and
+ModificationMaterials.equippedProfessionEffects maps cloak use spell 126389 -> Goblin Glider 4897 and
 waist use spell 55004 -> Nitro Boosts 4223, alongside the existing glove map.
 Cached item info plus a successfully populated, identity-checked inventory
 tooltip and no GetItemSpell return establish a missing use tinker (value 0).

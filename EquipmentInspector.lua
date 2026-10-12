@@ -1,6 +1,7 @@
 local _, WSGS = ...
 local Inspector = {}
 WSGS.EquipmentInspector = Inspector
+local MaterialCatalog = WSGS.ModificationMaterials
 local upgradeFields = {"upgradeEligibility", "upgradeStep", "upgradeMaximum", "upgradeRemaining", "upgradeState"}
 local function unknown(reason)
     return {
@@ -65,7 +66,7 @@ function Inspector:Inspect(slotId, link)
     for _, field in ipairs(upgradeFields) do
         result[field] = unknown("Upgrade tooltip unavailable, unreadable, or inconsistent")
     end
-    result.tinker = unknown("Engineering effect not established")
+    result.tinker = unknown("Profession effect not established")
     local pattern, order = upgradePattern(ITEM_UPGRADE_TOOLTIP_FORMAT)
     if pattern then
         local ok, lines = pcall(function()
@@ -141,26 +142,25 @@ function Inspector:Inspect(slotId, link)
             end
         end
     end
-    local effects = WSGS.Engineering.effects[slotId]
-    if effects then
+    local _, _, supportedProfessionSlot = MaterialCatalog:ProfessionEffect(slotId)
+    if supportedProfessionSlot then
         local ok, name, spellId = pcall(C_Item.GetItemSpell, link)
         local requestedItemData = false
-        local knownDifferent = WSGS.Engineering.knownDifferentEffects[slotId] and
-                                   WSGS.Engineering.knownDifferentEffects[slotId][spellId]
-        if ok and effects[spellId] then
-            result.tinker = known(effects[spellId], "C_Item.GetItemSpell / MoP SpellItemEnchantment mapping")
-        elseif ok and knownDifferent then
+        local effect, skillLine = MaterialCatalog:ProfessionEffect(slotId, spellId)
+        if ok and effect and effect.effectID then
+            result.tinker = known(effect.effectID, "C_Item.GetItemSpell / profession effect mapping")
+        elseif ok and effect and effect.different then
             result.tinker = {
                 status = "KNOWN",
                 different = true,
                 spellId = spellId,
                 spellName = name,
-                source = "C_Item.GetItemSpell / known alternate engineering effect"
+                source = "C_Item.GetItemSpell / known alternate profession effect"
             }
         else
             result.tinker = unknown(not ok and "C_Item.GetItemSpell failed" or not spellId and
                                         "C_Item.GetItemSpell returned nil" or
-                                        "Equipped item use spell is not mapped for this engineering slot")
+                                        "Equipped item use spell is not mapped for this profession slot")
         end
         if ok then
             result.tinker.spellId, result.tinker.spellName = spellId, name
@@ -175,22 +175,23 @@ function Inspector:Inspect(slotId, link)
             end
         end
         local rawLink = type(link) == "string" and (link:match("|H(item:[^|]+)|h") or link) or tostring(link)
-        local signature = table.concat({rawLink, tostring(ok), tostring(spellId), tostring(name),
-                                        tostring(effects[spellId] or knownDifferent), tostring(requestedItemData),
-                                        result.tinker.status, tostring(result.tinker.value)}, ":")
+        local mapped = effect and (effect.effectID or effect.name or effect.different)
+        local signature = table.concat({rawLink, tostring(ok), tostring(spellId), tostring(name), tostring(skillLine),
+                                        tostring(mapped), tostring(requestedItemData), result.tinker.status,
+                                        tostring(result.tinker.value)}, ":")
         self.tinkerDiagnostics = self.tinkerDiagnostics or {}
         if self.tinkerDiagnostics[slotId] ~= signature then
             self.tinkerDiagnostics[slotId] = signature
             WSGS:Debug(string.format(
-                "[ACTION][VERIFY] slot=%d type=TINKER item=%s getItemSpell=%s spellID=%s spellName=%s mapped=%s itemDataRequested=%s result=%s observed=%s reason=%s",
-                slotId, rawLink, ok and "ok" or "error", tostring(spellId), tostring(name),
-                tostring(effects[spellId] or knownDifferent), tostring(requestedItemData), result.tinker.status,
+                "[ACTION][VERIFY] slot=%d type=TINKER profession=%s item=%s getItemSpell=%s spellID=%s spellName=%s mapped=%s itemDataRequested=%s result=%s observed=%s reason=%s",
+                slotId, tostring(skillLine), rawLink, ok and "ok" or "error", tostring(spellId), tostring(name),
+                tostring(mapped), tostring(requestedItemData), result.tinker.status,
                 tostring(result.tinker.value or result.tinker.spellId), result.tinker.reason or "none"))
         end
     else
         result.tinker = {
             status = "NOT_APPLICABLE",
-            reason = "Not a supported engineering slot"
+            reason = "Not a supported profession-effect slot"
         }
     end
     return result

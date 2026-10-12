@@ -24,7 +24,7 @@ EquipmentSlots.lua
 Import\Module.lua
 Import\Specialization.lua
 Import\ManagedBuilds.lua
-Engineering.lua
+ModificationMaterials.lua
 ItemLinkDecoder.lua
 EquipmentInspector.lua
 EquipmentScanner.lua
@@ -35,7 +35,6 @@ EquipmentPlanner.lua
 EquipmentExecution.lua
 EquipmentSetSync.lua
 EquipmentActions.lua
-ModificationMaterials.lua
 SlotActionHandlers.lua
 SlotActionPlanner.lua
 ProfessionEnhancementExecution.lua

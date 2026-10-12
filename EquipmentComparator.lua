@@ -94,20 +94,27 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
         local expected = target[field]
         local targetSource
         if field == "tinker" then
-            expected, targetSource = WSGS.Engineering:Target(target, slot.id, context)
+            expected, targetSource = target.tinker, target.tinker ~= nil and "SIMULATION" or nil
+            if expected == nil then
+                expected, targetSource =
+                    WSGS.ModificationMaterials:RecommendedProfessionEnhancement(slot.id, context)
+            end
         end
         if field == "professionSocket" then
             expected = nil
         elseif field == "buckle" then
-            expected = slot.id == 6 and requestedSocketCount(target.gems) > 0 or nil
+            local buckle = WSGS.ModificationMaterials.actions.prerequisites.beltBuckle
+            expected = slot.id == buckle.slot and requestedSocketCount(target.gems) > 0 or nil
         end
         local difference
         if field == "professionSocket" and not emptyTarget then
-            local eligible = context and context.blacksmithing == true
+            local socket = WSGS.ModificationMaterials.actions.prerequisites.professionSockets[slot.id]
+            local eligible = socket and context and context.professions and
+                                 context.professions[socket.profession] ~= nil
             local targetCount = requestedSocketCount(target.gems)
             local socketCount = observations.socketCount
             local actualCount = socketCount and socketCount.status == "KNOWN" and socketCount.value or nil
-            if slot.id ~= 9 and slot.id ~= 10 or targetCount == 0 then
+            if not socket or targetCount == 0 then
                 difference = {
                     state = "NOT_APPLICABLE",
                     reason = "Target does not require a profession socket"
@@ -115,7 +122,8 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
             elseif not eligible then
                 difference = {
                     state = "NOT_APPLICABLE",
-                    reason = "Character does not have Blacksmithing"
+                    reason = "Character does not have " ..
+                        (WSGS.ModificationMaterials.professionNames[socket.profession] or "the required profession")
                 }
             elseif actualCount == nil then
                 difference = {
@@ -131,7 +139,7 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
                     source = "Imported gem count versus equipped socket count"
                 }
             end
-            if slot.id == 9 or slot.id == 10 then
+            if socket then
                 debugSocket(position, slot.id, "PROFESSION_SOCKET", eligible, targetCount, actualCount, difference)
             end
         elseif field == "upgradeStep" and not emptyTarget then

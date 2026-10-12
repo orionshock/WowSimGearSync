@@ -35,7 +35,7 @@ GetProfessions returns primary profession indices; GetProfessionInfo(index)
 returns skillLine in its seventh result. Engineering is skillLine 202.
 Local Mists SpellBookFrame.lua:586,700 uses these exact profession API contracts;
 CharacterStatsPaneImproved/newstats.lua:87,94-103 corroborates Engineering 202.
-The scanner records context.engineering and context.recommendedTinkers once
+The scanner records the general profession context and enhancement-recommendation setting once
 per scan. SKILL_LINES_CHANGED (Mists SpellBookFrame.lua:17) refreshes the visible
 doll. No repeated polling, compatibility dispatch or profession name matching.
 db.profile.recommendedEngineeringTinkers defaults true; native AceConfig toggle

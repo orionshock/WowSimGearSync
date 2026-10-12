@@ -154,6 +154,7 @@ Materials.actions = {
             profession = 202, -- Engineering skill line.
             spellID = 55016, -- Nitro Boosts recipe.
             slot = 6, -- Waist inventory slot.
+            recommended = true,
             reagents = tinkerReagents
         },
         [4697] = { -- Phase Fingers (hands); equipped use spell 108788.
@@ -172,12 +173,14 @@ Materials.actions = {
             profession = 202, -- Engineering skill line.
             spellID = 126392, -- Goblin Glider recipe.
             slot = 15, -- Back inventory slot.
+            recommended = true,
             reagents = tinkerReagents
         },
         [4898] = { -- Synapse Springs (hands); equipped use spell 126734.
             profession = 202, -- Engineering skill line.
             spellID = 126731, -- Synapse Springs recipe.
             slot = 10, -- Hands inventory slot.
+            recommended = true,
             reagents = tinkerReagents
         },
 
@@ -282,26 +285,101 @@ Materials.actions = {
         }
     }
 }
+
+-- Profession skill line -> equipment slot -> equipped-item use spell.
+-- These observations identify profession effects already present on equipment;
+-- they do not make an effect available for application.
+Materials.equippedProfessionEffects = {
+    -- Engineering.
+    [202] = {
+        [6] = { -- Waist.
+            [55004] = {effectID = 4223}, -- Nitro Boosts.
+            [131459] = {effectID = 5000} -- Watergliding Jets.
+        },
+        [10] = { -- Hands.
+            [126734] = {effectID = 4898}, -- Synapse Springs.
+            [108788] = {effectID = 4697}, -- Phase Fingers.
+            [109076] = {effectID = 4698} -- Incendiary Fireworks Launcher.
+        },
+        [15] = { -- Back.
+            [126389] = {effectID = 4897}, -- Goblin Glider.
+            [55001] = {different = true, name = "Parachute"} -- Known alternate effect.
+        }
+    }
+}
+
 local function guidFor(bag, slot)
     local ok, guid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(bag, slot))
     return ok and guid or nil
 end
 
-function Materials:GetProfession(skillLineID)
+function Materials:ScanProfessions()
     local first, second = GetProfessions()
+    local professions = {}
     for _, professionIndex in pairs({first, second}) do
-        local name, _, _, _, numSpells, spellOffset, skillLine = GetProfessionInfo(professionIndex)
-        if skillLine == skillLineID then
-            local spellBookIndex = type(numSpells) == "number" and numSpells > 0 and type(spellOffset) == "number" and
-                                       spellOffset + 1 or nil
-            return {
+        local name, _, rank, maxRank, numSpells, spellOffset, skillLine = GetProfessionInfo(professionIndex)
+        if skillLine then
+            professions[skillLine] = {
                 name = name,
                 index = professionIndex,
+                rank = rank,
+                maxRank = maxRank,
                 skillLine = skillLine,
-                spellBookIndex = spellBookIndex
+                spellBookIndex = type(numSpells) == "number" and numSpells > 0 and type(spellOffset) == "number" and
+                    spellOffset + 1 or nil
             }
         end
     end
+    return professions
+end
+
+function Materials:GetProfession(skillLineID)
+    return self:ScanProfessions()[skillLineID]
+end
+
+function Materials:CharacterContext()
+    local professions = self:ScanProfessions()
+    local details = {}
+    for skillLine, profession in pairs(professions) do
+        details[#details + 1] = string.format("%s(%d)=%s/%s", profession.name or "unknown", skillLine,
+            tostring(profession.rank), tostring(profession.maxRank))
+    end
+    table.sort(details)
+    local signature = table.concat(details, ",")
+    if self.professionSignature ~= signature then
+        self.professionSignature = signature
+        WSGS:Debug("[ACTION][PLAN] professions=" .. (signature ~= "" and signature or "none"))
+    end
+    return {
+        professions = professions,
+        recommendedProfessionEnhancements = WSGS.db.profile.recommendedEngineeringTinkers
+    }
+end
+
+function Materials:RecommendedProfessionEnhancement(inventorySlot, context)
+    if not context or not context.recommendedProfessionEnhancements then
+        return nil
+    end
+    for effectID, definition in pairs(self.actions.profession) do
+        local validSlot = definition.slot == inventorySlot or definition.slots and definition.slots[inventorySlot]
+        if definition.recommended and validSlot and context.professions[definition.profession] then
+            return effectID, "RECOMMENDED"
+        end
+    end
+end
+
+function Materials:ProfessionEffect(inventorySlot, useSpellID)
+    local supportedSkillLine
+    for skillLine, slots in pairs(self.equippedProfessionEffects) do
+        local effects = slots[inventorySlot]
+        if effects then
+            supportedSkillLine = skillLine
+            if effects[useSpellID] then
+                return effects[useSpellID], skillLine, true
+            end
+        end
+    end
+    return nil, supportedSkillLine, supportedSkillLine ~= nil
 end
 
 local function professionAvailability(bags, recipe, inventorySlot)

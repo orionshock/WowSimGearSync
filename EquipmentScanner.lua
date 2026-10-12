@@ -1,6 +1,7 @@
 local _, WSGS = ...
 local Scanner = {}
 WSGS.EquipmentScanner = Scanner
+local Prerequisites = WSGS.ModificationMaterials.actions.prerequisites
 
 local function unknown(reason)
     return {
@@ -16,7 +17,7 @@ function Scanner:Scan(onlyPosition)
     local snapshot = {
         capturedAt = time(),
         slots = {},
-        context = WSGS.Engineering:CharacterContext()
+        context = WSGS.ModificationMaterials:CharacterContext()
     }
     for position = onlyPosition or 1, onlyPosition or 16 do
         local slot = WSGS.equipmentSlots[position]
@@ -64,12 +65,12 @@ function Scanner:Scan(onlyPosition)
                 reason = "Empty inventory slot"
             } or unknown("No verified equipped-item observation for this field")
         end
-        if slot.id ~= 6 then
+        if slot.id ~= Prerequisites.beltBuckle.slot then
             observations.buckle = {
                 status = "NOT_APPLICABLE"
             }
         end
-        if slot.id ~= 9 and slot.id ~= 10 then
+        if not Prerequisites.professionSockets[slot.id] then
             observations.professionSocket = {
                 status = "NOT_APPLICABLE"
             }
@@ -104,7 +105,7 @@ function Scanner:Scan(onlyPosition)
                 else
                     observations.socketCount = unknown("Equipped socket count unavailable")
                 end
-                if slot.id == 9 or slot.id == 10 then
+                if Prerequisites.professionSockets[slot.id] then
                     local ok, added = pcall(C_Item.GetItemNumAddedSockets, current.link)
                     if ok and type(added) == "number" and added >= 0 then
                         observations.professionSocket = {
@@ -117,7 +118,7 @@ function Scanner:Scan(onlyPosition)
                         observations.professionSocket = unknown("Added profession socket count unavailable")
                     end
                 end
-                if slot.id == 6 then
+                if slot.id == Prerequisites.beltBuckle.slot then
                     local third = decoded.gems.values[3]
                     if third.status == "KNOWN" and third.value > 0 then
                         observations.buckle = {
