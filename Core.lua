@@ -1,6 +1,6 @@
 local addonName, WSGS = ...
 
-WSGS.version = "0.1.1"
+WSGS.version = "0.1.2"
 
 local defaults = {
     global = {
@@ -21,7 +21,16 @@ end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
+events:RegisterEvent("PLAYER_LOGIN")
 events:SetScript("OnEvent", function(self, event, loadedAddon)
+    if event == "PLAYER_LOGIN" then
+        -- Register after Blizzard has created the chat edit boxes.
+        LibStub("AceTab-3.0"):RegisterTabCompletion(
+            "WSGS commands", "^/[wW][sS][gG][sS]%s+", { "debug" }, true
+        )
+        self:UnregisterEvent("PLAYER_LOGIN")
+        return
+    end
     if loadedAddon ~= addonName then
         return
     end
@@ -43,12 +52,14 @@ events:SetScript("OnEvent", function(self, event, loadedAddon)
         WSGSDB.profiles = nil
     end
     WSGS.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
+    LibStub("AceConsole-3.0"):RegisterChatCommand("wsgs", function(message)
+        WSGS:HandleCommand(message)
+    end)
     self:UnregisterEvent("ADDON_LOADED")
     WSGS:Debug("Loaded version " .. WSGS.version .. ".")
 end)
 
-SLASH_WSGS1 = "/wsgs"
-SlashCmdList.WSGS = function(message)
+function WSGS:HandleCommand(message)
     local command = (message or ""):match("^%s*(.-)%s*$"):lower()
     if command == "" then
         WSGS:ToggleWindow()
