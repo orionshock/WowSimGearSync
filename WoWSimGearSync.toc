@@ -38,6 +38,7 @@ EquipmentSetSync.lua
 EquipmentActions.lua
 ModificationMaterials.lua
 SlotActionPlanner.lua
+ProfessionEnhancementExecution.lua
 SlotActions.lua
 Window.lua
 SlotPresentation.lua

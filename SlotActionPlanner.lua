@@ -37,7 +37,7 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
     end
     local fields = difference.fields
     local modificationsRemain = false
-    for _, field in ipairs({ "buckle", "gems", "enchant", "tinker" }) do
+    for _, field in ipairs({ "professionSocket", "buckle", "gems", "enchant", "tinker" }) do
         local observed = fields[field]
         if observed and (observed.state == "MISMATCH" or observed.state == "UNKNOWN") then
             modificationsRemain = true
@@ -50,6 +50,22 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
     if not controller.targetGuid then
         controller.state, controller.reason = "BLOCKED", "Equipped item instance could not be verified"
         return controller
+    end
+
+    local professionSocketMissing = fields.professionSocket and fields.professionSocket.state == "MISMATCH"
+    if professionSocketMissing then
+        local socketRecipe = WSGS.ModificationMaterials.directSockets[controller.inventorySlot]
+        local recipe, reason, recipeName, professionName, professionSpellIndex =
+            WSGS.ModificationMaterials:SocketAvailability(bags, controller.inventorySlot)
+        addOperation(controller, { type = "PROFESSION_SOCKET", field = "professionSocket", expected = true,
+            spellID = recipe and (recipe.spellID or recipe.spellIDs and recipe.spellIDs[1]),
+            recipeSpellIDs = recipe and recipe.spellIDs,
+            spellName = recipeName, professionName = professionName,
+            professionSkillLine = socketRecipe and socketRecipe.profession,
+            professionSpellIndex = professionSpellIndex, nativeProfession = true }, reason)
+    elseif fields.professionSocket and fields.professionSocket.state == "UNKNOWN" then
+        addOperation(controller, { type = "PROFESSION_SOCKET", field = "professionSocket", expected = true },
+            fields.professionSocket.reason or "Profession socket state is unknown")
     end
 
     local buckleMissing = position == 8 and fields.buckle and fields.buckle.state == "MISMATCH"
@@ -71,6 +87,7 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
                 local gemID = observed.expected
                 local material, count = WSGS.ModificationMaterials:ForGem(bags, gemID)
                 local reason = (not gemID or gemID == 0) and "An installed gem cannot be removed without a replacement"
+                    or professionSocketMissing and "Required Blacksmithing socket must be applied first"
                     or buckleMissing and "Required belt buckle must be applied first"
                     or not material and string.format("Gem item %s is not in carried bags", valueText(gemID))
                     or material.locked and "Gem is locked" or nil
@@ -87,15 +104,25 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
 
     if fields.enchant and fields.enchant.state == "MISMATCH" then
         local enchantID = fields.enchant.expected
-        local material, fixedItemID, spellID = WSGS.ModificationMaterials:ForEnchant(bags, enchantID)
-        local reason = not WSGS.ModificationMaterials.enchantItems[enchantID]
-                and not WSGS.ModificationMaterials.enchantApplications[enchantID]
-                and "No confirmed material mapping for enchant " .. valueText(enchantID)
-            or not material and "Required enchant material is not in carried bags"
-            or material.locked and "Enchant material is locked" or nil
-        addOperation(controller, { type = "ENCHANT", field = "enchant", expected = enchantID,
-            material = material, materialItemID = fixedItemID or material and material.itemID,
-            spellID = spellID or material and material.spellID }, reason)
+        local direct = WSGS.ModificationMaterials.directEnhancements[enchantID]
+        if direct then
+            local recipe, reason, recipeName, professionName, professionSpellIndex =
+                WSGS.ModificationMaterials:DirectEnhancementAvailability(bags, enchantID, controller.inventorySlot)
+            addOperation(controller, { type = "PROFESSION_ENCHANT", field = "enchant", expected = enchantID,
+                spellID = recipe and recipe.spellID, spellName = recipeName,
+                professionName = professionName, professionSpellIndex = professionSpellIndex,
+                professionSkillLine = direct.profession, nativeProfession = true }, reason)
+        else
+            local material, fixedItemID, spellID = WSGS.ModificationMaterials:ForEnchant(bags, enchantID)
+            local reason = not WSGS.ModificationMaterials.enchantItems[enchantID]
+                    and not WSGS.ModificationMaterials.enchantApplications[enchantID]
+                    and "No confirmed material mapping for enchant " .. valueText(enchantID)
+                or not material and "Required enchant material is not in carried bags"
+                or material.locked and "Enchant material is locked" or nil
+            addOperation(controller, { type = "ENCHANT", field = "enchant", expected = enchantID,
+                material = material, materialItemID = fixedItemID or material and material.itemID,
+                spellID = spellID or material and material.spellID }, reason)
+        end
     elseif fields.enchant and fields.enchant.state == "UNKNOWN" then
         addOperation(controller, { type = "ENCHANT", field = "enchant", expected = fields.enchant.expected },
             fields.enchant.reason or "Enchant state is unknown")
@@ -106,7 +133,7 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
             WSGS.ModificationMaterials:TinkerAvailability(bags, fields.tinker.expected)
         addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,
             spellID = recipe and recipe.spellID, spellName = recipeName, professionName = professionName,
-            professionSpellIndex = professionSpellIndex,
+            professionSkillLine = 202, professionSpellIndex = professionSpellIndex, nativeProfession = true,
             targetSource = fields.tinker.targetSource }, reason)
     elseif fields.tinker and fields.tinker.state == "UNKNOWN" then
         addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,

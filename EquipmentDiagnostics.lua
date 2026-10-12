@@ -1,5 +1,5 @@
 local _, WSGS = ...
-local labels = { item = "Item", gems = "Gems", enchant = "Enchant", reforging = "Reforge", upgradeStep = "Upgrade", tinker = "Tinker", buckle = "Buckle" }
+local labels = { item = "Item", gems = "Gems", enchant = "Enchant", reforging = "Reforge", upgradeStep = "Upgrade", tinker = "Tinker", buckle = "Buckle", professionSocket = "Profession socket" }
 
 function WSGS:CompareLatestEquipment()
     local character = self.db.char
@@ -21,7 +21,7 @@ function WSGS:CompareLatestEquipment()
             local prefix = string.format("[SLOT:%02d] ", slot.position)
             self:Debug(prefix .. slot.slotName .. " (inventory " .. slot.currentSlotId ..
                 (slot.currentPosition ~= slot.position and "; inferred pair assignment)" or ")"))
-            for _, field in ipairs({ "item", "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }) do
+            for _, field in ipairs({ "item", "professionSocket", "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }) do
                 local difference = slot.fields[field]
                 local detail = difference.actual ~= nil and " (observed " .. tostring(difference.actual) .. ")" or ""
                 if difference.source then detail = detail .. " via " .. difference.source end
@@ -42,7 +42,7 @@ function WSGS:ProbeEquipment(position)
     local current = self.EquipmentScanner:Scan(position).slots[position]
     self:Print("[PROBE] " .. current.slotName .. " inventory=" .. current.slotId .. " item=" .. tostring(current.id))
     self:Print("[PROBE] Raw link: " .. (current.link and (current.link:match("|H(item:[^|]+)|h") or current.link) or "unavailable"))
-    for _, field in ipairs({ "enchant", "reforging", "tinker", "buckle" }) do
+    for _, field in ipairs({ "enchant", "reforging", "tinker", "buckle", "professionSocket" }) do
         local observed = current.observations[field]
         self:Print("[PROBE] " .. (labels[field] or field) .. ": " .. observed.status .. " " .. tostring(observed.value) .. (self.db.profile.debug and observed.source and " via " .. observed.source or ""))
     end

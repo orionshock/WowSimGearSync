@@ -2,11 +2,12 @@ local _, WSGS = ...
 -- Owns player-facing translation only. Scanner/comparator remain authoritative.
 local Presentation = {}
 WSGS.SlotPresentation = Presentation
-Presentation.fields = { "item", "upgradeStep", "gems", "enchant", "buckle", "tinker", "reforging" }
+Presentation.fields = { "item", "upgradeStep", "professionSocket", "gems", "enchant", "buckle", "tinker", "reforging" }
 local labels = { item = "Item", gems = "Gems", enchant = "Enchant", reforging = "Reforge",
-    upgradeStep = "Upgrade", tinker = "Tinker", buckle = "Buckle" }
+    upgradeStep = "Upgrade", tinker = "Tinker", buckle = "Buckle", professionSocket = "Socket" }
 local statusLabels = { item = "Equipped", upgradeStep = "Upgraded", gems = "Gemmed",
-    enchant = "Enchant", buckle = "Buckle", tinker = "Tinker", reforging = "Reforged" }
+    enchant = "Enchant", buckle = "Buckle", tinker = "Tinker", reforging = "Reforged",
+    professionSocket = "Socket" }
 function Presentation:MiniStates(difference, clickText)
     if not difference then return "" end
     local item = difference.fields.item

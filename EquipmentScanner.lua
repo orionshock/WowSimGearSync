@@ -30,11 +30,12 @@ function Scanner:Scan(onlyPosition)
             observations.item = unknown("Inventory identity unavailable or inconsistent")
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
-        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "upgradeRemaining", "upgradeState", "tinker", "buckle", "instance" }) do
+        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "upgradeRemaining", "upgradeState", "tinker", "buckle", "professionSocket", "instance" }) do
             observations[field] = empty and { status = "NOT_APPLICABLE", reason = "Empty inventory slot" }
                 or unknown("No verified equipped-item observation for this field")
         end
         if slot.id ~= 6 then observations.buckle = { status = "NOT_APPLICABLE" } end
+        if slot.id ~= 9 and slot.id ~= 10 then observations.professionSocket = { status = "NOT_APPLICABLE" } end
         if not empty then
             local ok, guid = pcall(function()
                 return C_Item.GetItemGUID(ItemLocation:CreateFromEquipmentSlot(slot.id))
@@ -47,6 +48,15 @@ function Scanner:Scan(onlyPosition)
                 observations.enchant = decoded.enchant
                 observations.gems = decoded.gems
                 observations.reforging = decoded.reforging
+                if slot.id == 9 or slot.id == 10 then
+                    local ok, added = pcall(C_Item.GetItemNumAddedSockets, current.link)
+                    if ok and type(added) == "number" and added >= 0 then
+                        observations.professionSocket = { status = "KNOWN", value = added > 0,
+                            count = added, source = "C_Item.GetItemNumAddedSockets" }
+                    else
+                        observations.professionSocket = unknown("Added profession socket count unavailable")
+                    end
+                end
                 if slot.id == 6 then
                     local third = decoded.gems.values[3]
                     if third.status == "KNOWN" and third.value > 0 then

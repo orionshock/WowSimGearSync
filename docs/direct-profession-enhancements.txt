@@ -1,0 +1,66 @@
+Task 024: Direct profession enhancements — MoP Classic only
+
+Execution contract
+
+Direct item-targeting recipes reuse the slot-click sequence already proven for
+Engineering: open the profession through its profession spellbook button, find
+the exact recipe link, verify reagents/tools/cooldown and selection, call
+DoTradeSkill, and target the equipped item with UseInventoryItem. No protected
+step is deferred to an event or timer. Events only verify the resulting equipped
+state and close the TradeSkill frame after UNIT_SPELLCAST_SUCCEEDED.
+
+Confirmed direct mappings
+
+Blacksmithing (skill line 164; effect is an added socket):
+- Wrist: recipes 113263 or 55628; SpellItemEnchantment 3717; 4 Strong Flux (3466)
+- Hands: recipes 114112 or 55641; SpellItemEnchantment 3723; 4 Strong Flux (3466)
+
+Tailoring (skill line 197; 3 Eternium Thread, item 38426):
+- 4892 -> 125481, Lightweave Embroidery, Back
+- 4893 -> 125482, Darkglow Embroidery, Back
+- 4894 -> 125483, Swordguard Embroidery, Back
+- 4895 -> 125496, Master's Spellthread, Legs
+- 4896 -> 125497, Sanctified Spellthread, Legs
+
+Leatherworking (skill line 165; 1 Eternium Thread, item 38426):
+- 4875 -> 124551, Fur Lining - Agility, Wrist
+- 4877 -> 124552, Fur Lining - Intellect, Wrist
+- 4878 -> 124553, Fur Lining - Stamina, Wrist
+- 4879 -> 124554, Fur Lining - Strength, Wrist
+- 4880 -> 124559, Primal Leg Reinforcements, Legs
+- 4881 -> 124561, Draconic Leg Reinforcements, Legs
+- 4882 -> 124563, Heavy Leg Reinforcements, Legs
+
+Enchanting (skill line 333; 2 Spirit Dust, item 74249):
+- 4359 -> 103461, Greater Agility, either Finger
+- 4360 -> 103462, Greater Intellect, either Finger
+- 4361 -> 103463, Greater Stamina, either Finger
+- 4807 -> 103465, Greater Strength, either Finger
+
+Inscription boundary
+
+Secret Inscription profession recipes create BoP enhancement items instead of
+starting item targeting. Creating them would be intermediate-item crafting, so
+it is deliberately not automated. Already-carried finished items remain usable:
+4912/87581 (Ox Horn), 4913/87585 (Tiger Fang), 4914/87584 (Tiger Claw), and
+4915/87582 (Crane Wing).
+
+Socket observation
+
+C_Item.GetItemNumSockets(target item ID) establishes the native socket count.
+An imported Wrist or Hands gem position beyond that count requests the
+Blacksmithing socket. C_Item.GetItemNumAddedSockets(equipped link) independently
+verifies the added socket before gem planning advances. Native sockets are not
+treated as profession-added sockets.
+
+Sources
+
+- Installed Blizzard_TradeSkillUI Mists implementation: GetTradeSkillInfo,
+  GetTradeSkillNumReagents, GetTradeSkillReagentInfo, GetTradeSkillTools,
+  SelectTradeSkill, GetTradeSkillSelectionIndex, and DoTradeSkill behavior.
+- Installed Blizzard generated Item API documentation for
+  C_Item.GetItemNumSockets and C_Item.GetItemNumAddedSockets.
+- Wowhead MoP Classic spell pages for every listed recipe/effect pair and its
+  reagents. The Secret Inscription recipe pages identify Create Item effects;
+  their item-effect pages identify enchant IDs 4912 through 4915.
+

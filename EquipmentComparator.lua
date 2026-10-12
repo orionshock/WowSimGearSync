@@ -1,7 +1,7 @@
 local _, WSGS = ...
 local Comparator = {}
 WSGS.EquipmentComparator = Comparator
-local fields = { "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }
+local fields = { "professionSocket", "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }
 
 local function scalar(expected, observed)
     if not observed or observed.status == "UNKNOWN" then
@@ -36,12 +36,32 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
         local expected = target[field]
         local targetSource
         if field == "tinker" then expected, targetSource = WSGS.Engineering:Target(target, slot.id, context) end
-        if field == "buckle" then
+        if field == "professionSocket" then
+            expected = nil
+        elseif field == "buckle" then
             expected = slot.id == 6 and type(target.gems) == "table"
                 and type(target.gems[3]) == "number" and target.gems[3] > 0 or nil
         end
         local difference
-        if field == "upgradeStep" and not emptyTarget then
+        if field == "professionSocket" and not emptyTarget then
+            if slot.id ~= 9 and slot.id ~= 10 or type(target.gems) ~= "table" or #target.gems == 0 then
+                difference = { state = "NOT_APPLICABLE", reason = "Target does not require a profession socket" }
+            else
+                local ok, nativeSockets = pcall(C_Item.GetItemNumSockets, target.id)
+                if not ok or type(nativeSockets) ~= "number" or nativeSockets < 0 then
+                    difference = { state = "UNKNOWN", expected = true,
+                        reason = "Native socket count unavailable for the target item" }
+                elseif #target.gems <= nativeSockets then
+                    difference = { state = "NOT_APPLICABLE", reason = "Target gems fit native sockets" }
+                elseif result.fields.item.state ~= "MATCH" then
+                    difference = { state = "UNKNOWN", expected = true,
+                        reason = "Target item is not confirmed in this slot" }
+                else
+                    difference = scalar(true, observations.professionSocket)
+                    difference.actualCount = observations.professionSocket.count
+                end
+            end
+        elseif field == "upgradeStep" and not emptyTarget then
             local eligibility = observations.upgradeEligibility
             local maximum = observations.upgradeMaximum
             difference = { state = "UNKNOWN", policy = "MAXIMUM", normalMaximum = 2,

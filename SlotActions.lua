@@ -4,7 +4,9 @@ WSGS.SlotActions = Actions
 
 local colors = { WAITING_FOR_ITEM = "8cb3ff", READY = "4dff66", PENDING = "999999",
     BLOCKED = "ffb326", COMPLETE = "4dff66" }
-local labels = { BUCKLE = "belt buckle", GEM = "gem", ENCHANT = "enchant", TINKER = "Engineering tinker" }
+local labels = { BUCKLE = "belt buckle", GEM = "gem", ENCHANT = "enchant",
+    PROFESSION_ENCHANT = "profession enhancement", PROFESSION_SOCKET = "Blacksmithing socket",
+    TINKER = "Engineering tinker" }
 
 local function debug(category, text)
     WSGS:Debug("[ACTION][" .. category .. "] " .. text)
@@ -19,11 +21,8 @@ local function operationSatisfied(operation, difference)
     local field = difference.fields[operation.field]
     if operation.type == "GEM" then field = field and field.sockets and field.sockets[operation.socket] end
     if not field then return false, "comparison field unavailable" end
-    return field.state == "MATCH", field.state .. (field.reason and ": " .. field.reason or "")
-end
-
-local function recipeIDFromLink(link)
-    return tonumber(link and (link:match("|Henchant:(%d+)") or link:match("|Hspell:(%d+)")))
+    return field.state == "MATCH", field.state .. (field.reason and ": " .. field.reason or ""),
+        field.actualCount or field.actual
 end
 
 function Actions:Refresh(profile, snapshot, comparison)
@@ -38,10 +37,11 @@ function Actions:Refresh(profile, snapshot, comparison)
         local built = WSGS.SlotActionPlanner:Build(position, profile, snapshot, comparison, bags)
         if previous and previous.pending then
             local sameInstance = previous.targetGuid == built.targetGuid
-            local satisfied, detail = operationSatisfied(previous.pending, comparison.slots[position])
+            local satisfied, detail, actual = operationSatisfied(previous.pending, comparison.slots[position])
             if sameInstance and satisfied then
-                debug("VERIFY", string.format("slot=%d type=%s expected=%s guid=%s result=MATCH",
-                    previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected), valueText(previous.targetGuid)))
+                debug("VERIFY", string.format("slot=%d type=%s expected=%s actual=%s guid=%s result=MATCH",
+                    previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected),
+                    valueText(actual), valueText(previous.targetGuid)))
                 debug("DONE", string.format("slot=%d type=%s verified", previous.inventorySlot, previous.pending.type))
             elseif previous.failure or not sameInstance then
                 built.state = "BLOCKED"
@@ -56,8 +56,9 @@ function Actions:Refresh(profile, snapshot, comparison)
                 built.timeoutScheduled = previous.timeoutScheduled
                 built.lastVerificationDetail = detail
                 if previous.lastVerificationDetail ~= detail then
-                    debug("VERIFY", string.format("slot=%d type=%s expected=%s result=STILL_PENDING reason=%s",
-                        previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected), detail))
+                    debug("VERIFY", string.format("slot=%d type=%s expected=%s actual=%s result=STILL_PENDING reason=%s",
+                        previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected),
+                        valueText(actual), detail))
                 end
             end
         elseif previous and previous.lastFailed and built.prepared then
@@ -76,15 +77,17 @@ function Actions:Refresh(profile, snapshot, comparison)
             WSGS.equipmentSlots[position].id, built.inventorySlot, built.state, op and op.type or "none",
             op and valueText(op.expected) or "nil", valueText(built.targetGuid), built.reason or op and op.reason or "none")) end
         if changed and built.state == "READY" then
-            debug("READY", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s spellName=%s professionSpell=%s guid=%s source=%s",
+            debug("READY", string.format("slot=%d type=%s material=%s materialGuid=%s profession=%s recipe=%s spellName=%s professionSpell=%s effect=%s guid=%s source=%s",
                 built.inventorySlot, built.prepared.type, valueText(built.prepared.materialItemID),
-                valueText(built.prepared.material and built.prepared.material.guid), valueText(built.prepared.spellID),
+                valueText(built.prepared.material and built.prepared.material.guid),
+                valueText(built.prepared.professionName), valueText(built.prepared.spellID),
                 valueText(built.prepared.spellName), valueText(built.prepared.professionSpellIndex),
-                valueText(built.targetGuid), valueText(built.prepared.targetSource)))
+                valueText(built.prepared.expected), valueText(built.targetGuid), valueText(built.prepared.targetSource)))
         elseif changed and built.state == "BLOCKED" then
             for _, blocked in ipairs(built.blocked) do
-                debug("BLOCK", string.format("slot=%d type=%s expected=%s reason=%s", built.inventorySlot,
-                    blocked.type, valueText(blocked.expected), blocked.reason or "unavailable"))
+                debug("BLOCK", string.format("slot=%d type=%s profession=%s recipe=%s expected=%s reason=%s",
+                    built.inventorySlot, blocked.type, valueText(blocked.professionName or blocked.professionSkillLine),
+                    valueText(blocked.spellID), valueText(blocked.expected), blocked.reason or "unavailable"))
             end
             if #built.blocked == 0 then debug("BLOCK", string.format("slot=%d reason=%s", built.inventorySlot,
                 built.reason or "unavailable")) end
@@ -103,7 +106,7 @@ function Actions:ConfigureButton(position)
     if not button or InCombatLockdown() then return end
     local controller = self.controllers[position]
     local operation = controller and controller.state == "READY" and controller.prepared
-    local actionType = operation and operation.type ~= "GEM" and operation.type ~= "TINKER" and "item" or nil
+    local actionType = operation and operation.type ~= "GEM" and not operation.nativeProfession and "item" or nil
     button:SetAttribute("wsgs-type1", actionType)
     button:SetAttribute("type1", actionType)
     button:SetAttribute("item1", actionType == "item" and operation.material
@@ -112,61 +115,6 @@ function Actions:ConfigureButton(position)
     button:SetAttribute("macrotext1", nil)
     button:SetAttribute("action1", nil)
     button:SetAttribute("target-slot1", actionType and controller.inventorySlot or nil)
-end
-
-function Actions:ExecuteTinker(controller, operation)
-    CloseTradeSkill()
-    debug("EXEC", string.format("slot=%d type=TINKER api=CastSpell profession=%s spellBookIndex=%d",
-        controller.inventorySlot, operation.professionName, operation.professionSpellIndex))
-    local opened, openProblem = pcall(CastSpell, operation.professionSpellIndex, BOOKTYPE_PROFESSION)
-    if not opened then
-        controller.failure = "Opening Engineering failed: " .. tostring(openProblem)
-        return
-    end
-    local professionName = GetTradeSkillLine()
-    if professionName ~= operation.professionName then
-        controller.failure = "Engineering recipe data did not open during the click"
-        debug("BLOCK", string.format("slot=%d type=TINKER recipe=%d profession=%s reason=%s",
-            controller.inventorySlot, operation.spellID, valueText(professionName), controller.failure))
-        return
-    end
-    ExpandTradeSkillSubClass(0)
-    local recipeIndex
-    for index = 1, GetNumTradeSkills() do
-        if recipeIDFromLink(GetTradeSkillRecipeLink(index)) == operation.spellID then
-            recipeIndex = index
-            break
-        end
-    end
-    if not recipeIndex then
-        controller.failure = "Engineering recipe is not learned, hidden, or unavailable in the profession list"
-        debug("BLOCK", string.format("slot=%d type=TINKER recipe=%d reason=%s",
-            controller.inventorySlot, operation.spellID, controller.failure))
-        return
-    end
-    debug("EXEC", string.format("slot=%d type=TINKER api=DoTradeSkill recipe=%d recipeIndex=%d",
-        controller.inventorySlot, operation.spellID, recipeIndex))
-    local ok, problem = pcall(DoTradeSkill, recipeIndex, 1)
-    local targeting = SpellCanTargetItem() or SpellCanTargetItemID()
-    debug("EXEC", string.format("slot=%d type=TINKER api=DoTradeSkill returned=%s targeting=%s",
-        controller.inventorySlot, ok and "ok" or "error", targeting and "item" or "none"))
-    if not ok then
-        controller.failure = "DoTradeSkill failed: " .. tostring(problem)
-    elseif not targeting then
-        controller.failure = "DoTradeSkill did not begin item targeting"
-    else
-        debug("EXEC", string.format("slot=%d type=TINKER api=UseInventoryItem target-slot=%d",
-            controller.inventorySlot, controller.inventorySlot))
-        local targeted, targetProblem = pcall(UseInventoryItem, controller.inventorySlot)
-        local stillTargeting = SpellCanTargetItem() or SpellCanTargetItemID()
-        debug("EXEC", string.format("slot=%d type=TINKER api=UseInventoryItem returned=%s targeting=%s",
-            controller.inventorySlot, targeted and "ok" or "error", stillTargeting and "item" or "none"))
-        if not targeted then
-            controller.failure = "Targeting equipped item failed: " .. tostring(targetProblem)
-        elseif stillTargeting then
-            controller.failure = "The client did not accept the equipped item target"
-        end
-    end
 end
 
 function Actions:Rescan(reason)
@@ -240,7 +188,7 @@ function Actions:PreClick(position, button)
         controller.inventorySlot, operation.type, valueText(operation.materialItemID),
         valueText(operation.material and operation.material.guid), valueText(operation.spellID),
         valueText(operation.spellName), valueText(controller.targetGuid),
-        operation.type == "GEM" and "socket" or operation.type == "TINKER" and "native" or "secure"))
+        operation.type == "GEM" and "socket" or operation.nativeProfession and "native" or "secure"))
 
     if operation.type == "GEM" then
         local ok, problem = pcall(SocketInventoryItem, controller.inventorySlot)
@@ -248,12 +196,13 @@ function Actions:PreClick(position, button)
         self:MarkPending(controller, operation, true)
         controller.reason = string.format("Use Blizzard Socketing: place item %d in socket %d, then apply", operation.materialItemID, operation.socket)
         if self.refreshView then self.refreshView() end
-    elseif operation.type == "TINKER" then
+    elseif operation.nativeProfession then
         controller.submitting = operation
         button.secureSubmission = { controller = controller, operation = operation }
-        debug("EXEC", string.format("slot=%d type=TINKER api=native-click target-slot=%d",
-            controller.inventorySlot, controller.inventorySlot))
-        self:ExecuteTinker(controller, operation)
+        debug("EXEC", string.format("slot=%d type=%s api=native-click target-slot=%d profession=%s recipe=%s effect=%s",
+            controller.inventorySlot, operation.type, controller.inventorySlot,
+            valueText(operation.professionName), valueText(operation.spellID), valueText(operation.expected)))
+        WSGS.ProfessionEnhancementExecution:Submit(controller, operation)
     else
         local material = operation.material
         if not material then return self:Fail(controller, operation, "Prepared material location is unavailable") end
@@ -369,12 +318,12 @@ function Actions:OnEvent(event, ...)
         if unit == "player" then
             for _, controller in pairs(self.controllers) do
                 local operation = controller.pending or controller.submitting
-                if operation and operation.type == "TINKER" and operation.spellID == spellID then
+                if operation and operation.nativeProfession and operation.spellID == spellID then
                     if TradeSkillFrame and TradeSkillFrame:IsShown() then
                         HideUIPanel(TradeSkillFrame)
                         debug("EVENT", string.format(
-                            "event=%s slot=%d type=TINKER tradeskill=closed",
-                            event, controller.inventorySlot))
+                            "event=%s slot=%d type=%s profession=%s tradeskill=closed",
+                            event, controller.inventorySlot, operation.type, operation.professionName))
                     end
                     break
                 end

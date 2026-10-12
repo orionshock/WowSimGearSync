@@ -3,6 +3,8 @@ local Materials = {}
 WSGS.ModificationMaterials = Materials
 
 Materials.beltBuckleItemID = 90046
+Materials.professionNames = { [164] = "Blacksmithing", [165] = "Leatherworking", [197] = "Tailoring",
+    [202] = "Engineering", [333] = "Enchanting" }
 
 -- SpellItemEnchantment ID -> the spell cast by the matching MoP scroll.
 -- These are the MoP enchanting recipes' Enchant Item effects, not item IDs.
@@ -23,6 +25,42 @@ Materials.enchantItems = {
     [4803] = 83006, [4804] = 83007, [4805] = 87560, [4806] = 87559,
     [4822] = 83764, [4823] = 83765, [4824] = 83763,
     [4825] = 82445, [4826] = 82444,
+    -- Secret inscriptions are finished BoP items. Their profession recipes
+    -- create these items, so only already-carried copies use the item path.
+    [4912] = 87581, [4913] = 87585, [4914] = 87584, [4915] = 87582,
+}
+
+-- Direct item-targeting profession recipes only. Recipe creation of scrolls,
+-- kits, spellthreads, inscriptions, or other intermediate items is excluded.
+Materials.directEnhancements = {
+    -- Tailoring: cloak embroideries and tailor-only leg spellthreads.
+    [4892] = { profession = 197, spellID = 125481, slot = 15, reagents = { [38426] = 3 } },
+    [4893] = { profession = 197, spellID = 125482, slot = 15, reagents = { [38426] = 3 } },
+    [4894] = { profession = 197, spellID = 125483, slot = 15, reagents = { [38426] = 3 } },
+    [4895] = { profession = 197, spellID = 125496, slot = 7, reagents = { [38426] = 3 } },
+    [4896] = { profession = 197, spellID = 125497, slot = 7, reagents = { [38426] = 3 } },
+    -- Leatherworking: Fur Linings and leatherworker-only leg reinforcements.
+    [4875] = { profession = 165, spellID = 124551, slot = 9, reagents = { [38426] = 1 } },
+    [4877] = { profession = 165, spellID = 124552, slot = 9, reagents = { [38426] = 1 } },
+    [4878] = { profession = 165, spellID = 124553, slot = 9, reagents = { [38426] = 1 } },
+    [4879] = { profession = 165, spellID = 124554, slot = 9, reagents = { [38426] = 1 } },
+    [4880] = { profession = 165, spellID = 124559, slot = 7, reagents = { [38426] = 1 } },
+    [4881] = { profession = 165, spellID = 124561, slot = 7, reagents = { [38426] = 1 } },
+    [4882] = { profession = 165, spellID = 124563, slot = 7, reagents = { [38426] = 1 } },
+    -- Enchanting: enchanter-only ring enchants.
+    [4359] = { profession = 333, spellID = 103461, slots = { [11] = true, [12] = true },
+        reagents = { [74249] = 2 } },
+    [4360] = { profession = 333, spellID = 103462, slots = { [11] = true, [12] = true },
+        reagents = { [74249] = 2 } },
+    [4361] = { profession = 333, spellID = 103463, slots = { [11] = true, [12] = true },
+        reagents = { [74249] = 2 } },
+    [4807] = { profession = 333, spellID = 103465, slots = { [11] = true, [12] = true },
+        reagents = { [74249] = 2 } },
+}
+
+Materials.directSockets = {
+    [9] = { profession = 164, spellIDs = { 113263, 55628 }, reagents = { [3466] = 4 } },
+    [10] = { profession = 164, spellIDs = { 114112, 55641 }, reagents = { [3466] = 4 } },
 }
 
 -- SpellItemEnchantment ID -> profession recipe and required carried reagents.
@@ -39,14 +77,33 @@ local function guidFor(bag, slot)
     return ok and guid or nil
 end
 
-local function engineeringProfession()
+local function profession(skillLineID)
     local first, second = GetProfessions()
     for _, professionIndex in pairs({ first, second }) do
         local name, _, _, _, numSpells, spellOffset, skillLine = GetProfessionInfo(professionIndex)
-        if skillLine == 202 then
+        if skillLine == skillLineID then
             return name, numSpells > 0 and spellOffset + 1 or nil
         end
     end
+end
+
+local function professionAvailability(bags, recipe, inventorySlot)
+    if recipe.slot and recipe.slot ~= inventorySlot
+        or recipe.slots and not recipe.slots[inventorySlot] then
+        return nil, "Direct profession recipe is not valid for this equipment slot"
+    end
+    local professionName, professionSpellIndex = profession(recipe.profession)
+    if not professionName then
+        return nil, (Materials.professionNames[recipe.profession] or "Required profession") .. " is unavailable"
+    end
+    if not professionSpellIndex then return nil, "Profession spellbook action is unavailable" end
+    for itemID, quantity in pairs(recipe.reagents or {}) do
+        if (bags.counts[itemID] or 0) < quantity then
+            return nil, string.format("Missing item %d (%d required)", itemID, quantity)
+        end
+    end
+    local spellID = recipe.spellID or recipe.spellIDs and recipe.spellIDs[1]
+    return recipe, nil, C_Spell.GetSpellName(spellID), professionName, professionSpellIndex
 end
 
 function Materials:ScanBags()
@@ -91,11 +148,23 @@ function Materials:ForEnchant(bags, enchantID)
     return spellID and bags.bySpell[spellID] or nil, itemID, spellID
 end
 
+function Materials:DirectEnhancementAvailability(bags, enchantID, inventorySlot)
+    local recipe = self.directEnhancements[enchantID]
+    if not recipe then return nil end
+    return professionAvailability(bags, recipe, inventorySlot)
+end
+
+function Materials:SocketAvailability(bags, inventorySlot)
+    local recipe = self.directSockets[inventorySlot]
+    if not recipe then return nil, "No confirmed Blacksmithing socket recipe for this slot" end
+    return professionAvailability(bags, recipe, inventorySlot)
+end
+
 function Materials:TinkerAvailability(bags, enchantID)
     local recipe = self.tinkerRecipes[enchantID]
     if not recipe then return nil, "No confirmed MoP tinker recipe mapping" end
     local recipeName = C_Spell.GetSpellName(recipe.spellID)
-    local professionName, professionSpellIndex = engineeringProfession()
+    local professionName, professionSpellIndex = profession(202)
     if not professionName then
         return nil, "Engineering profession is unavailable"
     end
