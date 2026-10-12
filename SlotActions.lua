@@ -377,6 +377,7 @@ function Actions:OnEvent(event, ...)
         local api = event == "REPLACE_ENCHANT" and C_Item.ReplaceEnchant
             or event == "BIND_ENCHANT" and C_Item.BindEnchant or C_Item.ActionBindsItem
         local ok, problem = pcall(api)
+        if ok then StaticPopup_Hide(event) end
         debug("EVENT", string.format("event=%s slot=%d type=%s confirm=%s", event,
             controller.inventorySlot, operation.type, ok and "accepted" or "failed"))
         if not ok then controller.failure = event .. " confirmation failed: " .. tostring(problem) end
