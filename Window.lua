@@ -92,7 +92,7 @@ function WSGS:CreateWindow()
     status:SetPoint("TOPLEFT", 20, -485)
     status:SetWidth(590)
     status:SetJustifyH("LEFT")
-    status:SetText("Ready to import. Each import creates a separate saved build.")
+    status:SetText("Ready to import. Each import creates a separate build for this session.")
     local summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     summary:SetPoint("TOPLEFT", 20, -550)
     summary:SetWidth(590)
@@ -112,7 +112,7 @@ function WSGS:CreateWindow()
         end
         status:SetTextColor(0.4, 1, 0.4)
         local metadata = profile.metadata
-        local message = string.format("Saved %s (%s): %d entries, %d equipped, %d warnings.",
+        local message = string.format("Imported %s (%s): %d entries, %d equipped, %d warnings.",
             profile.name, tostring(profile.class), metadata.entryCount, metadata.equippedCount, #metadata.warnings)
         if #metadata.warnings > 0 then message = message .. "\n" .. metadata.warnings[1]:sub(1, 180) end
         status:SetText(message)

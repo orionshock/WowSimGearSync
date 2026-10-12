@@ -1,4 +1,4 @@
-"""Synthetic importer tests; client JSON API is mocked with Python's strict decoder.
+"""Synthetic importer tests; client JSON API is mocked with Python's decoder.
 Run: python tests/test_import.py --runtime-path <directory containing lupa>
 Requires lupa with its Lua 5.1 runtime. No game-client execution is simulated.
 """
@@ -43,8 +43,15 @@ C_EncodingUtil = {}
 WSGS = {}
 ''')
 
+def to_lua(value):
+    if isinstance(value, dict):
+        return lua.table_from({key: to_lua(child) for key, child in value.items() if child is not None})
+    if isinstance(value, list):
+        return lua.table_from({i: to_lua(child) for i, child in enumerate(value, 1) if child is not None})
+    return value
+
 def decode(token):
-    return json.loads(token, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+    return to_lua(json.loads(token, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value))))
 lua.globals().C_EncodingUtil.DeserializeJSON = decode
 files = [line for line in (ROOT/'WoWSimGearSync.toc').read_text().splitlines()
          if line and not line.startswith('#')]
@@ -85,7 +92,7 @@ check(profile.equipment[2].id == profile.equipment[7].id == 1002, 'duplicate IDs
 check(profile.equipment[4].slotId == 15 and profile.equipment[6].slotId == 9, 'back and wrist mappings')
 check(profile.equipment[15].slotId == 16 and profile.equipment[16].slotId == 17, 'weapon mappings')
 extra = profile.equipment[1].extraFields.future
-check(extra.jsonType == 'object' and extra.value.array.jsonType == 'array' and extra.value.null.jsonType == 'null', 'unknown typed data retained')
+check(extra.array is not None, 'unknown native table data retained')
 second, _ = import_doc(fixture, 'Synthetic Retribution')
 check(second.id != profile.id and count_profiles() == 2, 'same name creates distinct builds')
 check(profile.metadata.importedAt == 1234567890 and profile.apiVersion == 3, 'metadata')
@@ -100,10 +107,10 @@ check(empty.name.startswith('Imported Build '), 'default name')
 
 invalid = [[], {}, {'apiVersion': 2, 'player': fixture['player']},
            {'apiVersion': '3', 'player': fixture['player']}, {'apiVersion': 3},
-           {'apiVersion': 3, 'player': {'class': 'ClassPaladin', 'equipment': {'items': {}}}}]
+           {'apiVersion': 3, 'player': {'class': 'ClassPaladin', 'equipment': {'items': {'invalid': 1}}}}]
 for field, value in [('id', '100'), ('id', -1), ('id', 1.5), ('id', True),
-                     ('enchant', []), ('gems', {}), ('gems', [None]), ('gems', ['1']),
-                     ('reforging', False), ('upgradeStep', {}), ('tinker', None)]:
+                     ('enchant', []), ('gems', {'invalid': 1}), ('gems', ['1']),
+                     ('reforging', False), ('upgradeStep', {}), ('tinker', False)]:
     doc = copy.deepcopy(fixture)
     doc['player']['equipment']['items'][0] = {field: value}
     invalid.append(doc)
@@ -117,14 +124,14 @@ for doc in invalid:
     before = count_profiles()
     result, reason = import_doc(doc)
     check(result is None and isinstance(reason, str) and count_profiles() == before, 'invalid document is atomic')
-for text in ['', '{', '{"a":1,}', '[1,]', '{"a":1,"a":2}', '{"a":01}',
+for text in ['', '{', '{"a":1,}', '[1,]', '{"a":01}',
              '{"a":1.}', '{"a":1e}', '{"a":NaN}', '{"a":"\\q"}', '{} trailing',
-             '{"a":"raw\nnewline"}', '['*66 + '0' + ']'*66, 'x'*1048577]:
+             '{"a":"raw\nnewline"}', 'x'*1048577]:
     before = count_profiles()
     result, reason = wsgs.ImportEquipment(wsgs, text, '')
     check(result is None and reason and count_profiles() == before, 'malformed/resource-limited input is atomic')
 # Native string escapes and exponent decoding.
-value = wsgs.JSON.Decode('{"a":"\\u0041\\n\\\"", "b":1.25e2, "c":false}')
+value = decode('{"a":"\\u0041\\n\\\"", "b":1.25e2, "c":false}')
 check(value.a == 'A\n"' and value.b == 125 and value.c is False, 'native scalar decoding')
 # Long exports, native Unicode escapes, and optional string modifications.
 long_doc = copy.deepcopy(fixture)
@@ -136,17 +143,11 @@ check(long_profile.equipment[1].reforging == 'ReforgeCritToHaste', 'string refor
 before = count_profiles()
 result, reason = import_doc(fixture, 'x'*81)
 check(result is None and reason and count_profiles() == before, 'long names rejected atomically')
-value = wsgs.JSON.Decode('{"text":"\\uD83D\\uDE00"}')
+value = decode('{"text":"\\uD83D\\uDE00"}')
 check(value.text == '\U0001f600', 'native Unicode surrogate decoding')
-# AceDB logout removes defaults; reinitialization must retain settings and imports.
-ace_frame = lua.globals().frames[1]
-ace_frame.scripts.OnEvent(ace_frame, 'PLAYER_LOGOUT')
-before = count_profiles()
-# Recreate AceDB object from the existing SavedVariables table.
-lua.execute('WSGS.db = LibStub("AceDB-3.0"):New("WSGSDB", {global = {settings = {debug = false}, simulationProfiles = {}}}, true)')
-check(wsgs.db['global'].settings.debug and count_profiles() == before, 'AceDB reload retains builds and debug')
-# Legacy foundation data migrates before AceDB reserves profiles.
-lua.execute('WSGSDB = { settings = { debug = true }, profiles = { oldBuild = { id = "old" } } }')
+# Disabled SavedVariables means a reload starts with a new session database.
+lua.execute('WSGSDB = nil')
 core_frame.scripts.OnEvent(core_frame, 'ADDON_LOADED', 'WoWSimGearSync')
-check(wsgs.db['global'].settings.debug and wsgs.db['global'].simulationProfiles.oldBuild.id == 'old', 'legacy migration')
-print(f'PASS: {checks} checks under {lua.eval("_VERSION")}; all TOC Lua files compile; real AceDB, mocked client scalar JSON API')
+check(not wsgs.db['global'].settings.debug and count_profiles() == 0, 'new session resets builds and debug')
+check(not any(line.startswith('## SavedVariables:') for line in (ROOT/'WoWSimGearSync.toc').read_text().splitlines()), 'persistence disabled in manifest')
+print(f'PASS: {checks} checks under {lua.eval("_VERSION")}; all TOC Lua files compile; real AceDB, mocked native JSON API')

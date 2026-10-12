@@ -1,5 +1,4 @@
 local _, WSGS = ...
-local JSON = WSGS.JSON
 
 -- WoW Sims index -> MoP inventory slot ID. Shirt/tabard/ranged are excluded.
 WSGS.equipmentSlots = {
@@ -24,49 +23,56 @@ local function modification(value)
     return identifier(value) or (type(value) == "string" and value ~= "")
 end
 
--- Unknown JSON values use tagged plain tables so null/empty-array distinctions
--- survive SavedVariables serialization without relying on metatables.
-local function preserve(value)
-    local kind = JSON.Kind(value)
-    if kind == "null" then return { jsonType = "null" } end
-    if kind == "array" or kind == "object" then
-        local result = { jsonType = kind, value = {} }
-        for key, child in pairs(value) do result.value[key] = preserve(child) end
-        return result
+local function arrayLength(value)
+    if type(value) ~= "table" then return nil end
+    local length = 0
+    for key in pairs(value) do
+        if not identifier(key) or key < 1 then return nil end
+        length = math.max(length, key)
     end
-    return value
+    return length
+end
+
+local function copy(value)
+    if type(value) ~= "table" then return value end
+    local result = {}
+    for key, child in pairs(value) do result[key] = copy(child) end
+    return result
 end
 
 function WSGS:ValidateEquipment(document)
-    if JSON.Kind(document) ~= "object" then return nil, "Expected a top-level JSON object." end
+    if type(document) ~= "table" then return nil, "Expected a top-level JSON object." end
     if document.apiVersion ~= 3 then return nil, "Only numeric apiVersion 3 is supported." end
-    if JSON.Kind(document.player) ~= "object" then return nil, "Missing player object." end
+    if type(document.player) ~= "table" then return nil, "Missing player object." end
     local player = document.player
     if not ((type(player.class) == "string" and player.class:match("%S"))
         or (identifier(player.class) and player.class > 0)) then
         return nil, "player.class must be a class name or positive numeric identifier."
     end
-    if JSON.Kind(player.equipment) ~= "object" then return nil, "Missing player.equipment object." end
+    if type(player.equipment) ~= "table" then return nil, "Missing player.equipment object." end
     local items = player.equipment.items
-    if JSON.Kind(items) ~= "array" then return nil, "player.equipment.items must be an array." end
-    if #items > 16 then return nil, "Equipment contains more than 16 entries." end
+    local entryCount = arrayLength(items)
+    if not entryCount then return nil, "player.equipment.items must be an array." end
+    if entryCount > 16 then return nil, "Equipment contains more than 16 entries." end
     local equipment, warnings, equipped = {}, {}, 0
     for index = 1, 16 do
         local item = items[index]
         local slot = self.equipmentSlots[index]
         local normalized = { slotId = slot.id, slotName = slot.name, empty = true }
         equipment[index] = normalized
-        if item ~= nil and item ~= JSON.null then
-            if JSON.Kind(item) ~= "object" then return nil, "Item " .. index .. " must be an object or null." end
+        if item ~= nil then
+            if type(item) ~= "table" then return nil, "Item " .. index .. " must be an object or null." end
             for key, value in pairs(item) do
+                if type(key) ~= "string" then return nil, "Item " .. index .. " must be an object." end
                 local problem
                 if key == "id" then
                     if not identifier(value) then problem = "id must be a non-negative integer" end
                 elseif key == "gems" then
-                    if JSON.Kind(value) ~= "array" then
+                    if not arrayLength(value) then
                         problem = "gems must be an array"
                     else
-                        for _, gem in ipairs(value) do
+                        for gemIndex = 1, arrayLength(value) do
+                            local gem = value[gemIndex]
                             if not identifier(gem) then problem = "gem IDs must be non-negative integers" end
                         end
                     end
@@ -83,7 +89,7 @@ function WSGS:ValidateEquipment(document)
                     end
                 else
                     normalized.extraFields = normalized.extraFields or {}
-                    normalized.extraFields[key] = preserve(value)
+                    normalized.extraFields[key] = copy(value)
                     warnings[#warnings + 1] = "Item " .. index .. ": retained unsupported field " .. key:sub(1, 80) .. "."
                 end
             end
@@ -94,14 +100,28 @@ function WSGS:ValidateEquipment(document)
             end
         end
     end
-    if #items < 16 then warnings[#warnings + 1] = "Missing trailing positions were padded as empty." end
+    if entryCount < 16 then warnings[#warnings + 1] = "Missing trailing positions were padded as empty." end
     return { class = player.class, apiVersion = document.apiVersion, equipment = equipment,
-        metadata = { entryCount = #items, equippedCount = equipped, warnings = warnings, schemaVersion = 1 } }
+        metadata = { entryCount = entryCount, equippedCount = equipped, warnings = warnings, schemaVersion = 1 } }
 end
 
 function WSGS:ImportEquipment(text, requestedName)
     self:Debug("[IMPORT] Starting import")
-    local document, reason = JSON.Decode(text)
+    local document, reason
+    if type(text) ~= "string" or not text:match("%S") then
+        reason = "Paste a WoW Sims JSON export first."
+    elseif #text > 1048576 then
+        reason = "Export exceeds the 1 MiB import limit."
+    elseif not text:match("^%s*{") then
+        reason = "Expected a top-level JSON object."
+    else
+        local ok, result = pcall(C_EncodingUtil.DeserializeJSON, text)
+        if ok and type(result) == "table" then
+            document = result
+        else
+            reason = "Invalid JSON. Check the complete export and try again."
+        end
+    end
     local profile
     if document then profile, reason = self:ValidateEquipment(document) end
     if not profile then

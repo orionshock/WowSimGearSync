@@ -35,22 +35,6 @@ events:SetScript("OnEvent", function(self, event, loadedAddon)
         return
     end
 
-    if type(WSGSDB) ~= "table" then
-        WSGSDB = {}
-    end
-    -- The foundation used root settings/profiles before AceDB owned this table.
-    -- Move simulation data out of AceDB's reserved profiles key exactly once.
-    if type(WSGSDB.settings) == "table" then
-        if type(WSGSDB.global) ~= "table" then
-            WSGSDB.global = {}
-        end
-        WSGSDB.global.settings = WSGSDB.settings
-        if type(WSGSDB.profiles) == "table" then
-            WSGSDB.global.simulationProfiles = WSGSDB.profiles
-        end
-        WSGSDB.settings = nil
-        WSGSDB.profiles = nil
-    end
     WSGS.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
     LibStub("AceConsole-3.0"):RegisterChatCommand("wsgs", function(message)
         WSGS:HandleCommand(message)
