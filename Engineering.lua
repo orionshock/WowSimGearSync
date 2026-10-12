@@ -12,11 +12,26 @@ Engineering.effects = {
 
 function Engineering:CharacterContext()
     local first, second = GetProfessions()
-    local engineering = false
+    local professions = {}
     for _, index in pairs({ first, second }) do
-        if select(7, GetProfessionInfo(index)) == 202 then engineering = true end
+        local name, _, rank, maxRank, _, _, skillLine = GetProfessionInfo(index)
+        if skillLine then professions[skillLine] = { name = name, rank = rank, maxRank = maxRank } end
     end
-    return { engineering = engineering, recommendedTinkers = WSGS.db.profile.recommendedEngineeringTinkers }
+    local details = {}
+    for skillLine, profession in pairs(professions) do
+        details[#details + 1] = string.format("%s(%d)=%s/%s", profession.name or "unknown", skillLine,
+            tostring(profession.rank), tostring(profession.maxRank))
+    end
+    table.sort(details)
+    local signature = table.concat(details, ",")
+    if self.professionSignature ~= signature then
+        self.professionSignature = signature
+        WSGS:Debug(string.format("[ACTION][PLAN] professions=%s engineering=%s blacksmithing=%s",
+            signature ~= "" and signature or "none", tostring(professions[202] ~= nil),
+            tostring(professions[164] ~= nil)))
+    end
+    return { engineering = professions[202] ~= nil, blacksmithing = professions[164] ~= nil,
+        recommendedTinkers = WSGS.db.profile.recommendedEngineeringTinkers }
 end
 
 function Engineering:Target(item, slotId, context)

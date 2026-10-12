@@ -14,7 +14,82 @@ local function recipeIDFromLink(link)
     return tonumber(link and (link:match("|Henchant:(%d+)") or link:match("|Hspell:(%d+)")))
 end
 
+function Execution:SubmitTinker(controller, operation)
+    local profession = WSGS.ModificationMaterials:GetProfession(202)
+    if not profession then
+        controller.failure = "Engineering profession is unavailable"
+        return
+    end
+    if not profession.spellBookIndex then
+        controller.failure = "Engineering profession spellbook action is unavailable"
+        return
+    end
+    operation.professionName = profession.name
+    operation.professionSpellIndex = profession.spellBookIndex
+    CloseTradeSkill()
+    debug("EXEC", string.format(
+        "slot=%d type=TINKER api=CastSpell profession=%s professionSkillLine=202 detected=true spellBookIndex=%s recipe=%s effect=%s",
+        controller.inventorySlot, operation.professionName, valueText(operation.professionSpellIndex),
+        valueText(operation.spellID), valueText(operation.expected)))
+    local opened, openProblem = pcall(CastSpell, operation.professionSpellIndex, BOOKTYPE_PROFESSION)
+    local openedProfession = GetTradeSkillLine()
+    debug("EXEC", string.format(
+        "slot=%d type=TINKER api=CastSpell result=%s openedProfession=%s error=%s",
+        controller.inventorySlot, opened and "ok" or "error", valueText(openedProfession),
+        opened and "none" or valueText(openProblem)))
+    if not opened then
+        controller.failure = "Opening Engineering failed: " .. tostring(openProblem)
+        return
+    end
+    if openedProfession ~= operation.professionName then
+        controller.failure = "Engineering recipe data did not open during the click"
+        debug("BLOCK", string.format("slot=%d type=TINKER recipe=%s profession=%s reason=%s",
+            controller.inventorySlot, valueText(operation.spellID), valueText(openedProfession), controller.failure))
+        return
+    end
+    ExpandTradeSkillSubClass(0)
+    local recipeIndex
+    for index = 1, GetNumTradeSkills() do
+        if recipeIDFromLink(GetTradeSkillRecipeLink(index)) == operation.spellID then
+            recipeIndex = index
+            break
+        end
+    end
+    if not recipeIndex then
+        controller.failure = "Engineering recipe is not learned, hidden, or unavailable in the profession list"
+        debug("BLOCK", string.format("slot=%d type=TINKER recipe=%s reason=%s",
+            controller.inventorySlot, valueText(operation.spellID), controller.failure))
+        return
+    end
+    debug("EXEC", string.format("slot=%d type=TINKER recipe=%s recipeIndex=%d resolution=matched",
+        controller.inventorySlot, valueText(operation.spellID), recipeIndex))
+    debug("EXEC", string.format("slot=%d type=TINKER api=DoTradeSkill recipe=%s recipeIndex=%d",
+        controller.inventorySlot, valueText(operation.spellID), recipeIndex))
+    local ok, problem = pcall(DoTradeSkill, recipeIndex, 1)
+    local targeting = SpellCanTargetItem() or SpellCanTargetItemID()
+    debug("EXEC", string.format("slot=%d type=TINKER api=DoTradeSkill returned=%s targeting=%s",
+        controller.inventorySlot, ok and "ok" or "error", targeting and "item" or "none"))
+    if not ok then
+        controller.failure = "DoTradeSkill failed: " .. tostring(problem)
+    elseif not targeting then
+        controller.failure = "DoTradeSkill did not begin item targeting"
+    else
+        debug("EXEC", string.format("slot=%d type=TINKER api=UseInventoryItem target-slot=%d guid=%s",
+            controller.inventorySlot, controller.inventorySlot, valueText(controller.targetGuid)))
+        local targeted, targetProblem = pcall(UseInventoryItem, controller.inventorySlot)
+        local stillTargeting = SpellCanTargetItem() or SpellCanTargetItemID()
+        debug("EXEC", string.format("slot=%d type=TINKER api=UseInventoryItem returned=%s targeting=%s",
+            controller.inventorySlot, targeted and "ok" or "error", stillTargeting and "item" or "none"))
+        if not targeted then
+            controller.failure = "Targeting equipped item failed: " .. tostring(targetProblem)
+        elseif stillTargeting then
+            controller.failure = "The client did not accept the equipped item target"
+        end
+    end
+end
+
 function Execution:Submit(controller, operation)
+    if operation.type == "TINKER" then return self:SubmitTinker(controller, operation) end
     local profession = WSGS.ModificationMaterials:GetProfession(operation.professionSkillLine)
     if not profession then
         controller.failure = (WSGS.ModificationMaterials.professionNames[operation.professionSkillLine]

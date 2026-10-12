@@ -128,16 +128,13 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
             fields.enchant.reason or "Enchant state is unknown")
     end
 
-    if fields.tinker and fields.tinker.state == "MISMATCH" then
+    if fields.tinker and (fields.tinker.state == "MISMATCH" or fields.tinker.state == "UNKNOWN") then
         local recipe, reason, recipeName, professionName, professionSpellIndex =
             WSGS.ModificationMaterials:TinkerAvailability(bags, fields.tinker.expected)
         addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,
             spellID = recipe and recipe.spellID, spellName = recipeName, professionName = professionName,
             professionSkillLine = 202, professionSpellIndex = professionSpellIndex, nativeProfession = true,
             targetSource = fields.tinker.targetSource }, reason)
-    elseif fields.tinker and fields.tinker.state == "UNKNOWN" then
-        addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,
-            targetSource = fields.tinker.targetSource }, fields.tinker.reason or "Tinker state is unknown")
     end
 
     controller.prepared = controller.operations[1]

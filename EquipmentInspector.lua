@@ -48,7 +48,6 @@ function Inspector:Inspect(slotId, link)
     local result = {}
     for _, field in ipairs(upgradeFields) do result[field] = unknown("Upgrade tooltip unavailable, unreadable, or inconsistent") end
     result.tinker = unknown("Engineering effect not established")
-    local populatedTooltip = false
     local pattern, order = upgradePattern(ITEM_UPGRADE_TOOLTIP_FORMAT)
     if pattern then
         local ok, lines = pcall(function()
@@ -81,7 +80,6 @@ function Inspector:Inspect(slotId, link)
             return text
         end)
         if ok and lines and #lines > 0 then
-            populatedTooltip = true
             local current, maximum, conflict
             for _, text in ipairs(lines) do
                 local a, b = text:match(pattern)
@@ -117,14 +115,37 @@ function Inspector:Inspect(slotId, link)
     local effects = WSGS.Engineering.effects[slotId]
     if effects then
         local ok, name, spellId = pcall(C_Item.GetItemSpell, link)
+        local requestedItemData = false
         if ok and effects[spellId] then
             result.tinker = known(effects[spellId], "C_Item.GetItemSpell / MoP SpellItemEnchantment mapping")
-        elseif ok and not spellId and not name and populatedTooltip and C_Item.GetItemInfo(link) then
-            result.tinker = known(0, "Cached item and populated inventory tooltip / no item use spell")
         else
-            result.tinker = unknown("Use spell unmapped or item information unavailable")
+            result.tinker = unknown(not ok and "C_Item.GetItemSpell failed"
+                or not spellId and "C_Item.GetItemSpell returned nil"
+                or "Equipped item use spell is not mapped for this engineering slot")
         end
         if ok then result.tinker.spellId, result.tinker.spellName = spellId, name end
+        if ok and not spellId then
+            local decoded = WSGS.ItemLinkDecoder:Decode(link)
+            self.requestedTinkerItems = self.requestedTinkerItems or {}
+            if decoded and not self.requestedTinkerItems[decoded.id] then
+                self.requestedTinkerItems[decoded.id] = true
+                requestedItemData = true
+                C_Item.RequestLoadItemDataByID(decoded.id)
+            end
+        end
+        local rawLink = type(link) == "string" and (link:match("|H(item:[^|]+)|h") or link) or tostring(link)
+        local signature = table.concat({ rawLink, tostring(ok), tostring(spellId), tostring(name),
+            tostring(effects[spellId]), tostring(requestedItemData), result.tinker.status,
+            tostring(result.tinker.value) }, ":")
+        self.tinkerDiagnostics = self.tinkerDiagnostics or {}
+        if self.tinkerDiagnostics[slotId] ~= signature then
+            self.tinkerDiagnostics[slotId] = signature
+            WSGS:Debug(string.format(
+                "[ACTION][VERIFY] slot=%d type=TINKER item=%s getItemSpell=%s spellID=%s spellName=%s mapped=%s itemDataRequested=%s result=%s observed=%s reason=%s",
+                slotId, rawLink, ok and "ok" or "error", tostring(spellId), tostring(name),
+                tostring(effects[spellId]), tostring(requestedItemData), result.tinker.status, tostring(result.tinker.value),
+                result.tinker.reason or "none"))
+        end
     else
         result.tinker = { status = "NOT_APPLICABLE", reason = "Not a supported engineering slot" }
     end

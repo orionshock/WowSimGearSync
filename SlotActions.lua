@@ -160,7 +160,7 @@ function Actions:PreClick(position, button)
     button.secureSubmission = nil
     local controller = self.controllers[position]
     if not controller then return end
-    if controller.state == "BLOCKED" and controller.lastFailed then
+    if controller.state == "BLOCKED" then
         controller.lastFailed = nil
         self:Rescan("RETRY_CLICK")
         controller = self.controllers[position]

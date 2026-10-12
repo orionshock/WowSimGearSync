@@ -2,6 +2,18 @@ local _, WSGS = ...
 local Comparator = {}
 WSGS.EquipmentComparator = Comparator
 local fields = { "professionSocket", "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }
+local socketDiagnostics = {}
+
+local function debugSocket(position, slotId, kind, eligible, targetCount, actualCount, difference)
+    local signature = table.concat({ kind, tostring(eligible), tostring(targetCount), tostring(actualCount),
+        difference.state, difference.reason or difference.source or "" }, ":")
+    if socketDiagnostics[position] == signature then return end
+    socketDiagnostics[position] = signature
+    WSGS:Debug(string.format(
+        "[ACTION][PLAN] slot=%d type=%s eligible=%s targetSockets=%s equippedSockets=%s state=%s source=%s",
+        slotId, kind, tostring(eligible), tostring(targetCount), tostring(actualCount), difference.state,
+        difference.reason or difference.source or "target-versus-equipped socket count"))
+end
 
 local function scalar(expected, observed)
     if not observed or observed.status == "UNKNOWN" then
@@ -39,27 +51,28 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
         if field == "professionSocket" then
             expected = nil
         elseif field == "buckle" then
-            expected = slot.id == 6 and type(target.gems) == "table"
-                and type(target.gems[3]) == "number" and target.gems[3] > 0 or nil
+            expected = slot.id == 6 and type(target.gems) == "table" and #target.gems > 0 or nil
         end
         local difference
         if field == "professionSocket" and not emptyTarget then
-            if slot.id ~= 9 and slot.id ~= 10 or type(target.gems) ~= "table" or #target.gems == 0 then
+            local eligible = context and context.blacksmithing == true
+            local targetCount = type(target.gems) == "table" and #target.gems or 0
+            local socketCount = observations.socketCount
+            local actualCount = socketCount and socketCount.status == "KNOWN" and socketCount.value or nil
+            if slot.id ~= 9 and slot.id ~= 10 or targetCount == 0 then
                 difference = { state = "NOT_APPLICABLE", reason = "Target does not require a profession socket" }
+            elseif not eligible then
+                difference = { state = "NOT_APPLICABLE", reason = "Character does not have Blacksmithing" }
+            elseif actualCount == nil then
+                difference = { state = "UNKNOWN", expected = targetCount,
+                    reason = socketCount and socketCount.reason or "Equipped socket count unavailable" }
             else
-                local ok, nativeSockets = pcall(C_Item.GetItemNumSockets, target.id)
-                if not ok or type(nativeSockets) ~= "number" or nativeSockets < 0 then
-                    difference = { state = "UNKNOWN", expected = true,
-                        reason = "Native socket count unavailable for the target item" }
-                elseif #target.gems <= nativeSockets then
-                    difference = { state = "NOT_APPLICABLE", reason = "Target gems fit native sockets" }
-                elseif result.fields.item.state ~= "MATCH" then
-                    difference = { state = "UNKNOWN", expected = true,
-                        reason = "Target item is not confirmed in this slot" }
-                else
-                    difference = scalar(true, observations.professionSocket)
-                    difference.actualCount = observations.professionSocket.count
-                end
+                difference = { state = actualCount >= targetCount and "MATCH" or "MISMATCH",
+                    expected = targetCount, actual = actualCount,
+                    source = "Imported gem count versus equipped socket count" }
+            end
+            if slot.id == 9 or slot.id == 10 then
+                debugSocket(position, slot.id, "PROFESSION_SOCKET", eligible, targetCount, actualCount, difference)
             end
         elseif field == "upgradeStep" and not emptyTarget then
             local eligibility = observations.upgradeEligibility
@@ -80,6 +93,18 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
                     difference.reason = "Upgradeable item maximum is unknown (normally 2)"
                 end
             end
+        elseif field == "buckle" and not emptyTarget and expected then
+            local targetCount = #target.gems
+            local socketCount = observations.socketCount
+            local actualCount = socketCount and socketCount.status == "KNOWN" and socketCount.value or nil
+            if actualCount ~= nil then
+                difference = { state = actualCount >= targetCount and "MATCH" or "MISMATCH",
+                    expected = targetCount, actual = actualCount,
+                    source = "Imported gem count versus equipped socket count" }
+            else
+                difference = scalar(true, observations.buckle)
+            end
+            debugSocket(position, slot.id, "BUCKLE", true, targetCount, actualCount, difference)
         elseif emptyTarget or expected == nil or field == "gems" and next(expected) == nil then
             difference = { state = "NOT_APPLICABLE", reason = "Target does not specify this modification" }
         elseif result.fields.item.state ~= "MATCH" then

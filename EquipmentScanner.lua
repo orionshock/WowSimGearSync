@@ -30,7 +30,7 @@ function Scanner:Scan(onlyPosition)
             observations.item = unknown("Inventory identity unavailable or inconsistent")
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
-        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "upgradeRemaining", "upgradeState", "tinker", "buckle", "professionSocket", "instance" }) do
+        for _, field in ipairs({ "enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum", "upgradeRemaining", "upgradeState", "tinker", "buckle", "professionSocket", "socketCount", "instance" }) do
             observations[field] = empty and { status = "NOT_APPLICABLE", reason = "Empty inventory slot" }
                 or unknown("No verified equipped-item observation for this field")
         end
@@ -48,6 +48,13 @@ function Scanner:Scan(onlyPosition)
                 observations.enchant = decoded.enchant
                 observations.gems = decoded.gems
                 observations.reforging = decoded.reforging
+                local socketOK, socketCount = pcall(C_Item.GetItemNumSockets, current.link)
+                if socketOK and type(socketCount) == "number" and socketCount >= 0 then
+                    observations.socketCount = { status = "KNOWN", value = socketCount,
+                        source = "C_Item.GetItemNumSockets(equipped link)" }
+                else
+                    observations.socketCount = unknown("Equipped socket count unavailable")
+                end
                 if slot.id == 9 or slot.id == 10 then
                     local ok, added = pcall(C_Item.GetItemNumAddedSockets, current.link)
                     if ok and type(added) == "number" and added >= 0 then
