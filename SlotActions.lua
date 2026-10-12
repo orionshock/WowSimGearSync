@@ -75,17 +75,18 @@ function Actions:Refresh(profile, snapshot, comparison)
         local signature = table.concat({ valueText(built.inventorySlot), built.state, op and op.type or "none",
             op and valueText(op.expected) or "nil", valueText(built.targetGuid), built.reason or op and op.reason or "none",
             valueText(op and op.material and op.material.bag), valueText(op and op.material and op.material.slot),
-            valueText(op and op.targetSource) }, ":")
+            valueText(op and op.targetSource), valueText(op and op.actionSlot) }, ":")
         local changed = self.planSignatures[position] ~= signature
         self.planSignatures[position] = signature
         if changed then debug("PLAN", string.format("slot=%d actualSlot=%d state=%s next=%s expected=%s guid=%s reason=%s",
             WSGS.equipmentSlots[position].id, built.inventorySlot, built.state, op and op.type or "none",
             op and valueText(op.expected) or "nil", valueText(built.targetGuid), built.reason or op and op.reason or "none")) end
         if changed and built.state == "READY" then
-            debug("READY", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s spellName=%s guid=%s source=%s",
+            debug("READY", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s spellName=%s actionSlot=%s guid=%s source=%s",
                 built.inventorySlot, built.prepared.type, valueText(built.prepared.materialItemID),
                 valueText(built.prepared.material and built.prepared.material.guid), valueText(built.prepared.spellID),
-                valueText(built.prepared.spellName), valueText(built.targetGuid), valueText(built.prepared.targetSource)))
+                valueText(built.prepared.spellName), valueText(built.prepared.actionSlot),
+                valueText(built.targetGuid), valueText(built.prepared.targetSource)))
         elseif changed and built.state == "BLOCKED" then
             for _, blocked in ipairs(built.blocked) do
                 debug("BLOCK", string.format("slot=%d type=%s expected=%s reason=%s", built.inventorySlot,
@@ -108,7 +109,8 @@ function Actions:ConfigureButton(position)
     if not button or InCombatLockdown() then return end
     local controller = self.controllers[position]
     local operation = controller and controller.state == "READY" and controller.prepared
-    local actionType = operation and operation.type ~= "GEM" and (operation.type == "TINKER" and "macro" or "item") or nil
+    local actionType = operation and operation.type ~= "GEM"
+        and (operation.type == "TINKER" and (operation.actionSlot and "action" or "macro") or "item") or nil
     local macroText = actionType == "macro" and tinkerMacro(operation) or nil
     button:SetAttribute("wsgs-type1", actionType)
     button:SetAttribute("type1", actionType)
@@ -116,6 +118,7 @@ function Actions:ConfigureButton(position)
         and string.format("%d %d", operation.material.bag, operation.material.slot) or nil)
     button:SetAttribute("spell1", nil)
     button:SetAttribute("macrotext1", macroText)
+    button:SetAttribute("action1", actionType == "action" and operation.actionSlot or nil)
     button:SetAttribute("target-slot1", actionType and controller.inventorySlot or nil)
 end
 
@@ -261,13 +264,21 @@ function Actions:PreClick(position, button)
             end
         end
         self:ConfigureButton(position)
-        local expectedType = operation.type == "TINKER" and "macro" or "item"
+        local expectedType = operation.type == "TINKER"
+            and (operation.actionSlot and "action" or "macro") or "item"
         local expectedItem = operation.material
             and string.format("%d %d", operation.material.bag, operation.material.slot) or nil
         local expectedMacro = expectedType == "macro" and tinkerMacro(operation) or nil
+        if expectedType == "action" then
+            local actionType, actionID = GetActionInfo(operation.actionSlot)
+            if actionType ~= "spell" or actionID ~= operation.spellID then
+                return self:Fail(controller, operation, "Prepared recipe action-bar slot changed")
+            end
+        end
         if button:GetAttribute("type1") ~= expectedType
             or button:GetAttribute("target-slot1") ~= controller.inventorySlot
             or expectedType == "item" and button:GetAttribute("item1") ~= expectedItem
+            or expectedType == "action" and button:GetAttribute("action1") ~= operation.actionSlot
             or expectedType == "macro" and button:GetAttribute("macrotext1") ~= expectedMacro then
             return self:Fail(controller, operation, "Secure action could not be prepared")
         end
@@ -275,7 +286,8 @@ function Actions:PreClick(position, button)
         button.secureSubmission = { controller = controller, operation = operation }
         debug("EXEC", string.format("slot=%d type=%s api=SecureActionButton:%s action=%s target-slot=%d",
             controller.inventorySlot, operation.type, expectedType,
-            expectedType == "macro" and valueText(operation.spellName) or valueText(expectedItem),
+            expectedType == "action" and valueText(operation.actionSlot)
+                or expectedType == "macro" and valueText(operation.spellName) or valueText(expectedItem),
             controller.inventorySlot))
     end
 end
@@ -419,6 +431,7 @@ function Actions:Initialize()
         "SOCKET_INFO_UPDATE", "SOCKET_INFO_ACCEPT", "SOCKET_INFO_SUCCESS", "SOCKET_INFO_FAILURE", "SOCKET_INFO_CLOSE",
         "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
         "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE",
+        "ACTIONBAR_SLOT_CHANGED",
         "REPLACE_ENCHANT", "BIND_ENCHANT", "ACTION_WILL_BIND_ITEM",
         "PLAYER_REGEN_ENABLED" }) do frame:RegisterEvent(event) end
     frame:SetScript("OnEvent", function(_, ...) self:OnEvent(...) end)

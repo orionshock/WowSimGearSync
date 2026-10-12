@@ -106,6 +106,7 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
             WSGS.ModificationMaterials:TinkerAvailability(bags, fields.tinker.expected)
         addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,
             spellID = recipe and recipe.spellID, spellName = recipeName, professionName = professionName,
+            actionSlot = recipe and WSGS.ModificationMaterials:FindRecipeActionSlot(recipe.spellID),
             targetSource = fields.tinker.targetSource }, reason)
     elseif fields.tinker and fields.tinker.state == "UNKNOWN" then
         addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,

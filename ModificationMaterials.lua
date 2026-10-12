@@ -89,6 +89,13 @@ function Materials:ForEnchant(bags, enchantID)
     return spellID and bags.bySpell[spellID] or nil, itemID, spellID
 end
 
+function Materials:FindRecipeActionSlot(spellID)
+    for _, actionSlot in ipairs(C_ActionBar.FindSpellActionButtons(spellID) or {}) do
+        local actionType, actionID = GetActionInfo(actionSlot)
+        if actionType == "spell" and actionID == spellID then return actionSlot end
+    end
+end
+
 function Materials:TinkerAvailability(bags, enchantID)
     local recipe = self.tinkerRecipes[enchantID]
     if not recipe then return nil, "No confirmed MoP tinker recipe mapping" end
