@@ -2,13 +2,14 @@ local _, WSGS = ...
 -- Owns player-facing translation only. Scanner/comparator remain authoritative.
 local Presentation = {}
 WSGS.SlotPresentation = Presentation
-Presentation.fields = { "item", "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }
+Presentation.fields = { "item", "upgradeStep", "gems", "enchant", "buckle", "tinker", "reforging" }
 local labels = { item = "Item", gems = "Gems", enchant = "Enchant", reforging = "Reforge",
     upgradeStep = "Upgrade", tinker = "Tinker", buckle = "Buckle" }
-local short = { item = "I", gems = "G", enchant = "E", reforging = "R", upgradeStep = "U", tinker = "T", buckle = "B" }
+local statusLabels = { item = "Equipped", upgradeStep = "Upgraded", gems = "Gemmed",
+    enchant = "Enchant", buckle = "Buckle", tinker = "Tinker", reforging = "Reforged" }
 local styles = {
-    MATCH = { "4dff66", "+" }, MISMATCH = { "ffb326", "!" },
-    UNKNOWN = { "8cb3ff", "?" }, NOT_APPLICABLE = { "999999", "-" },
+    MATCH = { "4dff66", "" }, MISMATCH = { "ffb326", "!" },
+    UNKNOWN = { "8cb3ff", "" }, NOT_APPLICABLE = { "999999", "" },
 }
 
 function Presentation:MiniStates(difference)
@@ -19,10 +20,10 @@ function Presentation:MiniStates(difference)
         if value and (field == "item" or value.state ~= "NOT_APPLICABLE") then
             local style = styles[value.state]
             local color = field == "item" and value.state == "MISMATCH" and "ff4040" or style[1]
-            badges[#badges + 1] = "|cff" .. color .. short[field] .. style[2] .. "|r"
+            badges[#badges + 1] = "|cff" .. color .. style[2] .. statusLabels[field] .. "|r"
         end
     end
-    return table.concat(badges, " ")
+    return table.concat(badges, ", ")
 end
 
 local function itemText(item)

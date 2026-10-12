@@ -135,16 +135,23 @@ WSGS.Tests:Register("ui", "UI", {
             Doll:Render(profile, snapshot, result)
             for _, button in ipairs(frame.slots) do
                 assert(button.miniState:GetText() == WSGS.SlotPresentation:MiniStates(button.difference))
-                assert(button.miniState:GetText():find("I+", 1, true))
+                assert(button.miniState:GetText():find("Equipped", 1, true))
             end
-            assert(frame.slots[8].miniState:GetText():find("B!", 1, true))
-            assert(not frame.slots[1].miniState:GetText():find("B", 1, true))
+            assert(frame.slots[8].miniState:GetText():find("!Buckle", 1, true))
+            assert(not frame.slots[1].miniState:GetText():find("Buckle", 1, true))
             local text = WSGS.SlotPresentation:MiniStates({ fields = {
                 item = { state = "MISMATCH" }, gems = { state = "UNKNOWN" },
                 enchant = { state = "NOT_APPLICABLE" },
             } })
-            assert(text:find("|cffff4040I!", 1, true) and text:find("G?", 1, true))
-            assert(not text:find("E-", 1, true))
+            assert(text:find("|cffff4040!Equipped", 1, true) and text:find("Gemmed", 1, true))
+            assert(not text:find("Enchant", 1, true) and not text:find("+", 1, true))
+            local ordered = WSGS.SlotPresentation:MiniStates({ fields = {
+                item = { state = "MATCH" }, upgradeStep = { state = "MATCH" },
+                gems = { state = "MATCH" }, enchant = { state = "MATCH" },
+                buckle = { state = "MATCH" }, tinker = { state = "MATCH" },
+                reforging = { state = "MATCH" },
+            } }):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+            assert(ordered == "Equipped, Upgraded, Gemmed, Enchant, Buckle, Tinker, Reforged")
             assert(frame.helpHint:GetText() == "Hover a slot for details.")
         end)
     end },

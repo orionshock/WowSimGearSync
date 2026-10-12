@@ -150,7 +150,7 @@ function Doll:Create()
         button:SetSize(44, 44)
         if position <= 6 then button:SetPoint("TOPLEFT", 18, -112 - (position - 1) * 54)
         elseif position <= 14 then button:SetPoint("TOPRIGHT", -18, -112 - (position - 7) * 54)
-        else button:SetPoint("TOP", (position == 15 and -100 or 100), -558) end
+        else button:SetPoint("TOP", (position == 15 and -100 or 100), -548) end
         button.icon = button:CreateTexture(nil, "ARTWORK")
         button.icon:SetAllPoints()
         button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -163,16 +163,18 @@ function Doll:Create()
         backdrop:SetPoint("BOTTOMRIGHT")
         button.indicator = button:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         button.indicator:SetPoint("BOTTOMRIGHT", -1, 1)
-        local label = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        label:SetWidth(140)
-        if position <= 6 then label:SetPoint("LEFT", button, "RIGHT", 8, 10); label:SetJustifyH("LEFT")
-        elseif position <= 14 then label:SetPoint("RIGHT", button, "LEFT", -8, 10); label:SetJustifyH("RIGHT")
-        else label:SetPoint("TOP", button, "BOTTOM", 0, -4) end
-        label:SetText(slot.name)
         button.miniState = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        if position <= 6 then button.miniState:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -4)
-        elseif position <= 14 then button.miniState:SetPoint("TOPRIGHT", label, "BOTTOMRIGHT", 0, -4)
-        else button.miniState:SetPoint("TOP", label, "BOTTOM", 0, -4) end
+        button.miniState:SetWidth(position <= 14 and 240 or 180)
+        if position <= 6 then
+            button.miniState:SetPoint("LEFT", button, "RIGHT", 8, 0)
+            button.miniState:SetJustifyH("LEFT")
+        elseif position <= 14 then
+            button.miniState:SetPoint("RIGHT", button, "LEFT", -8, 0)
+            button.miniState:SetJustifyH("RIGHT")
+        else
+            button.miniState:SetPoint("TOP", button, "BOTTOM", 0, -4)
+            button.miniState:SetJustifyH("CENTER")
+        end
         button:SetScript("OnEnter", function(b) self.hovered = b; self:ShowSlotTooltip(b) end)
         button:SetScript("OnLeave", function() self.hovered = nil; GameTooltip:Hide() end)
         -- Deliberately no OnClick/drag/item-use handlers or secure equipment template.

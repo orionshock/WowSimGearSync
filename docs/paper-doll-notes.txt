@@ -101,10 +101,12 @@ upgrade/tinker behavior is preserved. Buckle evidence is described below. No 3D 
 automation, Equip queue, Equipment Manager, LDB settings UI, or Tab work is added.
 
 TASK 013: SLOT STATUS AND WAIST BUCKLE
-Mini badges beside each icon use I/G/E/R/U/T/B for item/gems/enchant/reforge/
-upgrade/tinker/buckle. Green + means matched, amber ! means pending, red I!
-means wrong/missing item, and blue ? means unknown. Non-applicable steps are
-omitted; gray icon indicators still identify empty targets. The center contains
+Colored full-word states beside each icon appear in this order: Equipped,
+Upgraded, Gemmed, Enchant/Buckle, Tinker, Reforged (only applicable steps).
+Green means matched, amber means pending, red means wrong/missing item,
+and blue means unknown. Missing/pending steps have a leading !; matched steps
+have no symbol. Words are comma-separated and wrap within each slot's column.
+Adjacent slot names are removed; names remain in tooltips. The center contains
 only a small hover hint. Bottom counts, quality borders and disabled Equip remain.
 
 Buckle requirement is implied only by a positive target gems[3] at waist (export
