@@ -69,10 +69,10 @@ function Actions:Refresh(profile, snapshot, comparison)
             WSGS.equipmentSlots[position].id, built.inventorySlot, built.state, op and op.type or "none",
             op and valueText(op.expected) or "nil", valueText(built.targetGuid), built.reason or op and op.reason or "none")) end
         if changed and built.state == "READY" then
-            debug("READY", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s guid=%s source=%s",
+            debug("READY", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s spellName=%s guid=%s source=%s",
                 built.inventorySlot, built.prepared.type, valueText(built.prepared.materialItemID),
                 valueText(built.prepared.material and built.prepared.material.guid), valueText(built.prepared.spellID),
-                valueText(built.targetGuid), valueText(built.prepared.targetSource)))
+                valueText(built.prepared.spellName), valueText(built.targetGuid), valueText(built.prepared.targetSource)))
         elseif changed and built.state == "BLOCKED" then
             for _, blocked in ipairs(built.blocked) do
                 debug("BLOCK", string.format("slot=%d type=%s expected=%s reason=%s", built.inventorySlot,
@@ -100,7 +100,9 @@ function Actions:ConfigureButton(position)
     button:SetAttribute("type1", actionType)
     button:SetAttribute("item1", actionType == "item" and operation.material
         and string.format("%d %d", operation.material.bag, operation.material.slot) or nil)
-    button:SetAttribute("spell1", actionType == "spell" and operation.spellID or nil)
+    -- Tradeskill enhancement recipes resolve through their localized names. A numeric
+    -- secure spell attribute uses CastSpellByID, which does not start these recipes.
+    button:SetAttribute("spell1", actionType == "spell" and operation.spellName or nil)
     button:SetAttribute("target-slot1", actionType and controller.inventorySlot or nil)
 end
 
@@ -171,9 +173,10 @@ function Actions:PreClick(position, button)
         return self:Fail(controller, operation, "The equipped target item or instance changed; rescan before retrying")
     end
     if IsInventoryItemLocked(controller.inventorySlot) then return self:Fail(controller, operation, "Target item is locked") end
-    debug("EXEC", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s guid=%s phase=%s",
+    debug("EXEC", string.format("slot=%d type=%s material=%s materialGuid=%s spell=%s spellName=%s guid=%s phase=%s",
         controller.inventorySlot, operation.type, valueText(operation.materialItemID),
-        valueText(operation.material and operation.material.guid), valueText(operation.spellID), valueText(controller.targetGuid),
+        valueText(operation.material and operation.material.guid), valueText(operation.spellID),
+        valueText(operation.spellName), valueText(controller.targetGuid),
         operation.type == "GEM" and "socket" or "secure"))
 
     if operation.type == "GEM" then
@@ -203,13 +206,15 @@ function Actions:PreClick(position, button)
         if button:GetAttribute("type1") ~= expectedType
             or button:GetAttribute("target-slot1") ~= controller.inventorySlot
             or expectedType == "item" and button:GetAttribute("item1") ~= expectedItem
-            or expectedType == "spell" and button:GetAttribute("spell1") ~= operation.spellID then
+            or expectedType == "spell" and button:GetAttribute("spell1") ~= operation.spellName then
             return self:Fail(controller, operation, "Secure action could not be prepared")
         end
         controller.submitting = operation
         button.secureSubmission = { controller = controller, operation = operation }
-        debug("EXEC", string.format("slot=%d type=%s api=SecureActionButton:%s target-slot=%d",
-            controller.inventorySlot, operation.type, expectedType, controller.inventorySlot))
+        debug("EXEC", string.format("slot=%d type=%s api=SecureActionButton:%s action=%s target-slot=%d",
+            controller.inventorySlot, operation.type, expectedType,
+            expectedType == "spell" and valueText(operation.spellName) or valueText(expectedItem),
+            controller.inventorySlot))
     end
 end
 
@@ -242,7 +247,9 @@ function Actions:TooltipLines(position)
         if operation.material then
             lines[#lines + 1] = string.format("Material: item %d at bag %d, slot %d", operation.material.itemID,
                 operation.material.bag, operation.material.slot)
-        elseif operation.spellID then lines[#lines + 1] = "Spell: " .. operation.spellID end
+        elseif operation.spellID then
+            lines[#lines + 1] = string.format("Recipe: %s (%d)", operation.spellName or "unavailable", operation.spellID)
+        end
     end
     if controller.reason then lines[#lines + 1] = controller.reason end
     return lines

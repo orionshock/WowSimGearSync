@@ -87,10 +87,14 @@ function Materials:TinkerAvailability(bags, enchantID)
     if not C_SpellBook.IsSpellKnown(recipe.spellID) then
         return nil, "Required Engineering recipe is not known"
     end
+    local recipeName = C_Spell.GetSpellName(recipe.spellID)
+    if not recipeName then
+        return nil, "Engineering recipe name is unavailable"
+    end
     for itemID, quantity in pairs(recipe.reagents) do
         if (bags.counts[itemID] or 0) < quantity then
             return nil, string.format("Missing item %d (%d required)", itemID, quantity)
         end
     end
-    return recipe
+    return recipe, nil, recipeName
 end
