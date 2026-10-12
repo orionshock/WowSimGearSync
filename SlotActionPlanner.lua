@@ -102,9 +102,10 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
     end
 
     if fields.tinker and fields.tinker.state == "MISMATCH" then
-        local recipe, reason, recipeName = WSGS.ModificationMaterials:TinkerAvailability(bags, fields.tinker.expected)
+        local recipe, reason, recipeName, professionName =
+            WSGS.ModificationMaterials:TinkerAvailability(bags, fields.tinker.expected)
         addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,
-            spellID = recipe and recipe.spellID, spellName = recipeName,
+            spellID = recipe and recipe.spellID, spellName = recipeName, professionName = professionName,
             targetSource = fields.tinker.targetSource }, reason)
     elseif fields.tinker and fields.tinker.state == "UNKNOWN" then
         addOperation(controller, { type = "TINKER", field = "tinker", expected = fields.tinker.expected,

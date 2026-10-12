@@ -39,6 +39,14 @@ local function guidFor(bag, slot)
     return ok and guid or nil
 end
 
+local function engineeringProfessionName()
+    local first, second = GetProfessions()
+    for _, professionIndex in pairs({ first, second }) do
+        local name, _, _, _, _, _, skillLine = GetProfessionInfo(professionIndex)
+        if skillLine == 202 then return name end
+    end
+end
+
 function Materials:ScanBags()
     local result = { byItem = {}, bySpell = {}, counts = {} }
     for bag = 0, NUM_BAG_SLOTS do
@@ -91,10 +99,14 @@ function Materials:TinkerAvailability(bags, enchantID)
     if not recipeName then
         return nil, "Engineering recipe name is unavailable"
     end
+    local professionName = engineeringProfessionName()
+    if not professionName then
+        return nil, "Engineering profession is unavailable"
+    end
     for itemID, quantity in pairs(recipe.reagents) do
         if (bags.counts[itemID] or 0) < quantity then
             return nil, string.format("Missing item %d (%d required)", itemID, quantity)
         end
     end
-    return recipe, nil, recipeName
+    return recipe, nil, recipeName, professionName
 end

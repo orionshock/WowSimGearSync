@@ -22,6 +22,16 @@ local function operationSatisfied(operation, difference)
     return field.state == "MATCH", field.state .. (field.reason and ": " .. field.reason or "")
 end
 
+local function tinkerMacro(operation)
+    if not operation or not operation.spellID or not operation.professionName then return nil end
+    return string.format("/run CloseTradeSkill()\n/cast %s\n/run WoWSimGearSync_DoTinker(%d)",
+        operation.professionName, operation.spellID)
+end
+
+local function recipeIDFromLink(link)
+    return tonumber(link and (link:match("|Henchant:(%d+)") or link:match("|Hspell:(%d+)")))
+end
+
 function Actions:Refresh(profile, snapshot, comparison)
     if not profile or not snapshot or not comparison then
         self.controllers = {}
@@ -50,8 +60,11 @@ function Actions:Refresh(profile, snapshot, comparison)
                 built.reason = "Awaiting client verification: " .. detail
                 built.serial = previous.serial
                 built.timeoutScheduled = previous.timeoutScheduled
-                debug("VERIFY", string.format("slot=%d type=%s expected=%s result=STILL_PENDING reason=%s",
-                    previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected), detail))
+                built.lastVerificationDetail = detail
+                if previous.lastVerificationDetail ~= detail then
+                    debug("VERIFY", string.format("slot=%d type=%s expected=%s result=STILL_PENDING reason=%s",
+                        previous.inventorySlot, previous.pending.type, valueText(previous.pending.expected), detail))
+                end
             end
         elseif previous and previous.lastFailed and built.prepared then
             built.state, built.lastFailed = "BLOCKED", previous.lastFailed
@@ -95,15 +108,63 @@ function Actions:ConfigureButton(position)
     if not button or InCombatLockdown() then return end
     local controller = self.controllers[position]
     local operation = controller and controller.state == "READY" and controller.prepared
-    local actionType = operation and operation.type ~= "GEM" and (operation.type == "TINKER" and "spell" or "item") or nil
+    local actionType = operation and operation.type ~= "GEM" and (operation.type == "TINKER" and "macro" or "item") or nil
+    local macroText = actionType == "macro" and tinkerMacro(operation) or nil
     button:SetAttribute("wsgs-type1", actionType)
     button:SetAttribute("type1", actionType)
     button:SetAttribute("item1", actionType == "item" and operation.material
         and string.format("%d %d", operation.material.bag, operation.material.slot) or nil)
-    -- Tradeskill enhancement recipes resolve through their localized names. A numeric
-    -- secure spell attribute uses CastSpellByID, which does not start these recipes.
-    button:SetAttribute("spell1", actionType == "spell" and operation.spellName or nil)
+    button:SetAttribute("spell1", nil)
+    button:SetAttribute("macrotext1", macroText)
     button:SetAttribute("target-slot1", actionType and controller.inventorySlot or nil)
+end
+
+function Actions:DoTinkerRecipe(recipeID)
+    local controller, operation
+    for _, candidate in pairs(self.controllers) do
+        local submitting = candidate.submitting
+        if submitting and submitting.type == "TINKER" and submitting.spellID == recipeID then
+            controller, operation = candidate, submitting
+            break
+        end
+    end
+    if not operation then return end
+    local professionName = GetTradeSkillLine()
+    if professionName ~= operation.professionName then
+        controller.failure = "Engineering recipe data did not open during the secure click"
+        debug("BLOCK", string.format("slot=%d type=TINKER recipe=%d profession=%s reason=%s",
+            controller.inventorySlot, recipeID, valueText(professionName), controller.failure))
+        return
+    end
+    ExpandTradeSkillSubClass(0)
+    local recipeIndex
+    for index = 1, GetNumTradeSkills() do
+        if recipeIDFromLink(GetTradeSkillRecipeLink(index)) == recipeID then
+            recipeIndex = index
+            break
+        end
+    end
+    if not recipeIndex then
+        controller.failure = "Engineering recipe is hidden or unavailable in the profession list"
+        debug("BLOCK", string.format("slot=%d type=TINKER recipe=%d reason=%s",
+            controller.inventorySlot, recipeID, controller.failure))
+        return
+    end
+    debug("EXEC", string.format("slot=%d type=TINKER api=DoTradeSkill recipe=%d recipeIndex=%d",
+        controller.inventorySlot, recipeID, recipeIndex))
+    local ok, problem = pcall(DoTradeSkill, recipeIndex, 1)
+    local targeting = SpellCanTargetItem() or SpellCanTargetItemID()
+    debug("EXEC", string.format("slot=%d type=TINKER api=DoTradeSkill returned=%s targeting=%s",
+        controller.inventorySlot, ok and "ok" or "error", targeting and "item" or "none"))
+    if not ok then
+        controller.failure = "DoTradeSkill failed: " .. tostring(problem)
+    elseif not targeting then
+        controller.failure = "DoTradeSkill did not begin item targeting"
+    end
+end
+
+_G.WoWSimGearSync_DoTinker = function(recipeID)
+    Actions:DoTinkerRecipe(recipeID)
 end
 
 function Actions:Rescan(reason)
@@ -200,20 +261,21 @@ function Actions:PreClick(position, button)
             end
         end
         self:ConfigureButton(position)
-        local expectedType = operation.type == "TINKER" and "spell" or "item"
+        local expectedType = operation.type == "TINKER" and "macro" or "item"
         local expectedItem = operation.material
             and string.format("%d %d", operation.material.bag, operation.material.slot) or nil
+        local expectedMacro = expectedType == "macro" and tinkerMacro(operation) or nil
         if button:GetAttribute("type1") ~= expectedType
             or button:GetAttribute("target-slot1") ~= controller.inventorySlot
             or expectedType == "item" and button:GetAttribute("item1") ~= expectedItem
-            or expectedType == "spell" and button:GetAttribute("spell1") ~= operation.spellName then
+            or expectedType == "macro" and button:GetAttribute("macrotext1") ~= expectedMacro then
             return self:Fail(controller, operation, "Secure action could not be prepared")
         end
         controller.submitting = operation
         button.secureSubmission = { controller = controller, operation = operation }
         debug("EXEC", string.format("slot=%d type=%s api=SecureActionButton:%s action=%s target-slot=%d",
             controller.inventorySlot, operation.type, expectedType,
-            expectedType == "spell" and valueText(operation.spellName) or valueText(expectedItem),
+            expectedType == "macro" and valueText(operation.spellName) or valueText(expectedItem),
             controller.inventorySlot))
     end
 end
@@ -355,6 +417,7 @@ function Actions:Initialize()
     for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED",
         "SOCKET_INFO_UPDATE", "SOCKET_INFO_ACCEPT", "SOCKET_INFO_SUCCESS", "SOCKET_INFO_FAILURE", "SOCKET_INFO_CLOSE",
         "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
+        "TRADE_SKILL_SHOW", "TRADE_SKILL_UPDATE",
         "REPLACE_ENCHANT", "BIND_ENCHANT", "ACTION_WILL_BIND_ITEM",
         "PLAYER_REGEN_ENABLED" }) do frame:RegisterEvent(event) end
     frame:SetScript("OnEvent", function(_, ...) self:OnEvent(...) end)
