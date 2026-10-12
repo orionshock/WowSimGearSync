@@ -4,6 +4,15 @@ WSGS.EquipmentComparator = Comparator
 local fields = { "professionSocket", "gems", "enchant", "reforging", "upgradeStep", "tinker", "buckle" }
 local socketDiagnostics = {}
 
+local function requestedSocketCount(gems)
+    local count = 0
+    if type(gems) ~= "table" then return count end
+    for index, gemID in ipairs(gems) do
+        if type(gemID) == "number" and gemID > 0 then count = index end
+    end
+    return count
+end
+
 local function debugSocket(position, slotId, kind, eligible, targetCount, actualCount, difference)
     local signature = table.concat({ kind, tostring(eligible), tostring(targetCount), tostring(actualCount),
         difference.state, difference.reason or difference.source or "" }, ":")
@@ -51,12 +60,12 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
         if field == "professionSocket" then
             expected = nil
         elseif field == "buckle" then
-            expected = slot.id == 6 and type(target.gems) == "table" and #target.gems > 0 or nil
+            expected = slot.id == 6 and requestedSocketCount(target.gems) > 0 or nil
         end
         local difference
         if field == "professionSocket" and not emptyTarget then
             local eligible = context and context.blacksmithing == true
-            local targetCount = type(target.gems) == "table" and #target.gems or 0
+            local targetCount = requestedSocketCount(target.gems)
             local socketCount = observations.socketCount
             local actualCount = socketCount and socketCount.status == "KNOWN" and socketCount.value or nil
             if slot.id ~= 9 and slot.id ~= 10 or targetCount == 0 then
@@ -94,7 +103,7 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
                 end
             end
         elseif field == "buckle" and not emptyTarget and expected then
-            local targetCount = #target.gems
+            local targetCount = requestedSocketCount(target.gems)
             local socketCount = observations.socketCount
             local actualCount = socketCount and socketCount.status == "KNOWN" and socketCount.value or nil
             if actualCount ~= nil then

@@ -48,10 +48,13 @@ function Scanner:Scan(onlyPosition)
                 observations.enchant = decoded.enchant
                 observations.gems = decoded.gems
                 observations.reforging = decoded.reforging
-                local socketOK, socketCount = pcall(C_Item.GetItemNumSockets, current.link)
-                if socketOK and type(socketCount) == "number" and socketCount >= 0 then
-                    observations.socketCount = { status = "KNOWN", value = socketCount,
-                        source = "C_Item.GetItemNumSockets(equipped link)" }
+                local socketOK, nativeSockets = pcall(C_Item.GetItemNumSockets, current.link)
+                local addedOK, addedSockets = pcall(C_Item.GetItemNumAddedSockets, current.link)
+                if socketOK and type(nativeSockets) == "number" and nativeSockets >= 0
+                    and addedOK and type(addedSockets) == "number" and addedSockets >= 0 then
+                    observations.socketCount = { status = "KNOWN", value = nativeSockets + addedSockets,
+                        native = nativeSockets, added = addedSockets,
+                        source = "C_Item.GetItemNumSockets + C_Item.GetItemNumAddedSockets" }
                 else
                     observations.socketCount = unknown("Equipped socket count unavailable")
                 end
