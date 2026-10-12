@@ -7,7 +7,9 @@ Commands.lua registers the existing options table with AceConfig under
 handling, and help output; it uses AceConsole internally. Root /wsgs displays
 standard AceConfigCmd help. There is no custom dispatcher, input normalization,
 root window toggle, completion candidate generator, or manual chat hook.
-Debug uses a native toggle; compare an execute; probe/test validated inputs.
+Debug uses a native toggle; compare/import execute options; probe/test validated inputs.
+/wsgs import creates the existing import window if needed and shows it; repeated
+invocations keep it open. Root /wsgs still shows native help.
 Core.lua retains AceAddon initialization and AceDB defaults. Settings remain
 in db.profile, simulation builds/sequence/latest tracking in db.char.
 SavedVariables remains commented out. No LDB or paper doll was added.
@@ -68,10 +70,8 @@ EXACT IN-GAME VALIDATION
 /wsgs test comparator
 /wsgs test importer
 /wsgs test nonsense         (validation error)
-Reload clears session-only builds while SavedVariables is disabled. To compare
-an imported build without a window launcher, use the existing namespace method:
-/run LibStub("AceAddon-3.0"):GetAddon("WoWSimGearSync"):ToggleWindow()
-This is a manual verification probe, not a new slash command or root behavior.
+Reload clears session-only builds while SavedVariables is disabled. To open the existing import screen:
+/wsgs import                (show; repeat to confirm it stays open)
 Import your gear, then repeat compare/probe. Run tests twice; build collection,
 latest ID, next sequence, and debug should be unchanged by the test runner.
 
