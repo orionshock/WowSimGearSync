@@ -31,6 +31,7 @@ EquipmentScanner.lua
 EquipmentComparator.lua
 EquipmentInventory.lua
 EquipmentState.lua
+ShoppingList.lua
 EquipmentDiagnostics.lua
 EquipmentPlanner.lua
 EquipmentExecution.lua

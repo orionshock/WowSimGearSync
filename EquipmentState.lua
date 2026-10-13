@@ -180,7 +180,9 @@ function Equipment:OnItemDataEvent(event, itemID, success)
     if not self.pendingItemData or not self.pendingItemData[itemID] then
         return
     end
+    local requester = self.pendingItemData[itemID]
     self.pendingItemData[itemID] = nil
+    self:SendMessage("WSGS_ITEM_DATA_RECEIVED", itemID, success, requester)
     if not success or not itemIsRelevant(self.equipmentState, itemID) then
         return
     end
