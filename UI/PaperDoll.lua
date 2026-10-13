@@ -69,7 +69,7 @@ function UI:RenderPaperDoll(state)
     elseif comparison then
         local s = comparison.summary
         frame.summary:SetText(string.format(
-            "Items matched: %d/16  |  Wrong items: %d\nConfiguration differences: %d  |  Unknown observations: %d",
+            "Matched: %d/16  |  UnMatched: %d\nDifference: %d  |  Unknown: %d",
             s.matched, s.itemMismatches, s.configurationMismatches, s.unknown))
     else
         frame.summary:SetText(reason or "Comparison unavailable")
