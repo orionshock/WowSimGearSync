@@ -95,7 +95,7 @@ function UI:RenderPaperDoll(state)
                           "Interface\\Icons\\INV_Misc_QuestionMark"
             if not name and frame:IsShown() and not self.requestedItems[target.id] then
                 self.requestedItems[target.id] = true
-                C_Item.RequestLoadItemDataByID(target.id)
+                Equipment:RequestItemData(target.id, "PaperDoll:target")
             end
         end
         button.icon:SetTexture(texture)

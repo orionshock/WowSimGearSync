@@ -64,8 +64,8 @@ function UI:WSGS_EQUIPMENT_STATE_CHANGED()
     self:UpdateEquipButton()
 end
 
-function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED()
-    self:QueuePaperDollRefresh("PLAYER_EQUIPMENT_CHANGED")
+function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED(_, event, ...)
+    self:QueuePaperDollRefresh(event, ...)
 end
 
 function UI:OnEnable()

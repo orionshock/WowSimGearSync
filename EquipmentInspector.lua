@@ -171,7 +171,7 @@ function Inspector:Inspect(slotId, link)
             if decoded and not self.requestedTinkerItems[decoded.id] then
                 self.requestedTinkerItems[decoded.id] = true
                 requestedItemData = true
-                C_Item.RequestLoadItemDataByID(decoded.id)
+                WSGS:GetModule("Equipment"):RequestItemData(decoded.id, "EquipmentInspector:tinker")
             end
         end
         local rawLink = type(link) == "string" and (link:match("|H(item:[^|]+)|h") or link) or tostring(link)

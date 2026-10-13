@@ -287,11 +287,11 @@ function Actions:RefreshCurrentBuild()
     return state
 end
 
-function Actions:QueueRefresh(event)
+function Actions:QueueRefresh(event, ...)
     if verificationEvents[event] then
         self.verificationEvent = event
     end
-    self:SendMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", event)
+    self:SendMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", event, ...)
     if self:PendingCount() == 0 then
         return
     end

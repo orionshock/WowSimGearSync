@@ -162,12 +162,30 @@ local function itemIsRelevant(state, itemID)
     return false
 end
 
+function Equipment:RequestItemData(itemID, requester)
+    if type(itemID) ~= "number" or itemID <= 0 then
+        return nil, "Item ID must be a positive number"
+    end
+    self.pendingItemData = self.pendingItemData or {}
+    self.pendingItemData[itemID] = requester or true
+    local ok, problem = pcall(C_Item.RequestLoadItemDataByID, itemID)
+    if not ok then
+        self.pendingItemData[itemID] = nil
+        return nil, tostring(problem)
+    end
+    return true
+end
+
 function Equipment:OnItemDataEvent(event, itemID, success)
+    if not self.pendingItemData or not self.pendingItemData[itemID] then
+        return
+    end
+    self.pendingItemData[itemID] = nil
     if not success or not itemIsRelevant(self.equipmentState, itemID) then
         return
     end
     self:InvalidateState(event, itemID, success)
-    self:QueueRefresh(event)
+    self:QueueRefresh(event, itemID, success)
 end
 
 function Equipment:WSGS_BUILD_IMPORTED(event)
