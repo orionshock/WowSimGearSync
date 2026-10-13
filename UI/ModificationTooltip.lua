@@ -5,11 +5,11 @@ local Tooltip = {}
 UI.ModificationTooltip = Tooltip
 
 local ICON_SIZE = 46
-local ARROW_SIZE = 22
+local ARROW_WIDTH, ARROW_HEIGHT = 52, 22
 local PADDING = 12
 local MAX_WIDTH = 440
 local MIN_WIDTH = 180
-local ARROW_TEXTURE = "Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up"
+local ARROW_TEXTURE = "Interface\\TalentFrame\\TalentFrame-Parts"
 
 local function measuredWidth(frame, text)
     frame.measure:SetText(text or "")
@@ -63,7 +63,8 @@ local function acquireArrow(frame)
     if not arrow then
         arrow = frame:CreateTexture(nil, "ARTWORK")
         arrow:SetTexture(ARROW_TEXTURE)
-        arrow:SetSize(ARROW_SIZE, ARROW_SIZE)
+        arrow:SetTexCoord(0.78515625, 0.99218750, 0.54687500, 0.58789063)
+        arrow:SetSize(ARROW_WIDTH, ARROW_HEIGHT)
         frame.arrows[index] = arrow
     end
     arrow:Show()
@@ -179,8 +180,8 @@ function Tooltip:Show(icon, status)
         elseif section.current then
             y = addRow(frame, section.current, y, width) - 2
             local arrow = acquireArrow(frame)
-            arrow:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + math.floor((ICON_SIZE - ARROW_SIZE) / 2), y)
-            y = y - ARROW_SIZE - 2
+            arrow:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + math.floor((ICON_SIZE - ARROW_WIDTH) / 2), y)
+            y = y - ARROW_HEIGHT - 2
         end
         if section.target then
             y = addRow(frame, section.target, y, width)
