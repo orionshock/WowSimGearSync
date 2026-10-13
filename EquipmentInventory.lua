@@ -29,6 +29,7 @@ function Inventory:Scan(equipment)
                     link = info.hyperlink,
                     bag = bag,
                     bagSlot = slot,
+                    count = info.stackCount or 1,
                     locked = info.isLocked,
                     key = "bag:" .. bag .. ":" .. slot,
                     observations = {}

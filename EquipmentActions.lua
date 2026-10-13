@@ -1,6 +1,5 @@
 local _, WSGS = ...
-local Actions = WSGS:NewModule("Equipment", "AceEvent-3.0")
-WSGS.EquipmentActions = Actions
+local Actions = WSGS:GetModule("Equipment")
 local verificationEvents = {
     PLAYER_EQUIPMENT_CHANGED = true,
     BAG_UPDATE_DELAYED = true,
@@ -151,7 +150,7 @@ function Actions:LogVerification(record, snapshot, verified, reason, event)
     record.diagnosticLogged = true
 end
 
-function Actions:Reconcile(profile, snapshot, bags, combat, now, event)
+function Actions:Reconcile(state, snapshot, bags, combat, now, event)
     local final = self.batch and (now >= self.batch.deadline or event == "FINAL")
     if self.batch then
         for _, record in ipairs(self.batch.records) do
@@ -182,7 +181,7 @@ function Actions:Reconcile(profile, snapshot, bags, combat, now, event)
             self.pending = nil
         end
     end
-    self.plan = WSGS.EquipmentPlanner:Plan(profile, snapshot, bags)
+    self.plan = WSGS.EquipmentPlanner:Plan(state)
     if self.batch and self:PendingCount() == 0 then
         local counts = self:OutcomeCounts()
         if counts.FAILED > 0 or counts.BLOCKED > 0 then
@@ -208,14 +207,8 @@ function Actions:Reconcile(profile, snapshot, bags, combat, now, event)
     return self.batch and self:OutcomeCounts() or nil
 end
 
-function Actions:ReadNow()
-    local snapshot = WSGS.EquipmentScanner:Scan()
-    local bags = WSGS.EquipmentInventory:Scan(snapshot)
-    return snapshot, bags
-end
-
-function Actions:UnresolvedSlots(profile, snapshot)
-    local comparison = WSGS.EquipmentComparator:Compare(profile, snapshot)
+function Actions:UnresolvedSlots(state)
+    local comparison = state.comparison
     local unresolved = {}
     if not comparison then
         return unresolved
@@ -228,10 +221,14 @@ function Actions:UnresolvedSlots(profile, snapshot)
     return unresolved
 end
 
-function Actions:LogDone(profile, snapshot)
+function Actions:LogDone(state)
     if not self.batch or self.batch.summaryLogged or self:PendingCount() > 0 then
         return
     end
+    local snapshot = {
+        slots = state.equipped,
+        context = state.context
+    }
     self.batch.summaryLogged = true
     local counts, attempted = self:OutcomeCounts(), 0
     for _, record in ipairs(self.batch.records) do
@@ -244,7 +241,7 @@ function Actions:LogDone(profile, snapshot)
                 "classification=" .. record.status .. "; observed=" .. reason, "FINAL_RESCAN")
         end
     end
-    local unresolved = self:UnresolvedSlots(profile, snapshot)
+    local unresolved = self:UnresolvedSlots(state)
     WSGS:Debug(string.format(
         "[EQUIP][DONE] planned=%d attempted=%d verified=%d failed=%d blocked=%d pending=%d completed=%d actualUnresolved=%d slots=%s",
         self.batch.total, attempted, counts.VERIFIED, counts.FAILED, counts.BLOCKED, counts.STILL_PENDING,
@@ -252,19 +249,21 @@ function Actions:LogDone(profile, snapshot)
         #unresolved > 0 and table.concat(unresolved, ",") or "none"))
     if not self.batch.setSyncAttempted then
         self.batch.setSyncAttempted = true
-        WSGS.EquipmentSetSync:Synchronize(profile, snapshot, self.batch)
+        WSGS.EquipmentSetSync:Synchronize(self.stateBuild, state, self.batch)
     end
 end
 
-function Actions:Refresh(profile, snapshot)
-    local bags
-    if snapshot then
-        bags = WSGS.EquipmentInventory:Scan(snapshot)
-    else
-        snapshot, bags = self:ReadNow()
+function Actions:Refresh(state)
+    if not state then
+        state = self:GetState(nil)
     end
+    local snapshot = {
+        slots = state.equipped,
+        context = state.context
+    }
+    local bags = state.bags
     local before = self.batch and self:OutcomeCounts()
-    local counts = self:Reconcile(profile, snapshot, bags, InCombatLockdown() or UnitAffectingCombat("player"),
+    local counts = self:Reconcile(state, snapshot, bags, InCombatLockdown() or UnitAffectingCombat("player"),
         GetTime(), self.verificationEvent)
     self.verificationEvent = nil
     self.snapshot, self.bags = snapshot, bags
@@ -275,23 +274,17 @@ function Actions:Refresh(profile, snapshot)
         WSGS:Debug(string.format("[EQUIP][VERIFY] progress=%d/%d plannerUnresolved=%d", counts.VERIFIED,
             self.batch.total, self.plan.unresolvedCount))
     end
-    self:LogDone(profile, snapshot)
+    self:LogDone(state)
     self:SendMessage("WSGS_EQUIPMENT_STATE_CHANGED")
     return self.plan
 end
 
 function Actions:RefreshCurrentBuild()
     local profile = WSGS:GetActiveSimulationProfile()
-    if not profile then
-        self:Refresh(nil)
-        WSGS.Actions:Refresh()
-        return nil
-    end
-    local snapshot = WSGS.EquipmentScanner:Scan()
-    local comparison, reason = WSGS.EquipmentComparator:Compare(profile, snapshot)
-    self:Refresh(profile, snapshot)
-    WSGS.Actions:Refresh(profile, snapshot, comparison)
-    return profile, snapshot, comparison, reason
+    local state = self:GetState(profile)
+    self:Refresh(state)
+    WSGS.Actions:Refresh(state)
+    return state
 end
 
 function Actions:QueueRefresh(event)
@@ -309,12 +302,16 @@ function Actions:QueueRefresh(event)
     C_Timer.After(0, function()
         self.refreshQueued = false
         if self:PendingCount() > 0 then
-            self:Refresh(WSGS:GetActiveSimulationProfile())
+            local state = self:GetState(WSGS:GetActiveSimulationProfile())
+            self:Refresh(state)
         end
     end)
 end
 
 function Actions:OnEquipmentStateEvent(event, ...)
+    if self:IsObservationEvent(event) then
+        self:InvalidateState(event, ...)
+    end
     local active = self.batch and self:PendingCount() > 0
     if active and verificationEvents[event] then
         WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
@@ -336,19 +333,6 @@ function Actions:UI_ERROR_MESSAGE(event, ...)
     WSGS:Debug(string.format("[EQUIP][BLOCK] op=%d inv=%d reason=%s", record.index, record.operation.slotId,
         record.error))
     self:QueueRefresh(event)
-end
-
-function Actions:OnEnable()
-    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "OnEquipmentStateEvent")
-    self:RegisterEvent("BAG_UPDATE_DELAYED", "OnEquipmentStateEvent")
-    self:RegisterEvent("ITEM_LOCK_CHANGED", "OnEquipmentStateEvent")
-    self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnEquipmentStateEvent")
-    self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnEquipmentStateEvent")
-    self:RegisterEvent("UI_ERROR_MESSAGE")
-    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnEquipmentStateEvent")
-    self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "OnEquipmentStateEvent")
-    self:RegisterEvent("SPELLS_CHANGED", "OnEquipmentStateEvent")
-    self:RegisterEvent("CURSOR_CHANGED", "OnEquipmentStateEvent")
 end
 
 local function blockRemaining(batch, first, reason)
@@ -394,7 +378,7 @@ end
 function Actions:LogPlan(profile)
     WSGS:Debug(string.format("[EQUIP][PLAN] click cursor=%s operations=%d unresolved=%d missing=%d blocked=%d",
         cursorState(), #self.plan.operations, self.plan.unresolvedCount, #self.plan.missing, #self.plan.blocked))
-    local comparison = WSGS.EquipmentComparator:Compare(profile, self.snapshot)
+    local comparison = self.equipmentState and self.equipmentState.comparison
     local byTarget, missing = {}, {}
     for index, operation in ipairs(self.plan.operations) do
         byTarget[operation.targetPosition] = index
@@ -455,12 +439,13 @@ function Actions:Click()
     end
     self.fault, self.batch, self.pending = nil, nil, nil
     local profile = WSGS:GetActiveSimulationProfile()
-    self:Refresh(profile)
+    local state = self:RefreshState(profile, "GlobalEquipClick")
+    self:Refresh(state)
     if profile then
         self:LogPlan(profile)
     end
     if self.state == "COMPLETE" then
-        WSGS.EquipmentSetSync:Synchronize(profile, self.snapshot)
+        WSGS.EquipmentSetSync:Synchronize(profile, state)
         return
     end
     if self.state ~= "READY" then
@@ -484,12 +469,14 @@ function Actions:Click()
     end
     -- This immediate rescan only observes. Every protected action above ran in
     -- the original button callback.
-    self:Refresh(WSGS:GetActiveSimulationProfile())
+    state = self:RefreshState(WSGS:GetActiveSimulationProfile(), "GlobalEquipImmediateVerify")
+    self:Refresh(state)
     C_Timer.After(4, function()
         if self.batch == batch and self:PendingCount() > 0 then
             WSGS:Debug(string.format("[EQUIP][EVENT] name=VERIFY_TIMEOUT pending=%d", self:PendingCount()))
             self.verificationEvent = "FINAL"
-            self:Refresh(WSGS:GetActiveSimulationProfile())
+            local finalState = self:RefreshState(WSGS:GetActiveSimulationProfile(), "GlobalEquipFinalVerify")
+            self:Refresh(finalState)
         end
     end)
 end

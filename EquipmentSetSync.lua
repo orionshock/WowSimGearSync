@@ -43,10 +43,10 @@ function Sync:Block(profile, reason)
     return nil, reason
 end
 
-function Sync:Check(profile, snapshot, batch)
-    local comparison, problem = WSGS.EquipmentComparator:Compare(profile, snapshot)
+function Sync:Check(profile, state, batch)
+    local comparison = state and state.comparison
     if not comparison then
-        return nil, problem
+        return nil, state and state.reason or "Equipment State is unavailable."
     end
     local instanceByTarget = {}
     for _, record in ipairs(batch and batch.records or {}) do
@@ -63,10 +63,10 @@ function Sync:Check(profile, snapshot, batch)
         local target = profile.equipment[position]
         local result = comparison.slots[position]
         local physical = comparison.assignments[position]
-        local current = snapshot.slots[physical]
+        local current = state.equipped[physical]
         local itemMatch = result.fields.item.state == "MATCH"
         local instance = instanceByTarget[position]
-        local instanceMatch = not instance or snapshot.slots[instance.position].guid == instance.guid
+        local instanceMatch = not instance or state.equipped[instance.position].guid == instance.guid
         local verified = itemMatch and instanceMatch
         WSGS:Debug(string.format(
             "[SET][CHECK] build=%s pos=%d inv=%d physical=%d target=%s observed=%s GUID=%s itemMatch=%s instanceMatch=%s result=%s",
@@ -167,14 +167,14 @@ function Sync:CallSave(action, setID, name, icon)
     return true, nil, eventSeen
 end
 
-function Sync:SetMatchesSnapshot(setID, snapshot)
+function Sync:SetMatchesState(setID, state)
     local ok, itemIDs = pcall(C_EquipmentSet.GetItemIDs, setID)
     if not ok or type(itemIDs) ~= "table" then
         return nil, "Saved item IDs are unavailable."
     end
     local mismatches = {}
     for position, slot in ipairs(WSGS.equipmentSlots) do
-        local expected = snapshot.slots[position].id or EQUIPMENT_SET_EMPTY_SLOT or 0
+        local expected = state.equipped[position].id or EQUIPMENT_SET_EMPTY_SLOT or 0
         local actual = itemIDs[slot.id]
         if actual == nil then
             actual = EQUIPMENT_SET_EMPTY_SLOT or 0
@@ -186,7 +186,7 @@ function Sync:SetMatchesSnapshot(setID, snapshot)
     return #mismatches == 0, #mismatches > 0 and table.concat(mismatches, ",") or nil
 end
 
-function Sync:VerifySaved(profile, setID, snapshot, eventSeen, desiredIcon)
+function Sync:VerifySaved(profile, setID, state, eventSeen, desiredIcon)
     local info = setInfo(setID)
     if not info then
         return nil, "The saved set could not be found after synchronization."
@@ -194,7 +194,7 @@ function Sync:VerifySaved(profile, setID, snapshot, eventSeen, desiredIcon)
     if info.name ~= profile.name then
         return nil, "The client saved the set as '" .. info.name .. "' instead of '" .. profile.name .. "'."
     end
-    local matches, difference = self:SetMatchesSnapshot(setID, snapshot)
+    local matches, difference = self:SetMatchesState(setID, state)
     local iconMatch = not desiredIcon or info.icon == desiredIcon
     WSGS:Debug(string.format(
         "[SET][VERIFY] build=%s setID=%d nameMatch=yes itemsMatch=%s desiredIcon=%s savedIcon=%s iconMatch=%s eventSeen=%s differences=%s",
@@ -210,7 +210,7 @@ function Sync:VerifySaved(profile, setID, snapshot, eventSeen, desiredIcon)
     return true
 end
 
-function Sync:Run(profile, snapshot, batch)
+function Sync:Run(profile, state, batch)
     WSGS:Debug(string.format("[SET][CHECK] build=%s associatedSetID=%s decision=verify-equipment",
         shown(profile and profile.name), shown(profile and profile.equipmentSetID)))
     if not profile or type(profile.name) ~= "string" or profile.name == "" then
@@ -223,7 +223,7 @@ function Sync:Run(profile, snapshot, batch)
     if not C_EquipmentSet.CanUseEquipmentSets() then
         return self:Block(profile, "Equipment Manager is unavailable for this character.")
     end
-    local comparison, problem = self:Check(profile, snapshot, batch)
+    local comparison, problem = self:Check(profile, state, batch)
     if not comparison then
         return self:Block(profile, "Target equipment is not fully verified: " .. problem)
     end
@@ -251,7 +251,7 @@ function Sync:Run(profile, snapshot, batch)
         if not setID then
             return self:Block(profile, "The created set was not returned by name lookup.")
         end
-        local verified, verifyProblem = self:VerifySaved(profile, setID, snapshot, eventSeen, icon)
+        local verified, verifyProblem = self:VerifySaved(profile, setID, state, eventSeen, icon)
         if not verified then
             return self:Block(profile, verifyProblem)
         end
@@ -289,7 +289,7 @@ function Sync:Run(profile, snapshot, batch)
         set, changed = renamed, true
     end
 
-    local contentsMatch, difference = self:SetMatchesSnapshot(set.id, snapshot)
+    local contentsMatch, difference = self:SetMatchesState(set.id, state)
     if contentsMatch == nil then
         return self:Block(profile, difference)
     end
@@ -304,7 +304,7 @@ function Sync:Run(profile, snapshot, batch)
         end
         changed = true
     end
-    local verified, verifyProblem = self:VerifySaved(profile, set.id, snapshot, eventSeen, icon)
+    local verified, verifyProblem = self:VerifySaved(profile, set.id, state, eventSeen, icon)
     if not verified then
         return self:Block(profile, verifyProblem)
     end
@@ -313,8 +313,8 @@ function Sync:Run(profile, snapshot, batch)
     return true
 end
 
-function Sync:Synchronize(profile, snapshot, batch)
-    local ok, result, reason = pcall(self.Run, self, profile, snapshot, batch)
+function Sync:Synchronize(profile, state, batch)
+    local ok, result, reason = pcall(self.Run, self, profile, state, batch)
     if not ok then
         return self:Block(profile, "Equipment Manager API error: " .. tostring(result))
     end

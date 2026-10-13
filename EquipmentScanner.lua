@@ -9,9 +9,6 @@ local function unknown(reason)
     }
 end
 
--- Confirmed event names for consumers; the scanner itself owns no listeners.
-Scanner.rescanEvents = {"PLAYER_EQUIPMENT_CHANGED", "GET_ITEM_INFO_RECEIVED", "ITEM_DATA_LOAD_RESULT"}
-
 function Scanner:Scan(onlyPosition)
     local snapshot = {
         capturedAt = time(),

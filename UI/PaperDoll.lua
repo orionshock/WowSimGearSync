@@ -1,5 +1,6 @@
 local _, WSGS = ...
 local UI = WSGS.UI
+local Equipment = WSGS:GetModule("Equipment")
 
 local Presentation = UI.SlotPresentation
 local fields = Presentation.fields
@@ -45,9 +46,12 @@ function UI:ShowSlotTooltip(button)
     GameTooltip:Show()
 end
 
-function UI:RenderPaperDoll(profile, snapshot, comparison, reason)
+function UI:RenderPaperDoll(state)
     local frame = self:CreatePaperDoll()
-    self.profile, self.snapshot, self.comparison, self.error = profile, snapshot, comparison, reason
+    local profile = state and state.build
+    local comparison = state and state.comparison
+    local reason = state and state.reason
+    self.profile, self.state, self.comparison, self.error = profile, state, comparison, reason
     if not frame.buildName:HasFocus() or frame.buildName.buildId ~= (profile and profile.id) then
         frame.buildName:SetText(profile and profile.name or "No active build")
     end
@@ -69,9 +73,10 @@ function UI:RenderPaperDoll(profile, snapshot, comparison, reason)
     end
     self.relevantItems = {}
     for position, button in ipairs(frame.slots) do
-        local target = profile and profile.equipment[position]
-        local difference = comparison and comparison.slots[position]
-        local current = snapshot and snapshot.slots[difference and difference.currentPosition or position]
+        local slotState = state and state.slots[position]
+        local target = slotState and slotState.target
+        local difference = slotState and slotState.comparison
+        local current = slotState and slotState.current
         button.target, button.current, button.difference = target, current, difference
         for _, item in ipairs({target or {}, current or {}}) do
             if item.id and item.id > 0 then
@@ -114,7 +119,7 @@ function UI:UpdateEquipButton()
     if not self.paperDoll then
         return
     end
-    local actions = WSGS.EquipmentActions
+    local actions = Equipment
     self.paperDoll.equipButton:SetText(equipButtonLabels[actions.state] or "Blocked")
     self.paperDoll.equipButton:SetEnabled(actions.state == "READY" or actions.state == "FAULT" or actions.state ==
                                               "COMPLETE")
@@ -196,7 +201,7 @@ function UI:CreatePaperDoll()
     equip:SetText("Equip")
     equip:Disable()
     equip:SetScript("OnClick", function()
-        WSGS.EquipmentActions:Click()
+        Equipment:Click()
     end)
     frame.equipButton = equip
     local note = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

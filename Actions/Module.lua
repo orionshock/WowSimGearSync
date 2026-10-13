@@ -1,5 +1,6 @@
 local _, WSGS = ...
 local Actions = WSGS:NewModule("Actions", "AceEvent-3.0")
+local Equipment = WSGS:GetModule("Equipment")
 WSGS.Actions = Actions
 
 local Internal = WSGS.ActionsInternal
@@ -142,26 +143,25 @@ local function logPlan(position, controller)
     end
 end
 
-local function rebuildController(position, profile, snapshot, comparison, bags)
+local function rebuildController(position, state)
     local previous = controllers[position]
-    local built = Internal.Planner:Build(position, profile, snapshot, comparison, bags)
-    built = carryPending(previous, built, comparison.slots[position])
+    local built = Internal.Planner:Build(position, state)
+    built = carryPending(previous, built, state.comparison.slots[position])
     controllers[position] = built
     logPlan(position, built)
     configureButton(position)
 end
 
-function Actions:Refresh(profile, snapshot, comparison)
-    if not profile or not snapshot or not comparison then
+function Actions:Refresh(state)
+    if not state or not state.build or not state.comparison then
         controllers = {}
         for position in pairs(buttons) do
             configureButton(position)
         end
         return
     end
-    local bags = WSGS.ModificationMaterials:ScanBags()
     for position = 1, 16 do
-        rebuildController(position, profile, snapshot, comparison, bags)
+        rebuildController(position, state)
     end
 end
 
@@ -175,10 +175,9 @@ local function refreshFromClient(self, reason)
     if not profile then
         return
     end
-    local snapshot = WSGS.EquipmentScanner:Scan()
-    local comparison = WSGS.EquipmentComparator:Compare(profile, snapshot)
-    if comparison then
-        self:Refresh(profile, snapshot, comparison)
+    local state = Equipment:RefreshState(profile, "SlotActions:" .. tostring(reason))
+    if state.comparison then
+        self:Refresh(state)
     end
     self:SendMessage("WSGS_ACTIONS_CHANGED", reason)
 end
@@ -664,11 +663,19 @@ function Actions:ACTION_WILL_BIND_ITEM(event, ...)
     confirmApplication(self, event, C_Item.ActionBindsItem, ...)
 end
 
+function Actions:WSGS_EQUIPMENT_STATE_INVALIDATED(_, event, ...)
+    if event == "PLAYER_EQUIPMENT_CHANGED" then
+        self:PLAYER_EQUIPMENT_CHANGED(event, ...)
+    elseif event == "BAG_UPDATE_DELAYED" then
+        self:BAG_UPDATE_DELAYED(event, ...)
+    elseif event == "ITEM_LOCK_CHANGED" then
+        self:ITEM_LOCK_CHANGED(event, ...)
+    end
+end
+
 function Actions:OnEnable()
     planSignatures = {}
-    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-    self:RegisterEvent("BAG_UPDATE_DELAYED")
-    self:RegisterEvent("ITEM_LOCK_CHANGED")
+    self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
     self:RegisterEvent("SOCKET_INFO_UPDATE")
     self:RegisterEvent("SOCKET_INFO_ACCEPT")
     self:RegisterEvent("SOCKET_INFO_SUCCESS")

@@ -1,5 +1,6 @@
 local _, WSGS = ...
 local UI = WSGS:NewModule("UI", "AceEvent-3.0")
+local Equipment = WSGS:GetModule("Equipment")
 WSGS.UI = UI
 
 function UI:RefreshEscapeWindow()
@@ -28,8 +29,8 @@ function UI:RefreshPaperDoll()
     if not self.paperDoll or not self.paperDoll:IsShown() then
         return
     end
-    local profile, snapshot, comparison, reason = WSGS.EquipmentActions:RefreshCurrentBuild()
-    self:RenderPaperDoll(profile, snapshot, comparison, reason)
+    local state = Equipment:RefreshCurrentBuild()
+    self:RenderPaperDoll(state)
 end
 
 function UI:QueuePaperDollRefresh(event, itemId, success)
@@ -68,9 +69,6 @@ function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED()
 end
 
 function UI:OnEnable()
-    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "QueuePaperDollRefresh")
-    self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "QueuePaperDollRefresh")
-    self:RegisterEvent("SKILL_LINES_CHANGED", "QueuePaperDollRefresh")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
     self:RegisterMessage("WSGS_ACTIONS_CHANGED")
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED")

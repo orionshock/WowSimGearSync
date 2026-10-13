@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local Equipment = WSGS:GetModule("Equipment")
 local labels = {
     item = "Item",
     gems = "Gems",
@@ -17,7 +18,8 @@ function WSGS:CompareLatestEquipment()
         self:Print("[COMPARE] Import a WoW Sims build before comparing equipment.")
         return
     end
-    local result, reason = self.EquipmentComparator:Compare(profile, self.EquipmentScanner:Scan())
+    local state = Equipment:GetState(profile)
+    local result, reason = state.comparison, state.reason
     if not result then
         self:Print("[COMPARE] " .. reason);
         return
@@ -65,7 +67,8 @@ function WSGS:ProbeEquipment(position)
         self:Print("[PROBE] Use an export position from 1 to 16.");
         return
     end
-    local current = self.EquipmentScanner:Scan(position).slots[position]
+    local state = Equipment:RefreshState(self:GetActiveSimulationProfile(), "ProbeEquipment")
+    local current = state.equipped[position]
     self:Print("[PROBE] " .. current.slotName .. " inventory=" .. current.slotId .. " item=" .. tostring(current.id))
     self:Print("[PROBE] Raw link: " ..
                    (current.link and (current.link:match("|H(item:[^|]+)|h") or current.link) or "unavailable"))

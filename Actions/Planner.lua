@@ -20,9 +20,9 @@ local function classify(controller, operation, prepared, reason, retryable)
     end
 end
 
-function Planner:Build(position, profile, snapshot, comparison, bags)
-    local target, difference = profile.equipment[position], comparison.slots[position]
-    local current = snapshot.slots[difference.currentPosition]
+function Planner:Build(position, state)
+    local target, difference = state.target[position], state.comparison.slots[position]
+    local current = state.slots[position].current
     local controller = {
         position = position,
         inventorySlot = difference.currentSlotId,
@@ -64,7 +64,7 @@ function Planner:Build(position, profile, snapshot, comparison, bags)
         inventorySlot = controller.inventorySlot,
         target = target,
         fields = difference.fields,
-        bags = bags
+        bags = state.materials
     }
     local professionSocket = difference.fields.professionSocket
     local buckle = difference.fields.buckle

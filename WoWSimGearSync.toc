@@ -29,8 +29,9 @@ ItemLinkDecoder.lua
 EquipmentInspector.lua
 EquipmentScanner.lua
 EquipmentComparator.lua
-EquipmentDiagnostics.lua
 EquipmentInventory.lua
+EquipmentState.lua
+EquipmentDiagnostics.lua
 EquipmentPlanner.lua
 EquipmentExecution.lua
 EquipmentSetSync.lua

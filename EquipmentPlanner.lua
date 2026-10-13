@@ -82,7 +82,12 @@ local function cost(target, candidate, position)
     return result
 end
 
-function Planner:Plan(profile, snapshot, inventory)
+function Planner:Plan(state)
+    local snapshot = {
+        slots = state.equipped,
+        context = state.context
+    }
+    local inventory = state.bags
     local plan = {
         operations = {},
         missing = {},
@@ -90,7 +95,7 @@ function Planner:Plan(profile, snapshot, inventory)
         assignments = {},
         unresolvedCount = 0
     }
-    local comparison, reason = WSGS.EquipmentComparator:Compare(profile, snapshot)
+    local comparison, reason = state.comparison, state.reason
     if not comparison then
         plan.blocked[1] = reason;
         return plan
@@ -101,8 +106,7 @@ function Planner:Plan(profile, snapshot, inventory)
         end
     end
     local used, candidates, counts, groups = {}, {}, {}, {}
-    for position, item in ipairs(snapshot.slots) do
-        item.position = position
+    for _, item in ipairs(snapshot.slots) do
         candidates[#candidates + 1] = item
     end
     for _, item in ipairs(inventory.items) do
@@ -115,7 +119,7 @@ function Planner:Plan(profile, snapshot, inventory)
     end
     -- Reserve every correctly equipped physical instance first, using the
     -- comparator's resolved ring/trinket mapping, even if modifications differ.
-    for position, target in ipairs(profile.equipment) do
+    for position, target in ipairs(state.target) do
         local physical = comparison.assignments[position]
         plan.assignments[position] = physical
         if present(target) then
@@ -209,7 +213,7 @@ function Planner:Plan(profile, snapshot, inventory)
             end
         end
     end
-    local main, off = profile.equipment[15], profile.equipment[16]
+    local main, off = state.target[15], state.target[16]
     local mainLoc, mainOperation -- supplied metadata only; no client calls in planner
     for _, operation in ipairs(plan.operations) do
         if operation.targetPosition == 15 then
@@ -221,7 +225,7 @@ function Planner:Plan(profile, snapshot, inventory)
         mainLoc = snapshot.slots[15].equipLoc
     end
     local freeIndex = 1
-    for position, target in ipairs(profile.equipment) do
+    for position, target in ipairs(state.target) do
         if not present(target) then
             local current = snapshot.slots[position]
             if current.observations.item.status ~= "KNOWN" then
