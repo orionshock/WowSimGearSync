@@ -153,10 +153,6 @@ local function scalarLines(fieldName, field)
     else
         local current = field.actualSpellName or effectName(fieldName, field.actual or field.actualSpellID, field)
         addPair(lines, current, effectName(fieldName, field.expected, field))
-        if fieldName == "tinker" and field.targetSource then
-            lines[#lines + 1] = field.targetSource == "RECOMMENDED" and "Source: Recommended Engineering default" or
-                                    "Source: WoW Sims export"
-        end
     end
     return lines
 end
@@ -174,9 +170,6 @@ local function outstandingLine(fieldName, field, item, actionState)
     end
     if field.state == "UNKNOWN" then
         return field.reason or "Current configuration is temporarily unavailable."
-    end
-    if field.state == "MISMATCH" then
-        return "Configuration incomplete."
     end
 end
 
@@ -212,9 +205,6 @@ function Presentation:ModificationIcons(difference, actionState)
                 lines = gemLines(field)
             else
                 lines = scalarLines(fieldName, field)
-            end
-            if definition.key == "tinker" and fieldName == "enchant" then
-                lines[#lines + 1] = "Source: WoW Sims export"
             end
             local outstanding = outstandingLine(fieldName, field, item, actionState)
             if outstanding then
