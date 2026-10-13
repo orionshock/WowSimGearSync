@@ -1,6 +1,7 @@
 local _, WSGS = ...
 local Sync = WSGS:NewModule("EquipmentSets", "AceEvent-3.0")
 WSGS.EquipmentSetSync = Sync
+local shirtSlot, rangedSlot, tabardSlot = INVSLOT_BODY, INVSLOT_RANGED, INVSLOT_TABARD
 
 local function shown(value)
     if value == nil or value == "" then
@@ -115,7 +116,29 @@ function Sync:Resolve(profile)
     end
 end
 
-local function captureIgnoredSlots()
+local function ignoredState(ignored)
+    if not ignored then
+        return "shirt=unknown tabard=unknown"
+    end
+    return string.format("shirt=%s tabard=%s", ignored[shirtSlot] and "ignored" or "included",
+        ignored[tabardSlot] and "ignored" or "included")
+end
+
+local function readSetIgnoredSlots(setID)
+    local ok, ignored = pcall(C_EquipmentSet.GetIgnoredSlots, setID)
+    if not ok or type(ignored) ~= "table" then
+        return nil, "saved ignored-slot state is unavailable"
+    end
+    if type(ignored[shirtSlot]) ~= "boolean" or type(ignored[tabardSlot]) ~= "boolean" then
+        return nil, "saved Shirt or Tabard ignored state is incomplete"
+    end
+    return {
+        [shirtSlot] = ignored[shirtSlot],
+        [tabardSlot] = ignored[tabardSlot]
+    }
+end
+
+local function captureSaveSelection()
     local ignored = {}
     for slot = 1, 19 do
         ignored[slot] = C_EquipmentSet.IsSlotIgnoredForSave(slot)
@@ -123,14 +146,18 @@ local function captureIgnoredSlots()
     return ignored
 end
 
-local function configureManagedSlots()
+local function configureManagedSlots(ignored)
     C_EquipmentSet.ClearIgnoredSlotsForSave()
-    C_EquipmentSet.IgnoreSlotForSave(4)
-    C_EquipmentSet.IgnoreSlotForSave(18)
-    C_EquipmentSet.IgnoreSlotForSave(19)
+    C_EquipmentSet.IgnoreSlotForSave(rangedSlot)
+    if ignored[shirtSlot] then
+        C_EquipmentSet.IgnoreSlotForSave(shirtSlot)
+    end
+    if ignored[tabardSlot] then
+        C_EquipmentSet.IgnoreSlotForSave(tabardSlot)
+    end
 end
 
-local function restoreIgnoredSlots(ignored)
+local function restoreSaveSelection(ignored)
     C_EquipmentSet.ClearIgnoredSlotsForSave()
     for slot = 1, 19 do
         if ignored[slot] then
@@ -139,8 +166,8 @@ local function restoreIgnoredSlots(ignored)
     end
 end
 
-function Sync:CallSave(action, setID, name, icon)
-    local ignored = captureIgnoredSlots()
+function Sync:CallSave(action, setID, name, icon, managedIgnored)
+    local saveSelection = captureSaveSelection()
     self.active = {
         eventSeen = false,
         action = action,
@@ -148,14 +175,14 @@ function Sync:CallSave(action, setID, name, icon)
         name = name
     }
     local ok, problem = pcall(function()
-        configureManagedSlots()
+        configureManagedSlots(managedIgnored)
         if action == "CREATE" then
             C_EquipmentSet.CreateEquipmentSet(name, icon)
         else
             C_EquipmentSet.SaveEquipmentSet(setID, icon)
         end
     end)
-    local restoreOK, restoreProblem = pcall(restoreIgnoredSlots, ignored)
+    local restoreOK, restoreProblem = pcall(restoreSaveSelection, saveSelection)
     local eventSeen = self.active.eventSeen
     self.active = nil
     if not ok then
@@ -186,7 +213,7 @@ function Sync:SetMatchesState(setID, state)
     return #mismatches == 0, #mismatches > 0 and table.concat(mismatches, ",") or nil
 end
 
-function Sync:VerifySaved(profile, setID, state, eventSeen, desiredIcon)
+function Sync:VerifySaved(profile, setID, state, eventSeen, desiredIcon, expectedIgnored, operation)
     local info = setInfo(setID)
     if not info then
         return nil, "The saved set could not be found after synchronization."
@@ -196,15 +223,26 @@ function Sync:VerifySaved(profile, setID, state, eventSeen, desiredIcon)
     end
     local matches, difference = self:SetMatchesState(setID, state)
     local iconMatch = not desiredIcon or info.icon == desiredIcon
+    local resultingIgnored, ignoredProblem = readSetIgnoredSlots(setID)
     WSGS:Debug(string.format(
         "[SET][VERIFY] build=%s setID=%d nameMatch=yes itemsMatch=%s desiredIcon=%s savedIcon=%s iconMatch=%s eventSeen=%s differences=%s",
         shown(profile.name), setID, matches and "yes" or "no", shown(desiredIcon), shown(info.icon),
         desiredIcon and (iconMatch and "yes" or "no") or "not-required", eventSeen and "yes" or "no", shown(difference)))
+    WSGS:Debug(string.format(
+        "[SET][VERIFY] build=%s setID=%d operation=%s expectedIgnored=%s resultingIgnored=%s",
+        shown(profile.name), setID, shown(operation), ignoredState(expectedIgnored), ignoredState(resultingIgnored)))
     if not matches then
         return nil, "Saved set contents did not match equipped items: " .. (difference or "unknown")
     end
     if not iconMatch then
         return nil, "The client did not apply the managed specialization icon."
+    end
+    if expectedIgnored and not resultingIgnored then
+        return nil, "Saved Shirt and Tabard ignored state could not be verified: " .. ignoredProblem
+    end
+    if expectedIgnored and (resultingIgnored[shirtSlot] ~= expectedIgnored[shirtSlot] or
+        resultingIgnored[tabardSlot] ~= expectedIgnored[tabardSlot]) then
+        return nil, "The client did not preserve the managed Shirt and Tabard ignored state."
     end
     profile.equipmentSetID, profile.equipmentSetName = setID, info.name
     return true
@@ -240,10 +278,14 @@ function Sync:Run(profile, state, batch)
         if C_EquipmentSet.GetNumEquipmentSets() >= MAX_EQUIPMENT_SETS_PER_PLAYER then
             return self:Block(profile, "The Equipment Manager set limit has been reached.")
         end
+        local createIgnored = {
+            [shirtSlot] = true,
+            [tabardSlot] = true
+        }
         WSGS:Debug(string.format(
-            "[SET][CREATE] build=%s setID=nil specID=%s icon=%s action=C_EquipmentSet.CreateEquipmentSet",
-            shown(profile.name), shown(specID), shown(icon)))
-        local ok, callProblem, eventSeen = self:CallSave("CREATE", nil, profile.name, icon)
+            "[SET][CREATE] build=%s setID=nil specID=%s icon=%s action=C_EquipmentSet.CreateEquipmentSet existingIgnored=%s resultingIgnored=%s",
+            shown(profile.name), shown(specID), shown(icon), ignoredState(nil), ignoredState(createIgnored)))
+        local ok, callProblem, eventSeen = self:CallSave("CREATE", nil, profile.name, icon, createIgnored)
         if not ok then
             return self:Block(profile, "CreateEquipmentSet failed: " .. callProblem)
         end
@@ -251,7 +293,8 @@ function Sync:Run(profile, state, batch)
         if not setID then
             return self:Block(profile, "The created set was not returned by name lookup.")
         end
-        local verified, verifyProblem = self:VerifySaved(profile, setID, state, eventSeen, icon)
+        local verified, verifyProblem =
+            self:VerifySaved(profile, setID, state, eventSeen, icon, createIgnored, "CREATE")
         if not verified then
             return self:Block(profile, verifyProblem)
         end
@@ -259,7 +302,19 @@ function Sync:Run(profile, state, batch)
         return true
     end
 
+    local existingIgnored, ignoredProblem = readSetIgnoredSlots(set.id)
+    WSGS:Debug(string.format(
+        "[SET][CHECK] build=%s setID=%d operation=UPDATE existingIgnored=%s resultingIgnored=%s",
+        shown(profile.name), set.id, ignoredState(existingIgnored), ignoredState(existingIgnored)))
+    local contentsMatch, difference = self:SetMatchesState(set.id, state)
+    if contentsMatch == nil then
+        return self:Block(profile, difference)
+    end
+    if not contentsMatch and not existingIgnored then
+        return self:Block(profile, "Cannot update equipment without preserving Shirt and Tabard: " .. ignoredProblem)
+    end
     local changed, eventSeen = false, false
+    local operation = "CHECK"
     local nameUpdate, iconUpdate = set.name ~= profile.name, icon and set.icon ~= icon or false
     WSGS:Debug(string.format(
         "[SET][CHECK] build=%s setID=%d specID=%s resolvedIcon=%s existingIcon=%s nameUpdate=%s iconUpdate=%s",
@@ -286,25 +341,23 @@ function Sync:Run(profile, state, batch)
         if not renamed or renamed.name ~= profile.name or icon and renamed.icon ~= icon then
             return self:Block(profile, "The client did not apply the managed set name or specialization icon.")
         end
-        set, changed = renamed, true
+        set, changed, operation = renamed, true, "MODIFY"
     end
 
-    local contentsMatch, difference = self:SetMatchesState(set.id, state)
-    if contentsMatch == nil then
-        return self:Block(profile, difference)
-    end
     if not contentsMatch then
         WSGS:Debug(string.format(
-            "[SET][UPDATE] build=%s setID=%d action=C_EquipmentSet.SaveEquipmentSet differences=%s",
-            shown(profile.name), set.id, shown(difference)))
-        local ok, callProblem, saveEvent = self:CallSave("UPDATE", set.id, profile.name, set.icon)
+            "[SET][UPDATE] build=%s setID=%d action=C_EquipmentSet.SaveEquipmentSet differences=%s existingIgnored=%s resultingIgnored=%s",
+            shown(profile.name), set.id, shown(difference), ignoredState(existingIgnored), ignoredState(existingIgnored)))
+        local ok, callProblem, saveEvent =
+            self:CallSave("UPDATE", set.id, profile.name, set.icon, existingIgnored)
         eventSeen = eventSeen or saveEvent
         if not ok then
             return self:Block(profile, "SaveEquipmentSet failed: " .. callProblem)
         end
-        changed = true
+        changed, operation = true, "UPDATE"
     end
-    local verified, verifyProblem = self:VerifySaved(profile, set.id, state, eventSeen, icon)
+    local verified, verifyProblem =
+        self:VerifySaved(profile, set.id, state, eventSeen, icon, existingIgnored, operation)
     if not verified then
         return self:Block(profile, verifyProblem)
     end
