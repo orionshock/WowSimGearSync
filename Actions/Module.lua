@@ -29,6 +29,11 @@ local function operationSatisfied(operation, difference, targetInstanceMatches)
     })
 end
 
+local function sameOperation(left, right)
+    return left and right and left.handlerName == right.handlerName and left.type == right.type and
+               left.field == right.field and left.socket == right.socket and left.expected == right.expected
+end
+
 local function configureButton(position)
     local button = buttons[position]
     if not button or InCombatLockdown() then
@@ -84,10 +89,15 @@ local function carryPending(previous, built, difference)
                     valueText(previous.pending.expected), valueText(actual), valueText(previous.targetGuid), detail))
             end
         end
-    elseif previous.lastFailed and built.prepared then
+    elseif previous.lastFailed and built.prepared and
+        (previous.failureScope ~= "OPERATION" or sameOperation(previous.lastFailed, built.prepared)) then
         built.state = "BLOCKED"
         built.lastFailed = previous.lastFailed
+        built.failureScope = previous.failureScope
         built.reason = previous.reason
+    elseif previous.lastFailed and built.prepared then
+        debug("PLAN", string.format("slot=%d failed=%s fallback=%s decision=use-next-ready", built.inventorySlot,
+            previous.lastFailed.type, built.prepared.type))
     end
     return built
 end
@@ -226,13 +236,15 @@ local function markPending(self, controller, operation, waitForSocketAccept)
     end
 end
 
-fail = function(self, controller, operation, reason)
+fail = function(self, controller, operation, reason, scope)
     controller.state = "BLOCKED"
     controller.reason = reason
     controller.lastFailed = operation
+    controller.failureScope = scope or "SLOT"
     controller.pending = nil
     controller.submitting = nil
-    debug("BLOCK", string.format("slot=%d type=%s reason=%s", controller.inventorySlot, operation.type, reason))
+    debug("BLOCK", string.format("slot=%d type=%s scope=%s reason=%s", controller.inventorySlot, operation.type,
+        controller.failureScope, reason))
     self:SendMessage("WSGS_ACTIONS_CHANGED", "FAILED")
 end
 
@@ -253,7 +265,7 @@ local function submitGem(self, controller, request)
     local operation = request.operation
     local ok, problem = pcall(SocketInventoryItem, request.inventorySlot)
     if not ok then
-        fail(self, controller, operation, "SocketInventoryItem failed: " .. tostring(problem))
+        fail(self, controller, operation, "SocketInventoryItem failed: " .. tostring(problem), "OPERATION")
         return false
     end
     markPending(self, controller, operation, true)
@@ -281,7 +293,8 @@ local function submitProfession(self, controller, request, button)
     end
     if not result or result.status ~= "SUBMITTED" then
         button.wsgsSubmission = nil
-        fail(self, controller, operation, result and result.reason or "Profession execution returned no result")
+        fail(self, controller, operation, result and result.reason or "Profession execution returned no result",
+            "OPERATION")
         return false
     end
     operation.spellID = result.spellID
@@ -296,25 +309,25 @@ local function submitItem(self, controller, request, button)
     local operation = request.operation
     local material = operation.material
     if not material then
-        fail(self, controller, operation, "Prepared material location is unavailable")
+        fail(self, controller, operation, "Prepared material location is unavailable", "OPERATION")
         return false
     end
     local current = C_Container.GetContainerItemInfo(material.bag, material.slot)
     if not current or current.itemID ~= material.itemID or current.isLocked then
-        fail(self, controller, operation, "Prepared material moved or became locked")
+        fail(self, controller, operation, "Prepared material moved or became locked", "OPERATION")
         return false
     end
     local guidOK, currentGuid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(material.bag,
         material.slot))
     if material.guid and (not guidOK or currentGuid ~= material.guid) then
-        fail(self, controller, operation, "Prepared material instance moved; rescan before retrying")
+        fail(self, controller, operation, "Prepared material instance moved; rescan before retrying", "OPERATION")
         return false
     end
     configureButton(controller.position)
     local expectedItem = string.format("%d %d", material.bag, material.slot)
     if button:GetAttribute("type1") ~= "item" or button:GetAttribute("target-slot1") ~= controller.inventorySlot or
         button:GetAttribute("item1") ~= expectedItem then
-        fail(self, controller, operation, "Secure action could not be prepared")
+        fail(self, controller, operation, "Secure action could not be prepared", "OPERATION")
         return false
     end
     controller.submitting = operation
