@@ -42,11 +42,10 @@ Presentation.modifications = {{
     texture = 459028
 }}
 
-Presentation.colors = {
-    MATCH = {0.30, 1.00, 0.40},
-    INCOMPLETE = {1.00, 0.70, 0.15},
-    BLOCKED = {1.00, 0.25, 0.25},
-    UNKNOWN = {0.55, 0.70, 1.00}
+Presentation.complete = {
+    key = "complete",
+    label = "Configuration complete",
+    texture = "Interface\\RaidFrame\\ReadyCheck-Ready"
 }
 
 local function itemName(itemID, emptyText)
@@ -95,14 +94,14 @@ local function fieldFor(definition, fields)
 end
 
 local function presentationState(fieldName, field, item, actionState)
+    if field.state == "MATCH" then
+        return "MATCH"
+    end
     if item and item.state == "MISMATCH" then
         return "BLOCKED"
     end
     if actionState and actionState.state == "BLOCKED" and actionState.nextField == fieldName then
         return "BLOCKED"
-    end
-    if field.state == "MATCH" then
-        return "MATCH"
     end
     if field.state == "MISMATCH" then
         return "INCOMPLETE"
@@ -181,6 +180,21 @@ local function outstandingLine(fieldName, field, item, actionState)
     end
 end
 
+local function configurationComplete(fields)
+    if not fields.item or fields.item.state ~= "MATCH" then
+        return false
+    end
+    for _, fieldName in ipairs(Presentation.fields) do
+        if fieldName ~= "item" then
+            local field = fields[fieldName]
+            if not field or field.state ~= "MATCH" and field.state ~= "NOT_APPLICABLE" then
+                return false
+            end
+        end
+    end
+    return true
+end
+
 function Presentation:ModificationIcons(difference, actionState)
     local result = {}
     if not difference or not difference.fields then
@@ -189,7 +203,8 @@ function Presentation:ModificationIcons(difference, actionState)
     local item = difference.fields.item
     for _, definition in ipairs(self.modifications) do
         local fieldName, field = fieldFor(definition, difference.fields)
-        if field then
+        local state = field and presentationState(fieldName, field, item, actionState)
+        if field and state ~= "MATCH" then
             local lines
             if definition.key == "additionalSocket" then
                 lines = socketLines(fieldName, field)
@@ -209,10 +224,19 @@ function Presentation:ModificationIcons(difference, actionState)
                 key = definition.key,
                 label = definition.label,
                 texture = definition.texture,
-                state = presentationState(fieldName, field, item, actionState),
+                state = state,
                 lines = lines
             }
         end
+    end
+    if #result == 0 and configurationComplete(difference.fields) then
+        result[1] = {
+            key = self.complete.key,
+            label = self.complete.label,
+            texture = self.complete.texture,
+            state = "COMPLETE",
+            lines = {}
+        }
     end
     return result
 end

@@ -111,9 +111,8 @@ function UI:RenderPaperDoll(state)
             local status = statuses[index]
             icon.presentation = status
             if status then
-                local tint = Presentation.colors[status.state] or Presentation.colors.UNKNOWN
                 icon.texture:SetTexture(status.texture)
-                icon.texture:SetVertexColor(tint[1], tint[2], tint[3])
+                icon.texture:SetVertexColor(1, 1, 1)
                 icon:Show()
             else
                 icon:Hide()
@@ -126,8 +125,13 @@ function UI:RenderPaperDoll(state)
     end
     if self.hovered and frame:IsShown() then
         self:ShowSlotTooltip(self.hovered)
-    elseif self.hoveredIcon and self.hoveredIcon:IsShown() then
-        self:ShowModificationTooltip(self.hoveredIcon)
+    elseif self.hoveredIcon then
+        if self.hoveredIcon:IsShown() then
+            self:ShowModificationTooltip(self.hoveredIcon)
+        else
+            self.hoveredIcon = nil
+            GameTooltip:Hide()
+        end
     end
 end
 
