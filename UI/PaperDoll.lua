@@ -3,6 +3,8 @@ local UI = WSGS.UI
 local Equipment = WSGS:GetModule("Equipment")
 
 local Presentation = UI.SlotPresentation
+local FRAME_WIDTH, FRAME_HEIGHT = 550, 580
+local SLOT_SIDE_INSET, SLOT_TOP_OFFSET, SLOT_ROW_SPACING = 18, 104, 50
 local equipButtonLabels = {
     READY = "Equip",
     PENDING = "Equipping",
@@ -155,7 +157,7 @@ function UI:CreatePaperDoll()
     local frame = CreateFrame("Frame", "WSGSPaperDoll", UIParent, "PortraitFrameTemplate")
     self.paperDoll, self.requestedItems, self.relevantItems = frame, {}, {}
     frame:Hide()
-    frame:SetSize(650, 690)
+    frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetMovable(true)
@@ -203,7 +205,7 @@ function UI:CreatePaperDoll()
     end)
     local import = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     import:SetSize(100, 24)
-    import:SetPoint("TOPLEFT", 70, -62)
+    import:SetPoint("TOPLEFT", 44, -62)
     import:SetText("Import")
     import:SetScript("OnClick", function()
         self:ShowImportDialog()
@@ -211,7 +213,7 @@ function UI:CreatePaperDoll()
     frame.importButton = import
     local equip = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     equip:SetSize(100, 24)
-    equip:SetPoint("TOPRIGHT", -40, -62)
+    equip:SetPoint("TOPRIGHT", -44, -62)
     equip:SetText("Equip")
     equip:Disable()
     equip:SetScript("OnClick", function()
@@ -219,8 +221,8 @@ function UI:CreatePaperDoll()
     end)
     frame.equipButton = equip
     local note = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    note:SetPoint("TOPRIGHT", -20, -90)
-    note:SetWidth(440)
+    note:SetPoint("TOPRIGHT", -18, -88)
+    note:SetWidth(400)
     note:SetJustifyH("RIGHT")
     frame.equipNote = note
     frame.slots = {}
@@ -232,9 +234,10 @@ function UI:CreatePaperDoll()
         local leftColumn = position <= 6 or position >= 15
         if leftColumn then
             local row = position <= 6 and position or position - 8
-            button:SetPoint("TOPLEFT", 18, -112 - (row - 1) * 54)
+            button:SetPoint("TOPLEFT", SLOT_SIDE_INSET, -SLOT_TOP_OFFSET - (row - 1) * SLOT_ROW_SPACING)
         else
-            button:SetPoint("TOPRIGHT", -18, -112 - (position - 7) * 54)
+            button:SetPoint("TOPRIGHT", -SLOT_SIDE_INSET,
+                -SLOT_TOP_OFFSET - (position - 7) * SLOT_ROW_SPACING)
         end
         button.icon = button:CreateTexture(nil, "ARTWORK")
         button.icon:SetAllPoints()
@@ -295,13 +298,13 @@ function UI:CreatePaperDoll()
         WSGS.Actions:RegisterSlotButton(position, button)
     end
     local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    legend:SetPoint("CENTER", 0, 20)
+    legend:SetPoint("CENTER", 0, 8)
     legend:SetWidth(150)
     legend:SetText("Hover a slot for details.")
     frame.helpHint = legend
     frame.summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.summary:SetPoint("BOTTOM", 0, 30)
-    frame.summary:SetWidth(610)
+    frame.summary:SetPoint("BOTTOM", 0, 20)
+    frame.summary:SetWidth(510)
     frame:SetScript("OnShow", function()
         self:RefreshEscapeWindow()
         self.requestedItems = {}
