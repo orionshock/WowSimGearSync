@@ -20,10 +20,11 @@ local function selectedOperation(controller)
                controller.blocked[1])
 end
 
-local function operationSatisfied(operation, difference)
+local function operationSatisfied(operation, difference, targetInstanceMatches)
     return operation.handler:Verify({
         operation = operation,
-        difference = difference
+        difference = difference,
+        targetInstanceMatches = targetInstanceMatches
     })
 end
 
@@ -52,7 +53,7 @@ local function carryPending(previous, built, difference)
     end
     if previous.pending then
         local sameInstance = previous.targetGuid == built.targetGuid
-        local satisfied, detail, actual = operationSatisfied(previous.pending, difference)
+        local satisfied, detail, actual = operationSatisfied(previous.pending, difference, sameInstance)
         if sameInstance and satisfied then
             debug("VERIFY", string.format(
                 "slot=%d handler=%s type=%s expected=%s actual=%s guid=%s result=MATCH", previous.inventorySlot,

@@ -44,7 +44,11 @@ end
 
 local function verify(context)
     local operation, difference = context.operation, context.difference
-    if not difference or difference.fields.item.state ~= "MATCH" then
+    if not difference then
+        return false, "comparison unavailable"
+    end
+    local itemState = difference.fields.item.state
+    if itemState ~= "MATCH" and (itemState ~= "UNKNOWN" or not context.targetInstanceMatches) then
         return false, "target item no longer equipped"
     end
     local field = difference.fields[operation.field]
