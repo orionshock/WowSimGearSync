@@ -293,6 +293,15 @@ function Sync:Run(profile, state, batch)
         if not setID then
             return self:Block(profile, "The created set was not returned by name lookup.")
         end
+        WSGS:Debug(string.format(
+            "[SET][CREATE] build=%s setID=%d action=C_EquipmentSet.SaveEquipmentSet reason=apply-ignored-slots resultingIgnored=%s",
+            shown(profile.name), setID, ignoredState(createIgnored)))
+        local saved, saveProblem, saveEvent =
+            self:CallSave("CREATE_SAVE", setID, profile.name, icon, createIgnored)
+        eventSeen = eventSeen or saveEvent
+        if not saved then
+            return self:Block(profile, "SaveEquipmentSet after creation failed: " .. saveProblem)
+        end
         local verified, verifyProblem =
             self:VerifySaved(profile, setID, state, eventSeen, icon, createIgnored, "CREATE")
         if not verified then
