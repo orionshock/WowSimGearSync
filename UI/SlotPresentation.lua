@@ -94,23 +94,11 @@ local function fieldFor(definition, fields)
     end
 end
 
-local function fieldMatches(definition, fieldName)
-    if not fieldName then
-        return false
-    end
-    for _, candidate in ipairs(definition.fields) do
-        if candidate == fieldName then
-            return true
-        end
-    end
-    return false
-end
-
-local function presentationState(definition, field, item, actionState)
+local function presentationState(fieldName, field, item, actionState)
     if item and item.state == "MISMATCH" then
         return "BLOCKED"
     end
-    if actionState and actionState.state == "BLOCKED" and fieldMatches(definition, actionState.nextField) then
+    if actionState and actionState.state == "BLOCKED" and actionState.nextField == fieldName then
         return "BLOCKED"
     end
     if field.state == "MATCH" then
@@ -174,11 +162,11 @@ local function scalarLines(fieldName, field)
     return lines
 end
 
-local function outstandingLine(definition, field, item, actionState)
+local function outstandingLine(fieldName, field, item, actionState)
     if item and item.state == "MISMATCH" then
         return "Target item must be equipped first."
     end
-    if actionState and fieldMatches(definition, actionState.nextField) then
+    if actionState and actionState.nextField == fieldName then
         if actionState.state == "BLOCKED" and actionState.reason then
             return actionState.reason
         elseif actionState.state == "PENDING" then
@@ -213,7 +201,7 @@ function Presentation:ModificationIcons(difference, actionState)
             if definition.key == "tinker" and fieldName == "enchant" then
                 lines[#lines + 1] = "Source: WoW Sims export"
             end
-            local outstanding = outstandingLine(definition, field, item, actionState)
+            local outstanding = outstandingLine(fieldName, field, item, actionState)
             if outstanding then
                 lines[#lines + 1] = outstanding
             end
@@ -221,7 +209,7 @@ function Presentation:ModificationIcons(difference, actionState)
                 key = definition.key,
                 label = definition.label,
                 texture = definition.texture,
-                state = presentationState(definition, field, item, actionState),
+                state = presentationState(fieldName, field, item, actionState),
                 lines = lines
             }
         end
