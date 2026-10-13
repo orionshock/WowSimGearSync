@@ -5,8 +5,6 @@ local observationEvents = {
     PLAYER_EQUIPMENT_CHANGED = true,
     BAG_UPDATE_DELAYED = true,
     ITEM_LOCK_CHANGED = true,
-    GET_ITEM_INFO_RECEIVED = true,
-    ITEM_DATA_LOAD_RESULT = true,
     SPELLS_CHANGED = true,
     SKILL_LINES_CHANGED = true
 }
@@ -119,8 +117,11 @@ local function capture(build, consumer)
 end
 
 function Equipment:InvalidateState(reason, ...)
+    local alreadyInvalid = self.stateInvalid
     self.stateInvalid = true
-    WSGS:Debug(string.format("[STATE][INVALIDATE] reason=%s", shown(reason)))
+    if not alreadyInvalid then
+        WSGS:Debug(string.format("[STATE][INVALIDATE] reason=%s", shown(reason)))
+    end
     self:SendMessage("WSGS_EQUIPMENT_STATE_INVALIDATED", reason, ...)
 end
 
@@ -147,6 +148,28 @@ function Equipment:IsObservationEvent(event)
     return observationEvents[event] == true
 end
 
+local function itemIsRelevant(state, itemID)
+    if not state or type(itemID) ~= "number" then
+        return false
+    end
+    for position = 1, 16 do
+        local target = state.target and state.target[position]
+        local current = state.equipped[position]
+        if (target and target.id == itemID) or (current and current.id == itemID) then
+            return true
+        end
+    end
+    return false
+end
+
+function Equipment:OnItemDataEvent(event, itemID, success)
+    if not success or not itemIsRelevant(self.equipmentState, itemID) then
+        return
+    end
+    self:InvalidateState(event, itemID, success)
+    self:QueueRefresh(event)
+end
+
 function Equipment:WSGS_BUILD_IMPORTED(event)
     self:InvalidateState(event)
 end
@@ -159,8 +182,8 @@ function Equipment:OnEnable()
     self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnEquipmentStateEvent")
     self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnEquipmentStateEvent")
     self:RegisterEvent("UI_ERROR_MESSAGE")
-    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnEquipmentStateEvent")
-    self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "OnEquipmentStateEvent")
+    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnItemDataEvent")
+    self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "OnItemDataEvent")
     self:RegisterEvent("SPELLS_CHANGED", "OnEquipmentStateEvent")
     self:RegisterEvent("SKILL_LINES_CHANGED", "OnEquipmentStateEvent")
     self:RegisterEvent("CURSOR_CHANGED", "OnEquipmentStateEvent")
