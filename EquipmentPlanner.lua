@@ -82,56 +82,71 @@ local function cost(target, candidate, position)
     return result
 end
 
-function Planner:Plan(state)
-    local snapshot = {
-        slots = state.equipped,
-        context = state.context
+local function captureInputs(state)
+    local context = {
+        state = state,
+        snapshot = {
+            slots = state.equipped,
+            context = state.context
+        },
+        inventory = state.bags,
+        comparison = state.comparison,
+        candidates = {},
+        fingerprintCounts = {},
+        used = {},
+        targetGroups = {},
+        plan = {
+            operations = {},
+            missing = {},
+            blocked = {},
+            assignments = {},
+            unresolvedCount = 0
+        }
     }
-    local inventory = state.bags
-    local plan = {
-        operations = {},
-        missing = {},
-        blocked = {},
-        assignments = {},
-        unresolvedCount = 0
-    }
-    local comparison, reason = state.comparison, state.reason
-    if not comparison then
-        plan.blocked[1] = reason;
-        return plan
-    end
-    for _, slot in ipairs(comparison.slots) do
-        if slot.fields.item.state ~= "MATCH" then
-            plan.unresolvedCount = plan.unresolvedCount + 1
+    if context.comparison then
+        for _, slot in ipairs(context.comparison.slots) do
+            if slot.fields.item.state ~= "MATCH" then
+                context.plan.unresolvedCount = context.plan.unresolvedCount + 1
+            end
         end
     end
-    local used, candidates, counts, groups = {}, {}, {}, {}
-    for _, item in ipairs(snapshot.slots) do
-        candidates[#candidates + 1] = item
+    return context
+end
+
+local function collectCandidates(context)
+    for _, item in ipairs(context.snapshot.slots) do
+        context.candidates[#context.candidates + 1] = item
     end
-    for _, item in ipairs(inventory.items) do
-        candidates[#candidates + 1] = item
+    for _, item in ipairs(context.inventory.items) do
+        context.candidates[#context.candidates + 1] = item
     end
-    for _, item in ipairs(candidates) do
+    for _, item in ipairs(context.candidates) do
         if item.id and item.fingerprint then
-            counts[item.fingerprint] = (counts[item.fingerprint] or 0) + 1
+            context.fingerprintCounts[item.fingerprint] =
+                (context.fingerprintCounts[item.fingerprint] or 0) + 1
         end
     end
-    -- Reserve every correctly equipped physical instance first, using the
-    -- comparator's resolved ring/trinket mapping, even if modifications differ.
+end
+
+-- The comparator has already resolved interchangeable ring/trinket positions.
+-- Reserve those physical instances before looking for replacements so the
+-- planner does not duplicate comparison policy or steal a matched instance.
+local function reserveResolvedAssignments(context)
+    local state, comparison, snapshot = context.state, context.comparison, context.snapshot
     for position, target in ipairs(state.target) do
         local physical = comparison.assignments[position]
-        plan.assignments[position] = physical
+        context.plan.assignments[position] = physical
         if present(target) then
             local current = snapshot.slots[physical]
-            if comparison.slots[position].fields.item.state == "MATCH" then
-                used[identity(current)] = true
-            elseif comparison.slots[position].fields.item.state == "UNKNOWN" or current.locked then
-                plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
-                                                      ": equipped identity unavailable or locked."
+            local itemState = comparison.slots[position].fields.item.state
+            if itemState == "MATCH" then
+                context.used[identity(current)] = true
+            elseif itemState == "UNKNOWN" or current.locked then
+                context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                                                                         ": equipped identity unavailable or locked."
             else
-                groups[target.id] = groups[target.id] or {}
-                groups[target.id][#groups[target.id] + 1] = {
+                context.targetGroups[target.id] = context.targetGroups[target.id] or {}
+                context.targetGroups[target.id][#context.targetGroups[target.id] + 1] = {
                     position = position,
                     physical = physical,
                     target = target
@@ -139,109 +154,113 @@ function Planner:Plan(state)
             end
         end
     end
-    for id, targets in pairs(groups) do
-        local available = {}
-        for _, item in ipairs(candidates) do
-            if item.id == id and not used[identity(item)] then
-                available[#available + 1] = item
+end
+
+local function matchTargetGroup(context, id, targets)
+    local available = {}
+    for _, item in ipairs(context.candidates) do
+        if item.id == id and not context.used[identity(item)] then
+            available[#available + 1] = item
+        end
+    end
+    -- A valid equippable ID can occupy at most the two ring/trinket/weapon
+    -- positions. Enumerating both assignments avoids greedy duplicate theft.
+    if #targets > 2 then
+        context.plan.blocked[#context.plan.blocked + 1] =
+            "Item " .. id .. " requested in more than two incompatible positions."
+        return
+    end
+
+    local best, bestScore, assigned = nil, math.huge, {}
+    local function choose(index, score, reserved)
+        if index > #targets then
+            if score < bestScore then
+                bestScore, best = score, {}
+                for candidateIndex, candidate in pairs(assigned) do
+                    best[candidateIndex] = candidate
+                end
+            end
+            return
+        end
+        local target = targets[index]
+        assigned[index] = nil
+        choose(index + 1, score + 100000, reserved)
+        for _, item in ipairs(available) do
+            local key = identity(item)
+            if not reserved[key] and not item.locked and item.fingerprint and
+                locations[target.position][item.equipLoc] and
+                (target.position ~= 16 or item.equipLoc ~= "INVTYPE_2HWEAPON" or context.snapshot.context and
+                    context.snapshot.context.titansGrip) and
+                (item.guid or context.fingerprintCounts[item.fingerprint] == 1) then
+                reserved[key], assigned[index] = true, item
+                choose(index + 1, score + cost(target.target, item, target.position), reserved)
+                reserved[key], assigned[index] = nil, nil
             end
         end
-        -- A valid equippable ID can occupy at most the two ring/trinket/weapon
-        -- positions. Enumerating both assignments avoids greedy duplicate theft.
-        if #targets > 2 then
-            plan.blocked[#plan.blocked + 1] = "Item " .. id .. " requested in more than two incompatible positions."
+    end
+    choose(1, 0, {})
+
+    local unique = {}
+    for _, item in ipairs(available) do
+        unique[identity(item)] = true
+    end
+    local physicalCount = 0
+    for _ in pairs(unique) do
+        physicalCount = physicalCount + 1
+    end
+    local shortage = math.max(0, #targets - physicalCount)
+    for index, target in ipairs(targets) do
+        local item = best[index]
+        if item then
+            context.used[identity(item)] = true
+            context.plan.operations[#context.plan.operations + 1] = {
+                kind = "EQUIP",
+                source = item,
+                position = target.physical,
+                targetPosition = target.position,
+                slotId = WSGS.equipmentSlots[target.physical].id,
+                id = id,
+                direct = context.fingerprintCounts[item.fingerprint] == 1
+            }
+        elseif shortage > 0 then
+            shortage = shortage - 1
+            context.plan.missing[#context.plan.missing + 1] = {
+                position = target.position,
+                id = id
+            }
         else
-            local best, bestScore, assigned = nil, math.huge, {}
-            local function choose(index, score, reserved)
-                if index > #targets then
-                    if score < bestScore then
-                        bestScore, best = score, {}
-                        for i, candidate in pairs(assigned) do
-                            best[i] = candidate
-                        end
-                    end
-                    return
-                end
-                local target = targets[index]
-                assigned[index] = nil
-                choose(index + 1, score + 100000, reserved)
-                for _, item in ipairs(available) do
-                    local key = identity(item)
-                    if not reserved[key] and not item.locked and item.fingerprint and
-                        locations[target.position][item.equipLoc] and
-                        (target.position ~= 16 or item.equipLoc ~= "INVTYPE_2HWEAPON" or snapshot.context and
-                            snapshot.context.titansGrip) and (item.guid or counts[item.fingerprint] == 1) then
-                        reserved[key], assigned[index] = true, item
-                        choose(index + 1, score + cost(target.target, item, target.position), reserved)
-                        reserved[key], assigned[index] = nil, nil
-                    end
-                end
-            end
-            choose(1, 0, {})
-            local unique = {}
-            for _, item in ipairs(available) do
-                unique[identity(item)] = true
-            end
-            local physicalCount = 0
-            for _ in pairs(unique) do
-                physicalCount = physicalCount + 1
-            end
-            local shortage = math.max(0, #targets - physicalCount)
-            for index, target in ipairs(targets) do
-                local item = best[index]
-                if item then
-                    used[identity(item)] = true
-                    plan.operations[#plan.operations + 1] = {
-                        kind = "EQUIP",
-                        source = item,
-                        position = target.physical,
-                        targetPosition = target.position,
-                        slotId = WSGS.equipmentSlots[target.physical].id,
-                        id = id,
-                        direct = counts[item.fingerprint] == 1
-                    }
-                elseif shortage > 0 then
-                    shortage = shortage - 1
-                    plan.missing[#plan.missing + 1] = {
-                        position = target.position,
-                        id = id
-                    }
-                else
-                    plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[target.position].name .. ": item " .. id ..
-                                                          " is locked, unreadable, incompatible, or has ambiguous duplicate instances."
-                end
-            end
+            context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[target.position].name ..
+                                                                     ": item " .. id ..
+                                                                     " is locked, unreadable, incompatible, or has ambiguous duplicate instances."
         end
     end
-    local main, off = state.target[15], state.target[16]
-    local mainLoc, mainOperation -- supplied metadata only; no client calls in planner
-    for _, operation in ipairs(plan.operations) do
-        if operation.targetPosition == 15 then
-            mainLoc, mainOperation = operation.source.equipLoc, operation
-            break
-        end
+end
+
+local function matchTargetInstances(context)
+    for id, targets in pairs(context.targetGroups) do
+        matchTargetGroup(context, id, targets)
     end
-    if not mainLoc and present(main) and snapshot.slots[15].id == main.id then
-        mainLoc = snapshot.slots[15].equipLoc
-    end
+end
+
+local function allocateBagDestinations(context)
     local freeIndex = 1
-    for position, target in ipairs(state.target) do
+    for position, target in ipairs(context.state.target) do
         if not present(target) then
-            local current = snapshot.slots[position]
+            local current = context.snapshot.slots[position]
             if current.observations.item.status ~= "KNOWN" then
-                plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
-                                                      ": equipped identity is unavailable."
+                context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                                                                         ": equipped identity is unavailable."
             elseif current.id then
-                local destination = inventory.free[freeIndex]
+                local destination = context.inventory.free[freeIndex]
                 if current.locked or not (current.guid or current.fingerprint) then
-                    plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
-                                                          ": equipped item is locked or unreadable."
+                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                                                                             ": equipped item is locked or unreadable."
                 elseif not destination then
-                    plan.blocked[#plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
-                                                          ": no empty general bag slot is available."
+                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                                                                             ": no empty general bag slot is available."
                 else
                     freeIndex = freeIndex + 1
-                    plan.operations[#plan.operations + 1] = {
+                    context.plan.operations[#context.plan.operations + 1] = {
                         kind = "UNEQUIP",
                         source = current,
                         destination = destination,
@@ -254,12 +273,28 @@ function Planner:Plan(state)
             end
         end
     end
+end
+
+local function resolveWeaponDependencies(context)
+    local state, snapshot, plan = context.state, context.snapshot, context.plan
+    local main, off = state.target[15], state.target[16]
+    local mainLoc, mainOperation -- supplied metadata only; no client calls in planner
+    for _, operation in ipairs(plan.operations) do
+        if operation.kind == "EQUIP" and operation.targetPosition == 15 then
+            mainLoc, mainOperation = operation.source.equipLoc, operation
+            break
+        end
+    end
+    if not mainLoc and present(main) and snapshot.slots[15].id == main.id then
+        mainLoc = snapshot.slots[15].equipLoc
+    end
+
     local grip = snapshot.context and snapshot.context.titansGrip
     local currentMain, currentOff = snapshot.slots[15], snapshot.slots[16]
     local offUnequip
     for _, operation in ipairs(plan.operations) do
         if operation.kind == "UNEQUIP" and operation.position == 16 then
-            offUnequip = operation;
+            offUnequip = operation
             break
         end
     end
@@ -272,6 +307,7 @@ function Planner:Plan(state)
             end
         end
     end
+
     local weaponWork
     for _, operation in ipairs(plan.operations) do
         if operation.position >= 15 then
@@ -310,16 +346,21 @@ function Planner:Plan(state)
         end
         plan.blocked[#plan.blocked + 1] = "Off hand waits until the two-handed main hand can be replaced."
     end
+    context.mainLoc, context.mainOperation = mainLoc, mainOperation
+end
+
+local function orderOperations(context)
     -- Ordinary slots go first so a weapon rejection cannot prevent independent
     -- changes. For weapons, clear an unwanted off hand before a two-hander;
     -- otherwise replace the main hand before attempting the off hand.
     local offOperation
-    for _, operation in ipairs(plan.operations) do
+    for _, operation in ipairs(context.plan.operations) do
         if operation.kind == "EQUIP" and operation.position == 16 then
-            offOperation = operation;
+            offOperation = operation
             break
         end
     end
+    local mainOperation = context.mainOperation
     local offUsesMain = offOperation and offOperation.source.bag == nil and offOperation.source.position == 15 and
                             not (mainOperation and mainOperation.source.bag == nil and mainOperation.source.position ==
                                 16)
@@ -327,7 +368,7 @@ function Planner:Plan(state)
         if operation.position < 15 then
             return operation.position
         end
-        if operation.kind == "UNEQUIP" and operation.position == 16 and mainLoc == "INVTYPE_2HWEAPON" then
+        if operation.kind == "UNEQUIP" and operation.position == 16 and context.mainLoc == "INVTYPE_2HWEAPON" then
             return 20
         end
         if operation == offOperation and offUsesMain then
@@ -338,9 +379,23 @@ function Planner:Plan(state)
         end
         return 22
     end
-    table.sort(plan.operations, function(a, b)
+    table.sort(context.plan.operations, function(a, b)
         local first, second = order(a), order(b)
         return first == second and a.position < b.position or first < second
     end)
-    return plan
+end
+
+function Planner:Plan(state)
+    local context = captureInputs(state)
+    if not context.comparison then
+        context.plan.blocked[1] = state.reason
+        return context.plan
+    end
+    collectCandidates(context)
+    reserveResolvedAssignments(context)
+    matchTargetInstances(context)
+    allocateBagDestinations(context)
+    resolveWeaponDependencies(context)
+    orderOperations(context)
+    return context.plan
 end
