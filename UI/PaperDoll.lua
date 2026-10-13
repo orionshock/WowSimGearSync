@@ -3,7 +3,6 @@ local UI = WSGS.UI
 local Equipment = WSGS:GetModule("Equipment")
 
 local Presentation = UI.SlotPresentation
-local fields = Presentation.fields
 local equipButtonLabels = {
     READY = "Equip",
     PENDING = "Equipping",
@@ -13,34 +12,36 @@ local equipButtonLabels = {
     BLOCKED = "Blocked",
     COMPLETE = "Sync Set"
 }
--- Translate comparator states into presentation only; no item/modification
--- comparison or interchangeable-slot assignment is performed here.
-local function visualState(target, difference)
-    if not target or target.empty or not target.id or target.id == 0 then
-        return "EMPTY"
-    end
-    if not difference or difference.fields.item.state == "UNKNOWN" then
-        return "UNKNOWN"
-    end
-    if difference.fields.item.state == "MISMATCH" then
-        return "MISMATCH"
-    end
-    local mismatch, unknown
-    for _, field in ipairs(fields) do
-        local state = difference.fields[field].state
-        mismatch = mismatch or state == "MISMATCH"
-        unknown = unknown or state == "UNKNOWN"
-    end
-    return mismatch and "CONFIGURATION" or unknown and "UNKNOWN" or "MATCH", unknown
-end
 
 function UI:ShowSlotTooltip(button)
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-    for _, line in ipairs(Presentation:TooltipLines(button, WSGS.db.profile.debug)) do
-        GameTooltip:AddLine(line, 1, 1, 1, true)
+    GameTooltip:ClearLines()
+    local title, red, green, blue, action = Presentation:ItemTooltip(button.target,
+        button.actionState or WSGS.Actions:GetSlotState(button.position))
+    GameTooltip:AddLine(title, red, green, blue)
+    if action then
+        GameTooltip:AddLine(action, 1, 1, 1, true)
     end
-    local actionState = WSGS.Actions:GetSlotState(button.position)
-    for _, line in ipairs(actionState.tooltipLines) do
+    GameTooltip:Show()
+end
+
+function UI:ShowModificationTooltip(icon)
+    local status = icon.presentation
+    if status and icon.owner then
+        for _, current in ipairs(Presentation:ModificationIcons(icon.owner.difference, icon.owner.actionState)) do
+            if current.key == status.key then
+                status, icon.presentation = current, current
+                break
+            end
+        end
+    end
+    if not status then
+        return
+    end
+    GameTooltip:SetOwner(icon, "ANCHOR_RIGHT")
+    GameTooltip:ClearLines()
+    GameTooltip:AddLine(status.label, 1, 1, 1)
+    for _, line in ipairs(status.lines) do
         GameTooltip:AddLine(line, 1, 1, 1, true)
     end
     GameTooltip:Show()
@@ -101,10 +102,21 @@ function UI:RenderPaperDoll(state)
         button.icon:SetTexture(texture)
         local color = quality and ITEM_QUALITY_COLORS[quality]
         button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
-        local state = visualState(target, button.difference)
-        button.visualState = state
         local actionState = WSGS.Actions:GetSlotState(button.position)
-        button.miniState:SetText(Presentation:MiniStates(button.difference, actionState.clickText))
+        button.actionState = actionState
+        local statuses = Presentation:ModificationIcons(button.difference, actionState)
+        for index, icon in ipairs(button.statusIcons) do
+            local status = statuses[index]
+            icon.presentation = status
+            if status then
+                local tint = Presentation.colors[status.state] or Presentation.colors.UNKNOWN
+                icon.texture:SetTexture(status.texture)
+                icon.texture:SetVertexColor(tint[1], tint[2], tint[3])
+                icon:Show()
+            else
+                icon:Hide()
+            end
+        end
         button.icon:SetDesaturated(actionState.pending)
         if not InCombatLockdown() then
             button:Enable()
@@ -112,6 +124,8 @@ function UI:RenderPaperDoll(state)
     end
     if self.hovered and frame:IsShown() then
         self:ShowSlotTooltip(self.hovered)
+    elseif self.hoveredIcon and self.hoveredIcon:IsShown() then
+        self:ShowModificationTooltip(self.hoveredIcon)
     end
 end
 
@@ -228,14 +242,37 @@ function UI:CreatePaperDoll()
         button.quality = button:CreateTexture(nil, "OVERLAY")
         button.quality:SetTexture("Interface\\Common\\WhiteIconFrame")
         button.quality:SetAllPoints()
-        button.miniState = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        button.miniState:SetWidth(240)
-        if leftColumn then
-            button.miniState:SetPoint("LEFT", button, "RIGHT", 8, 0)
-            button.miniState:SetJustifyH("LEFT")
-        else
-            button.miniState:SetPoint("RIGHT", button, "LEFT", -8, 0)
-            button.miniState:SetJustifyH("RIGHT")
+        button.statusIcons = {}
+        for index = 1, #Presentation.modifications do
+            local statusIcon = CreateFrame("Frame", nil, frame)
+            button.statusIcons[index] = statusIcon
+            statusIcon.owner = button
+            statusIcon:SetSize(18, 18)
+            statusIcon:SetFrameLevel(button:GetFrameLevel() + 2)
+            if index == 1 then
+                if leftColumn then
+                    statusIcon:SetPoint("LEFT", button, "RIGHT", 7, 0)
+                else
+                    statusIcon:SetPoint("RIGHT", button, "LEFT", -7, 0)
+                end
+            elseif leftColumn then
+                statusIcon:SetPoint("LEFT", button.statusIcons[index - 1], "RIGHT", 2, 0)
+            else
+                statusIcon:SetPoint("RIGHT", button.statusIcons[index - 1], "LEFT", -2, 0)
+            end
+            statusIcon.texture = statusIcon:CreateTexture(nil, "ARTWORK")
+            statusIcon.texture:SetAllPoints()
+            statusIcon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            statusIcon:EnableMouse(true)
+            statusIcon:SetScript("OnEnter", function(icon)
+                self.hoveredIcon = icon
+                self:ShowModificationTooltip(icon)
+            end)
+            statusIcon:SetScript("OnLeave", function()
+                self.hoveredIcon = nil
+                GameTooltip:Hide()
+            end)
+            statusIcon:Hide()
         end
         button:SetScript("OnEnter", function(b)
             self.hovered = b;
@@ -277,6 +314,10 @@ function UI:CreatePaperDoll()
         if self.hovered then
             GameTooltip:Hide();
             self.hovered = nil
+        end
+        if self.hoveredIcon then
+            GameTooltip:Hide();
+            self.hoveredIcon = nil
         end
     end)
     return frame

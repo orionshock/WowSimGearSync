@@ -5,85 +5,92 @@ WSGS.ActionsInternal = Internal
 local Presentation = {}
 Internal.Presentation = Presentation
 
-local colors = {
-    WAITING_FOR_ITEM = "8cb3ff",
-    READY = "4dff66",
-    PENDING = "999999",
-    UNKNOWN = "8cb3ff",
-    BLOCKED = "ffb326",
-    COMPLETE = "4dff66"
-}
-
 local labels = {
     BUCKLE = "belt buckle",
     GEM = "gem",
     ENCHANT = "enchant",
     PROFESSION_ENCHANT = "profession enhancement",
-    PROFESSION_SOCKET = "Blacksmithing socket",
+    PROFESSION_SOCKET = "Prismatic Socket",
     TINKER = "Engineering tinker"
 }
 
-local function actionText(controller, operation)
-    if not controller or controller.state == "WAITING_FOR_ITEM" then
+local function itemName(itemID, fallback)
+    if type(itemID) ~= "number" or itemID <= 0 then
+        return fallback
+    end
+    return C_Item.GetItemInfo(itemID) or fallback or ("item " .. itemID)
+end
+
+local function operationName(operation)
+    if not operation then
         return nil
     end
-    local action = operation and labels[operation.type]
-    if controller.state == "READY" and action then
-        return "Click to apply " .. action
+    if operation.type == "GEM" then
+        return itemName(operation.expected, "gem " .. tostring(operation.expected))
     end
-    if controller.state == "PENDING" and action then
-        return "Applying " .. action .. "..."
+    if operation.type == "BUCKLE" then
+        return itemName(operation.materialItemID, "belt buckle")
+    end
+    if operation.type == "PROFESSION_SOCKET" then
+        return labels.PROFESSION_SOCKET
+    end
+    if operation.spellName then
+        return operation.spellName
+    end
+    local spellName = operation.spellID and C_Spell.GetSpellName(operation.spellID)
+    return spellName or labels[operation.type] or "modification"
+end
+
+local function clickInstruction(operation)
+    local name = operationName(operation)
+    if not operation then
+        return nil
+    elseif operation.type == "GEM" then
+        return "Insert " .. name
+    elseif operation.type == "PROFESSION_SOCKET" then
+        return "Add " .. name
+    end
+    return "Apply " .. name
+end
+
+local function actionText(controller, operation)
+    if not controller then
+        return "Click to recheck"
+    end
+    if controller.state == "WAITING_FOR_ITEM" then
+        return "Target item must be equipped before modifications are available"
+    end
+    local instruction = clickInstruction(operation)
+    if controller.state == "READY" and instruction then
+        return "Click: " .. instruction
+    end
+    if controller.state == "PENDING" and instruction then
+        return instruction .. "..."
     end
     if controller.state == "UNKNOWN" then
         return "Click to recheck"
     end
-    if controller.state == "BLOCKED" and controller.lastFailed and action then
-        return "Click to retry " .. action
+    if controller.state == "BLOCKED" then
+        return controller.reason or operation and operation.reason or "Modification blocked"
     end
-    if controller.state == "BLOCKED" and action then
-        return "Cannot apply " .. action
-    end
-    return "No action needed"
-end
-
-local function tooltipLines(controller, operation)
-    if not controller then
-        return {}
-    end
-    local color = colors[controller.state] or "ffffff"
-    local lines = {" ", "|cff" .. color .. "Action: " .. controller.state:gsub("_", " ") .. "|r"}
-    if operation then
-        local text = "Next: " .. labels[operation.type]
-        if operation.type == "GEM" and operation.expected and operation.socket then
-            text = text .. string.format(" %d in socket %d", operation.expected, operation.socket)
-        elseif operation.expected then
-            text = text .. " " .. tostring(operation.expected)
-        end
-        if operation.targetSource == "RECOMMENDED" then
-            text = text .. " (recommended)"
-        elseif operation.targetSource == "SIMULATION" then
-            text = text .. " (simulation target)"
-        end
-        lines[#lines + 1] = text
-        if operation.material then
-            lines[#lines + 1] = string.format("Material: item %d at bag %d, slot %d", operation.material.itemID,
-                operation.material.bag, operation.material.slot)
-        elseif operation.spellID then
-            lines[#lines + 1] = string.format("Recipe: %s (%d)", operation.spellName or "unavailable",
-                operation.spellID)
+    for _, fieldName in ipairs({"upgradeStep", "reforging"}) do
+        local field = controller.difference and controller.difference.fields[fieldName]
+        if field and (field.state == "MISMATCH" or field.state == "UNKNOWN") then
+            return "No click action available"
         end
     end
-    if controller.reason then
-        lines[#lines + 1] = controller.reason
-    end
-    return lines
+    return "Configuration complete"
 end
 
 function Presentation:Build(controller, operation)
+    local clickText = actionText(controller, operation)
     return {
         state = controller and controller.state or "COMPLETE",
         pending = controller and controller.state == "PENDING" or false,
-        clickText = actionText(controller, operation),
-        tooltipLines = tooltipLines(controller, operation)
+        clickText = clickText,
+        tooltipLines = {clickText},
+        nextField = operation and operation.field or nil,
+        nextType = operation and operation.type or nil,
+        reason = controller and (controller.reason or operation and operation.reason) or nil
     }
 end
