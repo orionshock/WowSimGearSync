@@ -181,6 +181,7 @@ function Import:ImportInto(character, text)
     if not profile then
         return nil, reason
     end
+    profile.sourceJSON = text
     return self:SaveBuild(character, profile)
 end
 

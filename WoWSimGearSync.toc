@@ -37,6 +37,9 @@ EquipmentPlanner.lua
 EquipmentExecution.lua
 EquipmentSetSync.lua
 EquipmentActions.lua
+NPC\Panel.lua
+NPC\Reforging.lua
+NPC\ItemUpgrades.lua
 Actions\Presentation.lua
 Actions\Handlers.lua
 Actions\Planner.lua
