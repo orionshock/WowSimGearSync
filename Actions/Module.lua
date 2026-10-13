@@ -22,7 +22,7 @@ local function selectedOperation(controller)
 end
 
 local function operationSatisfied(operation, difference, targetInstanceMatches)
-    return operation.handler:Verify({
+    return operation.handler.Verify({
         operation = operation,
         difference = difference,
         targetInstanceMatches = targetInstanceMatches
@@ -57,11 +57,11 @@ local function carryPending(previous, built, difference)
         local satisfied, detail, actual = operationSatisfied(previous.pending, difference, sameInstance)
         if sameInstance and satisfied then
             debug("VERIFY", string.format(
-                "slot=%d handler=%s type=%s expected=%s actual=%s guid=%s result=MATCH", previous.inventorySlot,
-                previous.pending.handlerName, previous.pending.type, valueText(previous.pending.expected),
-                valueText(actual), valueText(previous.targetGuid)))
-            debug("DONE", string.format("slot=%d handler=%s type=%s verified", previous.inventorySlot,
-                previous.pending.handlerName, previous.pending.type))
+                "slot=%d serial=%d handler=%s type=%s expected=%s actual=%s guid=%s result=VERIFIED",
+                previous.inventorySlot, previous.serial, previous.pending.handlerName, previous.pending.type,
+                valueText(previous.pending.expected), valueText(actual), valueText(previous.targetGuid)))
+            debug("DONE", string.format("slot=%d serial=%d type=%s next=%s", previous.inventorySlot,
+                previous.serial, previous.pending.type, built.prepared and built.prepared.type or "none"))
         elseif previous.failure or not sameInstance then
             built.state = "BLOCKED"
             built.reason = previous.failure or "Target item instance changed before verification"
@@ -79,9 +79,9 @@ local function carryPending(previous, built, difference)
             built.reason = "Awaiting client verification: " .. detail
             if previous.lastVerificationDetail ~= detail then
                 debug("VERIFY", string.format(
-                    "slot=%d handler=%s type=%s expected=%s actual=%s result=STILL_PENDING reason=%s",
-                    previous.inventorySlot, previous.pending.handlerName, previous.pending.type,
-                    valueText(previous.pending.expected), valueText(actual), detail))
+                    "slot=%d serial=%d handler=%s type=%s expected=%s actual=%s guid=%s result=STILL_PENDING reason=%s",
+                    previous.inventorySlot, previous.serial, previous.pending.handlerName, previous.pending.type,
+                    valueText(previous.pending.expected), valueText(actual), valueText(previous.targetGuid), detail))
             end
         end
     elseif previous.lastFailed and built.prepared then
