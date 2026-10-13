@@ -3,8 +3,8 @@ local UI = WSGS.UI
 local Equipment = WSGS:GetModule("Equipment")
 
 local Presentation = UI.SlotPresentation
-local FRAME_WIDTH, FRAME_HEIGHT = 550, 580
-local SLOT_SIDE_INSET, SLOT_TOP_OFFSET, SLOT_ROW_SPACING = 18, 104, 50
+local FRAME_WIDTH, FRAME_HEIGHT = 350, 550
+local SLOT_SIDE_INSET, SLOT_TOP_OFFSET, SLOT_ROW_SPACING = 10, 104, 47
 local equipButtonLabels = {
     READY = "Equip",
     PENDING = "Equipping",
@@ -177,8 +177,8 @@ function UI:CreatePaperDoll()
         frame:Hide()
     end)
     frame.buildName = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-    frame.buildName:SetPoint("TOP", 0, -35)
-    frame.buildName:SetSize(300, 24)
+    frame.buildName:SetPoint("TOPRIGHT", -15, -35)
+    frame.buildName:SetSize(200, 24)
     frame.buildName:SetAutoFocus(false)
     frame.buildName:SetMaxBytes(80)
     frame.buildName:SetScript("OnEnter", function(input)
@@ -222,7 +222,7 @@ function UI:CreatePaperDoll()
     frame.equipButton = equip
     local note = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     note:SetPoint("TOPRIGHT", -18, -88)
-    note:SetWidth(400)
+    note:SetWidth(320)
     note:SetJustifyH("RIGHT")
     frame.equipNote = note
     frame.slots = {}
@@ -259,9 +259,9 @@ function UI:CreatePaperDoll()
                     statusIcon:SetPoint("RIGHT", button, "LEFT", -7, 0)
                 end
             elseif leftColumn then
-                statusIcon:SetPoint("LEFT", button.statusIcons[index - 1], "RIGHT", 2, 0)
+                statusIcon:SetPoint("LEFT", button.statusIcons[index - 1], "RIGHT", 0, 0)
             else
-                statusIcon:SetPoint("RIGHT", button.statusIcons[index - 1], "LEFT", -2, 0)
+                statusIcon:SetPoint("RIGHT", button.statusIcons[index - 1], "LEFT", 0, 0)
             end
             statusIcon.texture = statusIcon:CreateTexture(nil, "ARTWORK")
             statusIcon.texture:SetAllPoints()
@@ -297,14 +297,9 @@ function UI:CreatePaperDoll()
         RegisterStateDriver(button, "combat", "[combat] combat; nocombat")
         WSGS.Actions:RegisterSlotButton(position, button)
     end
-    local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    legend:SetPoint("CENTER", 0, 8)
-    legend:SetWidth(150)
-    legend:SetText("Hover a slot for details.")
-    frame.helpHint = legend
     frame.summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.summary:SetPoint("BOTTOM", 0, 20)
-    frame.summary:SetWidth(510)
+    frame.summary:SetWidth(330)
     frame:SetScript("OnShow", function()
         self:RefreshEscapeWindow()
         self.requestedItems = {}
