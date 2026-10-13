@@ -16,6 +16,7 @@ local equipButtonLabels = {
 }
 
 function UI:ShowSlotTooltip(button)
+    UI.ModificationTooltip:Hide()
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
     GameTooltip:ClearLines()
     local title, red, green, blue, action = Presentation:ItemTooltip(button.target,
@@ -30,23 +31,37 @@ end
 function UI:ShowModificationTooltip(icon)
     local status = icon.presentation
     if status and icon.owner then
+        local refreshed
         for _, current in ipairs(Presentation:ModificationIcons(icon.owner.difference, icon.owner.actionState)) do
             if current.key == status.key then
-                status, icon.presentation = current, current
+                refreshed = current
                 break
             end
         end
+        status, icon.presentation = refreshed, refreshed
     end
     if not status then
+        UI.ModificationTooltip:Hide()
         return
     end
-    GameTooltip:SetOwner(icon, "ANCHOR_RIGHT")
-    GameTooltip:ClearLines()
-    GameTooltip:AddLine(status.label, 1, 1, 1)
-    for _, line in ipairs(status.lines) do
-        GameTooltip:AddLine(line, 1, 1, 1, true)
+    GameTooltip:Hide()
+    UI.ModificationTooltip:Show(icon, status)
+end
+
+local function registerTooltipItems(self, frame, status)
+    local tooltip = status and status.tooltip
+    for _, section in ipairs(tooltip and tooltip.sections or {}) do
+        for _, value in ipairs({section.current, section.target}) do
+            local itemID = value and value.itemID
+            if itemID then
+                self.relevantItems[itemID] = true
+                if frame:IsShown() and not C_Item.GetItemInfo(itemID) and not self.requestedItems[itemID] then
+                    self.requestedItems[itemID] = true
+                    Equipment:RequestItemData(itemID, "PaperDoll:modification-tooltip")
+                end
+            end
+        end
     end
-    GameTooltip:Show()
 end
 
 function UI:RenderPaperDoll(state)
@@ -111,6 +126,7 @@ function UI:RenderPaperDoll(state)
             local status = statuses[index]
             icon.presentation = status
             if status then
+                registerTooltipItems(self, frame, status)
                 icon.texture:SetTexture(status.texture)
                 icon.texture:SetVertexColor(1, 1, 1)
                 icon:Show()
@@ -130,7 +146,7 @@ function UI:RenderPaperDoll(state)
             self:ShowModificationTooltip(self.hoveredIcon)
         else
             self.hoveredIcon = nil
-            GameTooltip:Hide()
+            UI.ModificationTooltip:Hide()
         end
     end
 end
@@ -277,7 +293,7 @@ function UI:CreatePaperDoll()
             end)
             statusIcon:SetScript("OnLeave", function()
                 self.hoveredIcon = nil
-                GameTooltip:Hide()
+                UI.ModificationTooltip:Hide()
             end)
             statusIcon:Hide()
         end
@@ -317,8 +333,8 @@ function UI:CreatePaperDoll()
             GameTooltip:Hide();
             self.hovered = nil
         end
+        UI.ModificationTooltip:Hide()
         if self.hoveredIcon then
-            GameTooltip:Hide();
             self.hoveredIcon = nil
         end
     end)

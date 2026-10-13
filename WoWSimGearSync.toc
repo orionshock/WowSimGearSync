@@ -44,5 +44,6 @@ Actions\ProfessionExecution.lua
 Actions\Module.lua
 UI\Module.lua
 UI\SlotPresentation.lua
+UI\ModificationTooltip.lua
 UI\ImportDialog.lua
 UI\PaperDoll.lua

@@ -48,36 +48,88 @@ Presentation.complete = {
     texture = "Interface\\RaidFrame\\ReadyCheck-Ready"
 }
 
-local function itemName(itemID, emptyText)
+local function itemValue(itemID, emptyText)
     if type(itemID) ~= "number" then
-        return "Unknown"
+        return {
+            text = "Unknown"
+        }
     end
     if itemID == 0 then
-        return emptyText or "None"
+        return {
+            text = emptyText or "None",
+            absent = true
+        }
     end
-    return C_Item.GetItemInfo(itemID) or ("Item " .. itemID)
+    local name, _, quality, _, _, _, _, _, _, texture = C_Item.GetItemInfo(itemID)
+    local color = quality and ITEM_QUALITY_COLORS[quality]
+    return {
+        text = name or ("Item " .. itemID),
+        texture = texture or select(5, C_Item.GetItemInfoInstant(itemID)),
+        itemID = itemID,
+        color = color and {color.r, color.g, color.b} or nil
+    }
 end
 
-local function effectName(field, effectID, difference)
+local function spellValue(spellID, fallback)
+    if type(spellID) ~= "number" then
+        return {
+            text = fallback or "Unknown"
+        }
+    end
+    return {
+        text = C_Spell.GetSpellName(spellID) or fallback or ("Spell " .. spellID),
+        texture = C_Spell.GetSpellTexture(spellID),
+        spellID = spellID
+    }
+end
+
+local function effectValue(fieldName, effectID, difference)
     if type(effectID) ~= "number" then
-        return "Unknown"
+        return {
+            text = "Unknown"
+        }
     end
     if effectID == 0 then
-        return "None"
+        return {
+            text = "None",
+            absent = true
+        }
     end
-    if field == "tinker" and difference and difference.actualSpellID == effectID and difference.actualSpellName then
-        return difference.actualSpellName
+    if fieldName == "tinker" and difference and difference.actualSpellID == effectID then
+        return spellValue(effectID, difference.actualSpellName)
     end
     local catalog = WSGS.ModificationMaterials.actions
-    local definition = catalog.profession[effectID] or field == "enchant" and catalog.inventory[effectID]
-    local spellID = definition and (definition.spellID or definition.spellIDs and definition.spellIDs[1])
-    local name = spellID and C_Spell.GetSpellName(spellID)
-    return name or (field == "reforging" and "Reforge ID " or "Effect ID ") .. effectID
+    local profession = catalog.profession[effectID]
+    if profession then
+        return spellValue(profession.spellID or profession.spellIDs and profession.spellIDs[1],
+            "Effect ID " .. effectID)
+    end
+    local inventory = fieldName == "enchant" and catalog.inventory[effectID]
+    if inventory then
+        local itemID = inventory.itemID or inventory.purchasableItemID
+        if itemID then
+            return itemValue(itemID)
+        end
+        return spellValue(inventory.spellID, "Effect ID " .. effectID)
+    end
+    return {
+        text = (fieldName == "reforging" and "Reforge ID " or "Effect ID ") .. effectID
+    }
 end
 
-local function addPair(lines, current, target)
-    lines[#lines + 1] = "Current: " .. current
-    lines[#lines + 1] = "Target: " .. target
+local function transition(state, current, target, label)
+    local result = {
+        label = label,
+        target = target
+    }
+    if state == "UNKNOWN" then
+        result.currentUnknown = true
+    elseif not current or current.absent then
+        result.apply = true
+    else
+        result.current = current
+    end
+    return result
 end
 
 local function fieldFor(definition, fields)
@@ -109,52 +161,65 @@ local function presentationState(fieldName, field, item, actionState)
     return "UNKNOWN"
 end
 
-local function socketLines(fieldName, field)
-    local lines = {}
-    local present = field.state == "MATCH"
+local function socketTooltip(fieldName, field, inventorySlot)
+    local target
     if fieldName == "buckle" then
-        lines[1] = "Belt Buckle"
+        target = itemValue(WSGS.ModificationMaterials.actions.prerequisites.beltBuckle.itemID)
     elseif fieldName == "professionSocket" then
-        lines[1] = "Blacksmithing Socket"
-    end
-    addPair(lines, present and "Present" or field.actual == nil and "Unknown" or "Missing",
-        present and "Present" or "Prismatic Socket")
-    return lines
-end
-
-local function gemLines(field)
-    local lines = {}
-    for socket, difference in ipairs(field.sockets or {}) do
-        lines[#lines + 1] = "Socket " .. socket
-        addPair(lines, itemName(difference.actual, "Empty"), itemName(difference.expected, "Empty"))
-    end
-    if #lines == 0 and type(field.expected) == "table" then
-        for socket, gemID in ipairs(field.expected) do
-            lines[#lines + 1] = "Socket " .. socket
-            addPair(lines, "Unknown", itemName(gemID, "Empty"))
+        local definition = WSGS.ModificationMaterials.actions.prerequisites.professionSockets[inventorySlot]
+        if definition and definition.spellIDs then
+            target = spellValue(definition.spellIDs[1], "Prismatic Socket")
         end
     end
-    if #lines == 0 then
-        addPair(lines, "Unknown", "Configured gems")
-    end
-    return lines
+    target = target or {
+        text = "Prismatic Socket"
+    }
+    return {
+        sections = {transition(field.actual == nil and "UNKNOWN" or field.state, nil, target)}
+    }
 end
 
-local function scalarLines(fieldName, field)
-    local lines = {}
+local function gemTooltip(field)
+    local sections = {}
+    for socket, difference in ipairs(field.sockets or {}) do
+        if difference.state ~= "MATCH" then
+            sections[#sections + 1] = transition(difference.state, itemValue(difference.actual, "Empty"),
+                itemValue(difference.expected, "Empty"), "Socket " .. socket)
+        end
+    end
+    if #sections == 0 and type(field.expected) == "table" then
+        for socket, gemID in ipairs(field.expected) do
+            sections[#sections + 1] = transition("UNKNOWN", nil, itemValue(gemID, "Empty"), "Socket " .. socket)
+        end
+    end
+    return {
+        sections = sections
+    }
+end
+
+local function scalarTooltip(fieldName, field)
+    local current, target
     if fieldName == "upgradeStep" then
         local maximum = type(field.expected) == "number" and field.expected or nil
-        local current = type(field.actual) == "number" and maximum and string.format("%d/%d", field.actual, maximum) or
-                            "Unknown"
-        local target = maximum and string.format("%d/%d", maximum, maximum) or "Maximum"
-        addPair(lines, current, target)
+        current = type(field.actual) == "number" and maximum and {
+            text = string.format("%d/%d", field.actual, maximum),
+            texture = 237585
+        } or nil
+        target = {
+            text = maximum and string.format("%d/%d", maximum, maximum) or "Maximum",
+            texture = 237585
+        }
     elseif fieldName == "reforging" then
-        addPair(lines, effectName(fieldName, field.actual, field), effectName(fieldName, field.expected, field))
+        current = effectValue(fieldName, field.actual, field)
+        target = effectValue(fieldName, field.expected, field)
+        current.texture, target.texture = 459028, 459028
     else
-        local current = field.actualSpellName or effectName(fieldName, field.actual or field.actualSpellID, field)
-        addPair(lines, current, effectName(fieldName, field.expected, field))
+        current = effectValue(fieldName, field.actual or field.actualSpellID, field)
+        target = effectValue(fieldName, field.expected, field)
     end
-    return lines
+    return {
+        sections = {transition(field.state, current, target)}
+    }
 end
 
 local function outstandingLine(fieldName, field, item, actionState)
@@ -198,24 +263,28 @@ function Presentation:ModificationIcons(difference, actionState)
         local fieldName, field = fieldFor(definition, difference.fields)
         local state = field and presentationState(fieldName, field, item, actionState)
         if field and state ~= "MATCH" then
-            local lines
+            local tooltip
             if definition.key == "additionalSocket" then
-                lines = socketLines(fieldName, field)
+                tooltip = socketTooltip(fieldName, field, difference.currentSlotId)
             elseif definition.key == "gems" then
-                lines = gemLines(field)
+                tooltip = gemTooltip(field)
             else
-                lines = scalarLines(fieldName, field)
+                tooltip = scalarTooltip(fieldName, field)
             end
             local outstanding = outstandingLine(fieldName, field, item, actionState)
-            if outstanding then
-                lines[#lines + 1] = outstanding
+            tooltip.note = outstanding
+            local label = definition.label
+            if definition.key == "additionalSocket" and fieldName == "buckle" then
+                label = "Belt Buckle"
+            elseif definition.key == "tinker" then
+                label = fieldName == "tinker" and "Tinker" or "Profession Enhancement"
             end
             result[#result + 1] = {
                 key = definition.key,
-                label = definition.label,
+                label = label,
                 texture = definition.texture,
                 state = state,
-                lines = lines
+                tooltip = tooltip
             }
         end
     end
@@ -225,7 +294,9 @@ function Presentation:ModificationIcons(difference, actionState)
             label = self.complete.label,
             texture = self.complete.texture,
             state = "COMPLETE",
-            lines = {}
+            tooltip = {
+                sections = {}
+            }
         }
     end
     return result
