@@ -5,7 +5,7 @@ local Tooltip = {}
 UI.ModificationTooltip = Tooltip
 
 local ICON_SIZE = 46
-local ARROW_WIDTH, ARROW_HEIGHT = 52, 22
+local ARROW_WIDTH, ARROW_HEIGHT = 26, 22
 local PADDING = 12
 local MAX_WIDTH = 440
 local MIN_WIDTH = 180
@@ -113,6 +113,7 @@ local function addText(frame, value, y, width, fontObject, red, green, blue)
     text:SetFontObject(fontObject or GameTooltipText)
     text:SetText(value)
     text:SetTextColor(red or 1, green or 1, blue or 1)
+    text:SetJustifyH("CENTER")
     text:SetWidth(width)
     text:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, y)
     local height = math.ceil(text:GetStringHeight())
@@ -121,12 +122,14 @@ end
 
 local function addRow(frame, value, y, width)
     local row = acquireRow(frame)
-    local textWidth = width - PADDING * 2
+    local availableWidth = width - PADDING * 2
+    local iconWidth = value.texture and ICON_SIZE + 8 or 0
+    local rowWidth = math.min(availableWidth, math.ceil(measuredWidth(frame, value.text) + iconWidth))
+    local textWidth = rowWidth - iconWidth
     if value.texture then
         row.icon:SetTexture(value.texture)
         row.icon:Show()
         row.text:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
-        textWidth = textWidth - ICON_SIZE - 8
     else
         row.icon:Hide()
         row.text:SetPoint("LEFT", row, "LEFT")
@@ -137,8 +140,8 @@ local function addRow(frame, value, y, width)
         row.text:SetTextColor(value.color[1], value.color[2], value.color[3])
     end
     local height = math.max(ICON_SIZE, math.ceil(row.text:GetStringHeight()))
-    row:SetSize(width - PADDING * 2, height)
-    row:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING, y)
+    row:SetSize(rowWidth, height)
+    row:SetPoint("TOP", frame, "TOP", 0, y)
     return y - height
 end
 
@@ -180,7 +183,7 @@ function Tooltip:Show(icon, status)
         elseif section.current then
             y = addRow(frame, section.current, y, width) - 2
             local arrow = acquireArrow(frame)
-            arrow:SetPoint("TOPLEFT", frame, "TOPLEFT", PADDING + math.floor((ICON_SIZE - ARROW_WIDTH) / 2), y)
+            arrow:SetPoint("TOP", frame, "TOP", 0, y)
             y = y - ARROW_HEIGHT - 2
         end
         if section.target then

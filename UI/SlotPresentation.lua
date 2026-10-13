@@ -32,7 +32,7 @@ Presentation.modifications = {{
     texture = 136243 -- Trade_Engineering.
 }, {
     key = "upgradeStep",
-    label = "Upgrade",
+    label = "Item Upgrade",
     fields = {"upgradeStep"},
     texture = 237585
 }, {
