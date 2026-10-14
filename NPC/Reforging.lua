@@ -3,6 +3,16 @@ local Reforging = WSGS:NewModule("NPCReforging", "AceEvent-3.0")
 local Equipment = WSGS:GetModule("Equipment")
 
 local REFORGE_BASE, UNFORGE = 112, -1
+local REFORGE_STATS = {
+    Enum.BonusStatIndex.Spirit,
+    Enum.BonusStatIndex.DodgeRating,
+    Enum.BonusStatIndex.ParryRating,
+    Enum.BonusStatIndex.HitRating,
+    Enum.BonusStatIndex.CritRating,
+    Enum.BonusStatIndex.HasteRating,
+    Enum.BonusStatIndex.ExpertiseRating,
+    Enum.BonusStatIndex.MasteryRating
+}
 
 local function debug(category, text)
     WSGS:Debug("[REFORGE][" .. category .. "] " .. text)
@@ -21,10 +31,10 @@ local function effectPair(effectID)
     if index < 1 or index > 56 then
         return nil
     end
-    local source = math.floor((index - 1) / 7) + 1
+    local sourceIndex = math.floor((index - 1) / 7) + 1
     local offset = ((index - 1) % 7) + 1
-    local destination = offset >= source and offset + 1 or offset
-    return source, destination
+    local destinationIndex = offset >= sourceIndex and offset + 1 or offset
+    return REFORGE_STATS[sourceIndex], REFORGE_STATS[destinationIndex]
 end
 
 local function collect(state)
