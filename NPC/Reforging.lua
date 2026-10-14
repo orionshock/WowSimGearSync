@@ -3,6 +3,7 @@ local Reforging = WSGS:NewModule("NPCReforging", "AceEvent-3.0")
 local Equipment = WSGS:GetModule("Equipment")
 
 local REFORGE_BASE, UNFORGE = 112, -1
+local REFORGE_TRANSITION_ICON = "|T450908:22:22:0:0|t"
 local REFORGE_STATS = {
     Enum.BonusStatIndex.Spirit,
     Enum.BonusStatIndex.DodgeRating,
@@ -119,7 +120,7 @@ function Reforging:Refresh(reason)
     local rows = {}
     for index, entry in ipairs(entries) do
         rows[index] = string.format("%s   %s %s %s", entry.name, entry.actual == 0 and "None" or entry.actual,
-            WSGS.NPCPanel.TRANSITION_ICON, entry.expected == 0 and "None" or entry.expected)
+            REFORGE_TRANSITION_ICON, entry.expected == 0 and "None" or entry.expected)
     end
     local rfl, rflActive = self:GetRFL()
     local mode = rfl and "Executor: ReforgeLite (exact WoW Sims import)" or
