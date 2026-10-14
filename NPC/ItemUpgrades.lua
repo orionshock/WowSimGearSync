@@ -263,7 +263,10 @@ function Upgrades:Activate()
     self:Refresh("submitted")
 end
 
-function Upgrades:ITEM_UPGRADE_MASTER_OPENED(event)
+function Upgrades:PLAYER_INTERACTION_MANAGER_FRAME_SHOW(event, interactionType)
+    if interactionType ~= Enum.PlayerInteractionType.ItemUpgrade then
+        return
+    end
     self.open = true
     self.pending, self.blocker, self.started = nil, nil, nil
     self.lastCostLabel = nil
@@ -302,7 +305,10 @@ function Upgrades:ITEM_UPGRADE_FAILED(event, reason)
     self:Refresh(event)
 end
 
-function Upgrades:ITEM_UPGRADE_MASTER_CLOSED()
+function Upgrades:PLAYER_INTERACTION_MANAGER_FRAME_HIDE(_, interactionType)
+    if interactionType ~= Enum.PlayerInteractionType.ItemUpgrade then
+        return
+    end
     if self.pending then
         debug("BLOCK", string.format("serial=%d reason=npc-closed", self.pending.serial))
     end
@@ -326,11 +332,11 @@ function Upgrades:WSGS_EQUIPMENT_STATE_INVALIDATED(_, reason)
 end
 
 function Upgrades:OnEnable()
-    self:RegisterEvent("ITEM_UPGRADE_MASTER_OPENED")
+    self:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
+    self:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE")
     self:RegisterEvent("ITEM_UPGRADE_MASTER_SET_ITEM")
     self:RegisterEvent("ITEM_UPGRADE_MASTER_UPDATE")
     self:RegisterEvent("ITEM_UPGRADE_FAILED")
-    self:RegisterEvent("ITEM_UPGRADE_MASTER_CLOSED")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
 end
