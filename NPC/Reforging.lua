@@ -56,11 +56,12 @@ end
 
 function Reforging:GetRFL()
     local loaded = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("ReforgeLiteMopClassic")
-    local rfl = _G.ReforgeLiteMopClassic
     if not loaded then
         return nil, false
     end
-    if type(rfl) ~= "table" or type(rfl.ValidateWoWSimsString) ~= "function" or
+    local addonTable = _G.ReforgeLiteMopClassic
+    local rfl = type(addonTable) == "table" and addonTable.ReforgeLiteMopClassic or nil
+    if not rfl or type(rfl.ValidateWoWSimsString) ~= "function" or
         type(rfl.ApplyWoWSimsImport) ~= "function" or type(rfl.DoReforge) ~= "function" or not rfl.pdb then
         return nil, true
     end
