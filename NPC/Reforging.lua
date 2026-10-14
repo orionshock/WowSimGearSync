@@ -76,12 +76,18 @@ function Reforging:CreatePanel()
     frame.action:SetScript("OnClick", function()
         self:Activate()
     end)
+    frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    frame.close:SetPoint("TOPRIGHT", 2, 2)
+    frame.close:SetScript("OnClick", function()
+        self.dismissed = true
+        frame:Hide()
+    end)
     self.frame = frame
     return frame
 end
 
 function Reforging:Refresh(reason)
-    if not self.open then
+    if not self.open or self.dismissed then
         return
     end
     local frame = self:CreatePanel()
@@ -349,6 +355,7 @@ end
 
 function Reforging:FORGE_MASTER_OPENED(event)
     self.open = true
+    self.dismissed = false
     self.blocker, self.pending, self.running, self.started = nil, nil, false, nil
     C_Timer.After(0, function()
         self:Refresh(event)
@@ -374,7 +381,7 @@ function Reforging:FORGE_MASTER_CLOSED(event)
     if self.pending then
         debug("BLOCK", string.format("serial=%d reason=npc-closed", self.pending.serial))
     end
-    self.open, self.pending, self.running, self.rflRunning = false, nil, false, nil
+    self.open, self.pending, self.running, self.rflRunning, self.dismissed = false, nil, false, nil, false
     if self.frame then
         self.frame:Hide()
     end
