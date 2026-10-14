@@ -4,6 +4,7 @@ local Panel = {}
 WSGS.NPCPanel = Panel
 
 local WIDTH, ROW_HEIGHT = 286, 20
+Panel.TRANSITION_ICON = "|TInterface\\Buttons\\UI-SpellbookIcon-NextPage-Up:16:16:0:0|t"
 
 function Panel:Create(name, title)
     local frame = CreateFrame("Frame", name, UIParent, "TooltipBackdropTemplate")

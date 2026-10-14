@@ -112,8 +112,8 @@ function Reforging:Refresh(reason)
     self.entries = entries
     local rows = {}
     for index, entry in ipairs(entries) do
-        rows[index] = string.format("%s   %s → %s", entry.name, entry.actual == 0 and "None" or entry.actual,
-            entry.expected == 0 and "None" or entry.expected)
+        rows[index] = string.format("%s   %s %s %s", entry.name, entry.actual == 0 and "None" or entry.actual,
+            WSGS.NPCPanel.TRANSITION_ICON, entry.expected == 0 and "None" or entry.expected)
     end
     local rfl, rflActive = self:GetRFL()
     local mode = rfl and "Executor: ReforgeLite (exact WoW Sims import)" or

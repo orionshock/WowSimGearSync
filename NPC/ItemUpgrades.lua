@@ -68,8 +68,8 @@ function Upgrades:Refresh(reason, state)
     self.entries = entries
     local rows = {}
     for index, entry in ipairs(entries) do
-        rows[index] = string.format("%s   %d/%d → %d/%d", entry.name, entry.current, entry.maximum,
-            entry.maximum, entry.maximum)
+        rows[index] = string.format("%s   %d/%d %s %d/%d", entry.name, entry.current, entry.maximum,
+            WSGS.NPCPanel.TRANSITION_ICON, entry.maximum, entry.maximum)
     end
     local status
     if not build then
