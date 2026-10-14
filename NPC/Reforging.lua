@@ -21,6 +21,12 @@ local function value(value)
     return value == nil and "nil" or tostring(value)
 end
 
+local function clearReforgeWindow()
+    ClearCursor()
+    C_Reforge.SetReforgeFromCursorItem()
+    ClearCursor()
+end
+
 local function targetGuid(slot)
     local observed = slot and slot.current and slot.current.observations.instance
     return observed and observed.status == "KNOWN" and observed.value or nil
@@ -130,8 +136,6 @@ function Reforging:Refresh(reason)
         status = "This build predates source-JSON preservation; import it again."
     elseif self.rflRunning then
         status = "ReforgeLite owns the active transaction batch."
-    elseif self.waitingUnlock then
-        status = "Waiting for the reset item to unlock."
     elseif self.blocker then
         status = self.blocker
     else
@@ -247,7 +251,10 @@ function Reforging:SubmitNext()
         end
     end
     if not entry then
-        self.running, self.waitingUnlock = false, nil
+        self.running = false
+        if self.open then
+            clearReforgeWindow()
+        end
         if #entries == 0 then
             self.started = nil
         elseif not self.blocker then
@@ -266,9 +273,7 @@ function Reforging:SubmitNext()
         return self:SubmitNext()
     end
     local transaction, expected
-    if current > UNFORGE and entry.actual ~= 0 then
-        transaction, expected = UNFORGE, 0
-    elseif entry.expected == 0 then
+    if entry.expected == 0 then
         transaction, expected = UNFORGE, 0
     else
         transaction, costOrReason = self:ResolveOption(entry.expected)
@@ -298,8 +303,7 @@ function Reforging:SubmitNext()
         inventorySlot = entry.inventorySlot,
         itemID = entry.itemID,
         guid = entry.guid,
-        expected = expected,
-        finalTarget = entry.expected
+        expected = expected
     }
     debug("EXEC", string.format("serial=%d slot=%d item=%d guid=%s transaction=%d expected=%d cost=%d",
         self.serial, entry.inventorySlot, entry.itemID, value(entry.guid), transaction, expected, cost))
@@ -332,16 +336,6 @@ function Reforging:VerifyPending(event)
         verified and "VERIFIED" or "DEFERRED", event))
     if verified then
         self.pending = nil
-        if pending.expected ~= pending.finalTarget then
-            self.waitingUnlock = {
-                inventorySlot = pending.inventorySlot,
-                itemID = pending.itemID,
-                guid = pending.guid,
-                finalTarget = pending.finalTarget
-            }
-            debug("PLAN", string.format("slot=%d item=%d guid=%s action=wait-for-unlock target=%d",
-                pending.inventorySlot, pending.itemID, value(pending.guid), pending.finalTarget))
-        end
         self:SendMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", "PLAYER_EQUIPMENT_CHANGED")
     end
     return verified
@@ -368,13 +362,12 @@ function Reforging:Activate()
             self.blocker = "The previous reforge has not been observed yet."
             return self:Refresh("still-pending")
         end
-        if self.waitingUnlock then
-            if not self:ResumeAfterUnlock("CONTINUE_CLICK") then
-                self:Refresh("waiting-for-unlock")
-            end
-            return
-        end
     end
+    if CursorHasItem() then
+        self.blocker = "Place the held cursor item first"
+        return self:Refresh("cursor-occupied")
+    end
+    clearReforgeWindow()
     self.running = true
     self.started = true
     self.skipped = {}
@@ -384,23 +377,10 @@ end
 function Reforging:FORGE_MASTER_OPENED(event)
     self.open = true
     self.dismissed = false
-    self.blocker, self.pending, self.waitingUnlock, self.running, self.started = nil, nil, nil, false, nil
+    self.blocker, self.pending, self.running, self.started = nil, nil, false, nil
     C_Timer.After(0, function()
         self:Refresh(event)
     end)
-end
-
-function Reforging:ResumeAfterUnlock(event)
-    local waiting = self.waitingUnlock
-    if not self.open or not self.running or self.pending or not waiting or
-        IsInventoryItemLocked(waiting.inventorySlot) then
-        return false
-    end
-    self.waitingUnlock = nil
-    debug("PLAN", string.format("slot=%d item=%d guid=%s event=%s action=resume-after-unlock target=%d",
-        waiting.inventorySlot, waiting.itemID, value(waiting.guid), event, waiting.finalTarget))
-    self:SubmitNext()
-    return true
 end
 
 function Reforging:FORGE_MASTER_ITEM_CHANGED(event)
@@ -412,28 +392,17 @@ function Reforging:FORGE_MASTER_ITEM_CHANGED(event)
         self:SendMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", "PLAYER_EQUIPMENT_CHANGED")
     end
     if self.pending and self:VerifyPending(event) and self.running then
-        if self.waitingUnlock then
-            if not self:ResumeAfterUnlock(event) then
-                self:Refresh("waiting-for-unlock")
-            end
-        else
-            self:SubmitNext()
-        end
+        self:SubmitNext()
     else
         self:Refresh(event)
     end
-end
-
-function Reforging:ITEM_LOCK_CHANGED(event)
-    self:ResumeAfterUnlock(event)
 end
 
 function Reforging:FORGE_MASTER_CLOSED(event)
     if self.pending then
         debug("BLOCK", string.format("serial=%d reason=npc-closed", self.pending.serial))
     end
-    self.open, self.pending, self.waitingUnlock, self.running, self.rflRunning, self.dismissed =
-        false, nil, nil, false, nil, false
+    self.open, self.pending, self.running, self.rflRunning, self.dismissed = false, nil, false, nil, false
     if self.frame then
         self.frame:Hide()
     end
@@ -469,7 +438,6 @@ function Reforging:OnEnable()
     self:RegisterEvent("FORGE_MASTER_OPENED")
     self:RegisterEvent("FORGE_MASTER_ITEM_CHANGED")
     self:RegisterEvent("FORGE_MASTER_CLOSED")
-    self:RegisterEvent("ITEM_LOCK_CHANGED")
     self:RegisterEvent("UI_ERROR_MESSAGE")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
