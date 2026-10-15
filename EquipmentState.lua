@@ -159,7 +159,8 @@ local function itemIsRelevant(state, itemID)
             return true
         end
     end
-    return false
+    -- Newly loaded carried materials can change the bag use-spell index.
+    return state.bagItemsById and state.bagItemsById[itemID] ~= nil or false
 end
 
 function Equipment:RequestItemData(itemID, requester)
@@ -167,10 +168,16 @@ function Equipment:RequestItemData(itemID, requester)
         return nil, "Item ID must be a positive number"
     end
     self.pendingItemData = self.pendingItemData or {}
-    self.pendingItemData[itemID] = requester or true
+    requester = requester or true
+    local subscribers = self.pendingItemData[itemID]
+    if subscribers then
+        subscribers[requester] = true
+        return true
+    end
+    self.pendingItemData[itemID] = {[requester] = true}
     local ok, problem = pcall(C_Item.RequestLoadItemDataByID, itemID)
     if not ok then
-        self.pendingItemData[itemID] = nil
+        self:OnItemDataEvent("REQUEST_FAILED", itemID, false)
         return nil, tostring(problem)
     end
     return true
@@ -180,9 +187,17 @@ function Equipment:OnItemDataEvent(event, itemID, success)
     if not self.pendingItemData or not self.pendingItemData[itemID] then
         return
     end
-    local requester = self.pendingItemData[itemID]
+    local subscribers = self.pendingItemData[itemID]
     self.pendingItemData[itemID] = nil
-    self:SendMessage("WSGS_ITEM_DATA_RECEIVED", itemID, success, requester)
+    local count = 0
+    for requester in pairs(subscribers) do
+        count = count + 1
+        self:SendMessage("WSGS_ITEM_DATA_RECEIVED", itemID, success, requester)
+    end
+    if count > 1 or not success then
+        WSGS:Debug(string.format("[STATE][ITEM_DATA] item=%d subscribers=%d success=%s event=%s", itemID,
+            count, tostring(success), event))
+    end
     if not success or not itemIsRelevant(self.equipmentState, itemID) then
         return
     end
@@ -202,7 +217,8 @@ function Equipment:OnEnable()
     self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnEquipmentStateEvent")
     self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnEquipmentStateEvent")
     self:RegisterEvent("UI_ERROR_MESSAGE")
-    self:RegisterEvent("GET_ITEM_INFO_RECEIVED", "OnItemDataEvent")
+    -- Match the Classic Item continuation API: one authoritative completion
+    -- event, rather than consuming both cache and explicit-load notifications.
     self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "OnItemDataEvent")
     self:RegisterEvent("SPELLS_CHANGED", "OnEquipmentStateEvent")
     self:RegisterEvent("SKILL_LINES_CHANGED", "OnEquipmentStateEvent")

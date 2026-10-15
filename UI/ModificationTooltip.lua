@@ -90,7 +90,7 @@ local function tooltipWidth(frame, status)
     local tooltip = status.tooltip or {}
     for _, section in ipairs(tooltip.sections or {}) do
         width = math.max(width, measuredWidth(frame, section.label) + PADDING * 2)
-        for _, value in ipairs({section.current, section.target}) do
+        for _, value in ipairs({section.current or {}, section.target or {}}) do
             if value then
                 local iconWidth = value.texture and ICON_SIZE + 8 or 0
                 width = math.max(width, measuredWidth(frame, value.text) + iconWidth + PADDING * 2)

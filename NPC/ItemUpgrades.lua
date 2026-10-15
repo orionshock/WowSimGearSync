@@ -357,9 +357,11 @@ function Upgrades:WSGS_EQUIPMENT_STATE_INVALIDATED(_, reason)
 end
 
 function Upgrades:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
-    if requester == "ItemUpgradeStaging" and success then
+    if requester == "ItemUpgradeStaging" then
         self.requestedItems[itemID] = nil
-        self:QueueRefresh("item-data-received")
+        if success then
+            self:QueueRefresh("item-data-received")
+        end
     end
 end
 

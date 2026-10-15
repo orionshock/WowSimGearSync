@@ -3,6 +3,13 @@ local Inspector = {}
 WSGS.EquipmentInspector = Inspector
 local MaterialCatalog = WSGS.ModificationMaterials
 local upgradeFields = {"upgradeEligibility", "upgradeStep", "upgradeMaximum", "upgradeRemaining", "upgradeState"}
+
+WSGS:RegisterMessage("WSGS_ITEM_DATA_RECEIVED", function(_, itemID, success, requester)
+    if requester == "EquipmentInspector:tinker" and not success and Inspector.requestedTinkerItems then
+        Inspector.requestedTinkerItems[itemID] = nil
+    end
+end)
+
 local function unknown(reason)
     return {
         status = "UNKNOWN",

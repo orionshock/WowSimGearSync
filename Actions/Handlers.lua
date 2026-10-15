@@ -58,6 +58,10 @@ local function verify(context)
     if not field then
         return false, "comparison field unavailable"
     end
+    local expected = operation.expectedCount or operation.expected
+    if field.expected ~= expected then
+        return false, "comparison no longer describes the submitted expectation", field.actual
+    end
     return field.state == "MATCH", field.state .. (field.reason and ": " .. field.reason or ""),
         field.actualCount or field.actual
 end
@@ -80,6 +84,7 @@ function AdditionalSockets:Check(context)
                 type = definition.type,
                 field = definition.field,
                 expected = true,
+                expectedCount = difference.expected,
                 unresolved = difference.state == "UNKNOWN",
                 reason = difference.reason
             }

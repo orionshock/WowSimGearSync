@@ -51,7 +51,7 @@ end
 local function registerTooltipItems(self, frame, status)
     local tooltip = status and status.tooltip
     for _, section in ipairs(tooltip and tooltip.sections or {}) do
-        for _, value in ipairs({section.current, section.target}) do
+        for _, value in ipairs({section.current or {}, section.target or {}}) do
             local itemID = value and value.itemID
             if itemID then
                 self.relevantItems[itemID] = true

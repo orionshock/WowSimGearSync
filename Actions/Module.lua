@@ -7,6 +7,7 @@ local Internal = WSGS.ActionsInternal
 WSGS.ActionsInternal = nil
 local controllers, buttons, planSignatures = {}, {}, {}
 local serial = 0
+local controllerBuild
 
 local function debug(category, text)
     WSGS:Debug("[ACTION][" .. category .. "] " .. text)
@@ -31,7 +32,8 @@ end
 
 local function sameOperation(left, right)
     return left and right and left.handlerName == right.handlerName and left.type == right.type and
-               left.field == right.field and left.socket == right.socket and left.expected == right.expected
+               left.field == right.field and left.socket == right.socket and left.expected == right.expected and
+               left.expectedCount == right.expectedCount
 end
 
 local function configureButton(position)
@@ -51,6 +53,36 @@ local function configureButton(position)
     button:SetAttribute("macrotext1", nil)
     button:SetAttribute("action1", nil)
     button:SetAttribute("target-slot1", actionType and controller.inventorySlot or nil)
+end
+
+local function synchronizeBuild()
+    local build = WSGS:GetActiveSimulationProfile()
+    if controllerBuild == build then
+        return false
+    end
+    local previousBuild = controllerBuild
+    for _, controller in pairs(controllers) do
+        local operation = controller.pending or controller.submitting
+        if operation then
+            debug("CANCEL", string.format(
+                "build=%s nextBuild=%s slot=%d serial=%s type=%s expected=%s count=%s guid=%s reason=build-replaced verification-only",
+                valueText(previousBuild and previousBuild.id), valueText(build and build.id),
+                controller.inventorySlot, valueText(controller.serial), operation.type,
+                valueText(operation.expected), valueText(operation.expectedCount), valueText(controller.targetGuid)))
+        end
+    end
+    -- A new table also identifies a reimport of the same specialization. Do not
+    -- cancel any client cast/cursor; discard only our old verification records.
+    controllers, planSignatures = {}, {}
+    controllerBuild = build
+    for position, button in pairs(buttons) do
+        button.wsgsSubmission = nil
+        configureButton(position)
+    end
+    if previousBuild then
+        Actions:SendMessage("WSGS_ACTIONS_CHANGED", "BUILD_REPLACED")
+    end
+    return true
 end
 
 local function carryPending(previous, built, difference)
@@ -163,7 +195,9 @@ local function rebuildController(position, state)
 end
 
 function Actions:Refresh(state)
-    if not state or not state.build or not state.comparison then
+    synchronizeBuild()
+    if not state or not state.build or not state.comparison or not controllerBuild or
+        state.target ~= controllerBuild.equipment then
         controllers = {}
         for position in pairs(buttons) do
             configureButton(position)
@@ -201,6 +235,7 @@ local function scheduleTimeout(self, controller)
     controller.timeoutScheduled = true
     local pendingSerial = controller.serial
     C_Timer.After(8, function()
+        synchronizeBuild()
         local current = controllers[controller.position]
         if not current or current.state ~= "PENDING" or current.serial ~= pendingSerial then
             return
@@ -209,6 +244,7 @@ local function scheduleTimeout(self, controller)
             current.inventorySlot, pendingSerial))
         refreshFromClient(self, "VERIFICATION_TIMEOUT_RESCAN")
         C_Timer.After(0, function()
+            synchronizeBuild()
             current = controllers[controller.position]
             if not current or current.state ~= "PENDING" or current.serial ~= pendingSerial then
                 return
@@ -388,6 +424,9 @@ end
 
 function Actions:ActivateSlot(position, button)
     button.wsgsSubmission = nil
+    if synchronizeBuild() then
+        return
+    end
     local controller = controllers[position]
     if not controller then
         return
@@ -428,6 +467,7 @@ function Actions:ActivateSlot(position, button)
 end
 
 local function finishActivation(self, position, button)
+    synchronizeBuild()
     local submission = button.wsgsSubmission
     button.wsgsSubmission = nil
     if not submission then
@@ -459,6 +499,7 @@ function Actions:RegisterSlotButton(position, button)
 end
 
 local function activeState()
+    synchronizeBuild()
     local active, submitting
     for _, controller in pairs(controllers) do
         if controller.state == "PENDING" or controller.submitting then
@@ -597,6 +638,25 @@ function Actions:SOCKET_INFO_CLOSE(event, ...)
     finishEvent(self, event, submitting, ...)
 end
 
+function Actions:UNIT_SPELLCAST_SENT(event, unit, target, castGUID, spellID)
+    if unit ~= "player" then
+        return
+    end
+    synchronizeBuild()
+    for _, controller in pairs(controllers) do
+        local operation = controller.submitting
+        if operation then
+            local matches = operation.spellID == spellID
+            for _, recipeSpellID in ipairs(operation.recipeSpellIDs or {}) do
+                matches = matches or recipeSpellID == spellID
+            end
+            if matches then
+                operation.castGUID = castGUID
+            end
+        end
+    end
+end
+
 local function handleSpellcastResult(self, event, failed, unit, castGUID, spellID, ...)
     local active, submitting = activeState()
     if not active or unit ~= "player" then
@@ -605,7 +665,7 @@ local function handleSpellcastResult(self, event, failed, unit, castGUID, spellI
     local relevant, tradeSkillClosed
     for _, controller in pairs(controllers) do
         local operation = controller.pending or controller.submitting
-        if operation and operation.spellID == spellID then
+        if operation and operation.castGUID and operation.spellID == spellID and operation.castGUID == castGUID then
             relevant = true
             if failed then
                 controller.failure = "Client spell cast failed or was interrupted"
@@ -686,15 +746,21 @@ function Actions:WSGS_EQUIPMENT_STATE_INVALIDATED(_, event, ...)
     end
 end
 
+function Actions:WSGS_BUILD_IMPORTED()
+    synchronizeBuild()
+end
+
 function Actions:OnEnable()
     planSignatures = {}
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
+    self:RegisterMessage("WSGS_BUILD_IMPORTED")
     self:RegisterEvent("SOCKET_INFO_UPDATE")
     self:RegisterEvent("SOCKET_INFO_ACCEPT")
     self:RegisterEvent("SOCKET_INFO_SUCCESS")
     self:RegisterEvent("SOCKET_INFO_FAILURE")
     self:RegisterEvent("SOCKET_INFO_CLOSE")
     self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    self:RegisterEvent("UNIT_SPELLCAST_SENT")
     self:RegisterEvent("UNIT_SPELLCAST_FAILED")
     self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
     self:RegisterEvent("TRADE_SKILL_SHOW")

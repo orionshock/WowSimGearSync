@@ -330,9 +330,11 @@ function Shopping:WSGS_EQUIPMENT_STATE_INVALIDATED(_, reason)
 end
 
 function Shopping:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
-    if requester == "ShoppingList" and success then
+    if requester == "ShoppingList" then
         self.requestedItems[itemID] = nil
-        self:QueueRefresh()
+        if success then
+            self:QueueRefresh()
+        end
     end
 end
 
