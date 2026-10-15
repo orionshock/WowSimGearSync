@@ -3,8 +3,12 @@
 ## Notes: WoW Sims gear synchronization foundation for Mists of Pandaria Classic.
 ## Author: Orionshock <Orionshock@gmail.com> with Codex/OpenAI
 ## X-License: MIT
+## X-Category: Inventory
+## X-Credits: Codex/OpenAI
+## IconTexture: Interface\Icons\INV_Chest_Plate04
+## OptionalDeps: ReforgeLiteMopClassic
 ## Version: 0.3.0
-# SavedVariables: WSGSDB (temporarily disabled)
+## SavedVariables: WSGSDB
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
