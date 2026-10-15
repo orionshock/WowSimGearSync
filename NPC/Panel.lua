@@ -3,7 +3,7 @@ local _, WSGS = ...
 local Panel = {}
 WSGS.NPCPanel = Panel
 
-local WIDTH, ROW_HEIGHT = 286, 20
+local WIDTH, ROW_HEIGHT, ITEM_ROW_HEIGHT, ITEM_LIST_HEIGHT = 286, 20, 52, 364
 Panel.TRANSITION_ICON = "|TInterface\\Buttons\\UI-SpellbookIcon-NextPage-Up:16:16:0:0|t"
 
 function Panel:Create(name, title)
@@ -43,6 +43,10 @@ function Panel:Anchor(frame, owner)
 end
 
 function Panel:Render(frame, mode, rows, status, buttonText, enabled)
+    for _, row in ipairs(frame.itemRows or {}) do
+        row:Hide()
+    end
+    frame.action:Show()
     frame.mode:SetText(mode or "")
     local top = -50
     for index, value in ipairs(rows or {}) do
@@ -69,4 +73,86 @@ function Panel:Render(frame, mode, rows, status, buttonText, enabled)
     frame.action:SetText(buttonText or "Continue")
     frame.action:SetEnabled(enabled == true)
     frame:SetHeight(math.max(116, 82 + (#(rows or {}) * ROW_HEIGHT) + frame.status:GetStringHeight()))
+end
+
+local function createItemRow(frame, index)
+    local row = CreateFrame("Button", nil, frame.itemContent)
+    row:SetHeight(ITEM_ROW_HEIGHT)
+    row:SetPoint("TOPLEFT", 0, -((index - 1) * ITEM_ROW_HEIGHT))
+    row:SetPoint("RIGHT", frame.itemContent, "RIGHT", 0, 0)
+    local highlight = row:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints()
+    highlight:SetColorTexture(1, 1, 1, 0.08)
+
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(38, 38)
+    row.icon:SetPoint("LEFT", 2, 0)
+    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 7, 0)
+    row.name:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    row.name:SetJustifyH("LEFT")
+    row.name:SetWordWrap(false)
+    row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -2)
+    row.detail:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    row.detail:SetJustifyH("LEFT")
+    row.cost = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.cost:SetPoint("TOPLEFT", row.detail, "BOTTOMLEFT", 0, -1)
+    row.cost:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    row.cost:SetJustifyH("LEFT")
+    row:SetScript("OnClick", function(clicked)
+        if frame.itemRowClick then
+            frame.itemRowClick(clicked.entry)
+        end
+    end)
+    frame.itemRows[index] = row
+    return row
+end
+
+function Panel:RenderItemList(frame, mode, entries, status, onClick)
+    frame.mode:SetText(mode or "")
+    frame.itemRows = frame.itemRows or {}
+    frame.itemRowClick = onClick
+    if not frame.itemScroll then
+        frame.itemScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+        frame.itemScroll:SetPoint("TOPLEFT", 10, -48)
+        frame.itemScroll:SetPoint("RIGHT", frame, "RIGHT", -28, 0)
+        frame.itemContent = CreateFrame("Frame", nil, frame.itemScroll)
+        frame.itemContent:SetSize(WIDTH - 48, 1)
+        frame.itemScroll:SetScrollChild(frame.itemContent)
+    end
+    for _, row in ipairs(frame.rows) do
+        row:Hide()
+    end
+    frame.action:Hide()
+    for index, entry in ipairs(entries or {}) do
+        local row = frame.itemRows[index] or createItemRow(frame, index)
+        row.entry = entry.entry
+        row.icon:SetTexture(entry.icon)
+        row.name:SetText(entry.displayName)
+        row.name:SetTextColor(entry.r or 1, entry.g or 1, entry.b or 1)
+        row.detail:SetText(entry.detail)
+        row.cost:SetText(entry.cost)
+        if entry.affordable == false then
+            row.cost:SetTextColor(1, 0.25, 0.25)
+        else
+            row.cost:SetTextColor(0.8, 0.8, 0.8)
+        end
+        row:SetEnabled(entry.enabled ~= false)
+        row:Show()
+    end
+    for index = #(entries or {}) + 1, #frame.itemRows do
+        frame.itemRows[index]:Hide()
+    end
+    local contentHeight = #(entries or {}) * ITEM_ROW_HEIGHT
+    local visibleHeight = math.min(contentHeight, ITEM_LIST_HEIGHT)
+    frame.itemContent:SetHeight(math.max(1, contentHeight))
+    frame.itemScroll:SetHeight(math.max(1, visibleHeight))
+    frame.itemScroll:SetShown(#(entries or {}) > 0)
+    local rowBottom = -48 - visibleHeight
+    frame.status:ClearAllPoints()
+    frame.status:SetPoint("TOPLEFT", 12, rowBottom - 2)
+    frame.status:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
+    frame.status:SetText(status or "")
+    frame:SetHeight(math.max(88, 64 + visibleHeight + frame.status:GetStringHeight()))
 end
