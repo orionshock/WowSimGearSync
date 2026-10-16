@@ -34,16 +34,6 @@ end
 
 function Gems:CloseWindow()
     self.closing = true
-    local popup = self.popup
-    local which = self.confirmationWhich
-    self.popup = nil
-    self.confirmationWhich = nil
-    if popup then
-        popup:Hide()
-    end
-    if which then
-        StaticPopup_Hide(which)
-    end
     pcall(C_ItemSocketInfo.CloseSocketInfo)
     if ItemSocketingFrame and ItemSocketingFrame:IsShown() then
         HideUIPanel(ItemSocketingFrame)
@@ -86,61 +76,6 @@ function Gems:Watch(entry, phase)
     C_Timer.After(10, function()
         if self.batch and self.batch.current == entry and entry.phase == phase and entry.watch == watch then
             self:Stop("Socketing did not finish; recheck the item before retrying", "TIMEOUT")
-        end
-    end)
-end
-
-function Gems:TrackConfirmation(popup)
-    self.popup = popup
-    if not popup.wsgsGemCancelHook then
-        popup.wsgsGemCancelHook = true
-        popup:HookScript("OnHide", function(hidden)
-            local current = self.batch and self.batch.current
-            if self.popup == hidden and current then
-                if current.phase == "CONFIRMING" then
-                    self:Stop("Socketing cancelled", "CONFIRMATION_CLOSED")
-                elseif current.phase == "VERIFYING" then
-                    -- Do not reuse a confirmation frame while its previous
-                    -- native OnAccept is still on the Lua stack.
-                    self.popup, self.confirmationWhich = nil, nil
-                    self:Drive("CONFIRMATION_HIDDEN")
-                end
-            end
-        end)
-    end
-    self:Publish("CONFIRMATION")
-end
-
-function Gems:Confirm(which, data)
-    local entry = self.batch.current
-    entry.phase = "CONFIRMING"
-    self.popup = nil
-    self.confirmationWhich = which
-    if not StaticPopupDialogs[which] then
-        return self:Stop("Blizzard's socket confirmation is unavailable", which)
-    end
-    local popup = StaticPopup_Show(which, nil, nil, data)
-    if not popup then
-        return self:Stop("Blizzard's socket confirmation could not be shown", which)
-    end
-    self:TrackConfirmation(popup)
-end
-
-function Gems:ObserveConfirmation(which)
-    local entry = self.batch.current
-    entry.phase = "CONFIRMING"
-    self.popup, self.confirmationWhich = nil, which
-    -- Let Blizzard finish dispatching the synchronous confirmation event.
-    -- This callback only observes/cancels UI; it never submits a socket action.
-    C_Timer.After(0, function()
-        if not self.batch or self.batch.current ~= entry or entry.phase ~= "CONFIRMING" then
-            return
-        end
-        local popup = StaticPopup_FindVisible(which)
-        if popup then
-            self:TrackConfirmation(popup)
-        else
-            self:Stop("Blizzard's socket confirmation is unavailable", which)
         end
     end)
 end
@@ -241,7 +176,6 @@ function Gems:Stage(entry)
                     return self:Stop("The socket did not accept the required gem", "STAGE")
                 end
                 entry.staged[operation.socket] = operation.expected
-                entry.replacing = entry.replacing or existing > 0
                 log("STAGE", entry, operation, "SOCKET_INFO_UPDATE", "result=proposed", proposed)
             else
                 log("BLOCK", entry, operation, "STAGE", "reason=gem-missing-or-locked", difference.actual)
@@ -257,13 +191,11 @@ function Gems:Stage(entry)
         return self:Stop("The socket proposals or target item changed", "COMMIT_RECHECK")
     end
     log("COMMIT", entry, entry.pending, "STAGED", "result=ready")
+    entry.phase = "COMMITTING"
+    self:Watch(entry, "COMMITTING")
     if C_ItemSocketInfo.GetSocketItemBoundTradeable() and C_ItemSocketInfo.HasBoundGemProposed() then
-        self:Confirm("END_BOUND_TRADEABLE", "gem")
-    elseif entry.replacing then
-        self:Confirm("CONFIRM_ACCEPT_SOCKETS")
+        C_Item.EndBoundTradeable("gem")
     else
-        entry.phase = "COMMITTING"
-        self:Watch(entry, "COMMITTING")
         C_ItemSocketInfo.AcceptSockets()
     end
 end
@@ -285,7 +217,8 @@ function Gems:NextItem(event)
         end
         if #remaining > 0 and sameInstance(previous) then
             previous.operations = remaining
-            previous.ready, previous.committed, previous.replacing, previous.success = nil, nil, nil, nil
+            previous.ready, previous.committed, previous.success = nil, nil, nil
+            previous.confirmations, previous.confirmationPending = nil, nil
             previous.verification = {}
             return self:OpenItem(previous, event)
         end
@@ -336,18 +269,9 @@ function Gems:Step(event)
     end
     if entry.phase == "OPENING" and entry.ready then
         return self:Stage(entry)
-    elseif entry.phase == "CONFIRMING" then
-        local state = self:Publish("CONFIRM_RECHECK")
-        local field = self:Validate(entry, state)
-        if not field or not self:CheckProposals(entry) then
-            return self:Stop("The socket proposals or target item changed", event)
-        end
-        for socket, expected in pairs(entry.staged) do
-            local difference = field.sockets and field.sockets[socket]
-            if not difference or difference.state ~= "MISMATCH" or difference.expected ~= expected then
-                return self:Stop("The equipped gems or managed targets changed", event)
-            end
-        end
+    elseif entry.phase == "COMMITTING" and entry.confirmationPending then
+        entry.confirmationPending = nil
+        C_ItemSocketInfo.CompleteSocketing()
     elseif entry.phase == "VERIFYING" then
         local state = self:Publish("VERIFY")
         local field, problem = self:Validate(entry, state)
@@ -369,7 +293,7 @@ function Gems:Step(event)
         end
         -- The session lock can remain until CloseWindow in NextItem. Native
         -- success plus authoritative gem observations confirm this commit.
-        if verified and entry.success and not (self.popup and self.popup:IsShown()) then
+        if verified and entry.success then
             entry.phase = "VERIFIED"
             return self:NextItem(event)
         end
@@ -409,50 +333,43 @@ function Gems:Start(position)
     if ItemSocketingFrame and ItemSocketingFrame:IsShown() then
         return false, "Finish or close the existing socket window first"
     end
-    local entries, order = {}, {position}
+    local entries = {}
     local requested = {}
-    for other = 1, 16 do
-        if other ~= position then
-            order[#order + 1] = other
+    local controller = Internal.Planner:Build(position, state)
+    local entry = {position = position, itemID = controller.target.id,
+        inventorySlot = controller.inventorySlot, guid = controller.targetGuid,
+        operations = {}, verification = {}, targets = {}}
+    for _, operation in ipairs(controller.blocked) do
+        if operation.type == "GEM" then
+            log("BLOCK", entry, operation, "PLAN", "reason=" .. operation.reason)
         end
     end
-    for _, candidate in ipairs(order) do
-        local controller = Internal.Planner:Build(candidate, state)
-        local entry = {position = candidate, itemID = controller.target.id,
-            inventorySlot = controller.inventorySlot, guid = controller.targetGuid,
-            operations = {}, verification = {}, targets = {}}
-        for _, operation in ipairs(controller.blocked) do
-            if operation.type == "GEM" then
-                log("BLOCK", entry, operation, "PLAN", "reason=" .. operation.reason)
+    for _, operation in ipairs(controller.unknown) do
+        if operation.type == "GEM" then
+            log("BLOCK", entry, operation, "PLAN", "reason=unresolved " .. operation.reason)
+            local id = operation.expected or controller.target.id
+            if id and id > 0 and not requested[id] then
+                requested[id] = true
+                Equipment:RequestItemData(id, "GemSocketing")
             end
         end
-        for _, operation in ipairs(controller.unknown) do
-            if operation.type == "GEM" then
-                log("BLOCK", entry, operation, "PLAN", "reason=unresolved " .. operation.reason)
-                local id = operation.expected or controller.target.id
-                if id and id > 0 and not requested[id] then
-                    requested[id] = true
-                    Equipment:RequestItemData(id, "GemSocketing")
-                end
+    end
+    local operations = entry.operations
+    for _, operation in ipairs(controller.operations) do
+        if operation.type == "GEM" then
+            operations[#operations + 1] = operation
+            if not C_Item.GetItemInfo(operation.expected) and not requested[operation.expected] then
+                requested[operation.expected] = true
+                Equipment:RequestItemData(operation.expected, "GemSocketing")
             end
         end
-        local operations = entry.operations
-        for _, operation in ipairs(controller.operations) do
-            if operation.type == "GEM" then
-                operations[#operations + 1] = operation
-                if not C_Item.GetItemInfo(operation.expected) and not requested[operation.expected] then
-                    requested[operation.expected] = true
-                    Equipment:RequestItemData(operation.expected, "GemSocketing")
-                end
-            end
-        end
-        if #operations > 0 then
-            entries[#entries + 1] = entry
-            for _, operation in ipairs(operations) do
-                entry.targets[operation.socket] = operation.expected
-                log("PLAN", entry, operation, "CLICK", "result=eligible",
-                    controller.difference.fields.gems.sockets[operation.socket].actual)
-            end
+    end
+    if #operations > 0 then
+        entries[#entries + 1] = entry
+        for _, operation in ipairs(operations) do
+            entry.targets[operation.socket] = operation.expected
+            log("PLAN", entry, operation, "CLICK", "result=eligible",
+                controller.difference.fields.gems.sockets[operation.socket].actual)
         end
     end
     if #entries == 0 then
@@ -482,8 +399,7 @@ function Gems:GetSlotState(position)
     if not entry or position ~= entry.position and position ~= batch.origin then
         return
     end
-    local text = entry.phase == "CONFIRMING" and "Confirm the changes in Blizzard's socket window" or
-        entry.phase == "VERIFYING" and "Verifying installed gems..." or "Socketing managed gems..."
+    local text = entry.phase == "VERIFYING" and "Verifying installed gems..." or "Socketing managed gems..."
     return {state = "PENDING", pending = true, clickText = text, tooltipLines = {text},
         nextField = "gems", nextType = "GEM", reason = text}
 end
@@ -505,7 +421,7 @@ function Gems:OnSocketEvent(event)
             entry.ready = true
         end
     elseif event == "SOCKET_INFO_ACCEPT" or event == "SOCKET_INFO_SUCCESS" then
-        if entry.phase ~= "COMMITTING" and entry.phase ~= "CONFIRMING" and entry.phase ~= "VERIFYING" then
+        if entry.phase ~= "COMMITTING" and entry.phase ~= "VERIFYING" then
             return self:Stop("The socket window changed unexpectedly", event)
         end
         if entry.phase ~= "VERIFYING" then
@@ -515,7 +431,18 @@ function Gems:OnSocketEvent(event)
         end
         entry.success = entry.success or event == "SOCKET_INFO_SUCCESS"
     elseif event == "SOCKET_INFO_BIND_CONFIRM" or event == "SOCKET_INFO_REFUNDABLE_CONFIRM" then
-        self:ObserveConfirmation(event == "SOCKET_INFO_BIND_CONFIRM" and "BIND_SOCKET" or "REFUNDABLE_SOCKET")
+        entry.confirmations = entry.confirmations or {}
+        if entry.confirmations[event] then
+            return self:Stop("Blizzard did not accept the socket confirmation", event)
+        end
+        entry.confirmations[event] = true
+        entry.phase = "COMMITTING"
+        entry.confirmationPending = true
+        -- Blizzard may show its dialog later in this event's dispatch. Only
+        -- dismiss that stale UI here; completion runs in the event handler.
+        C_Timer.After(0, function()
+            StaticPopup_Hide(event == "SOCKET_INFO_BIND_CONFIRM" and "BIND_SOCKET" or "REFUNDABLE_SOCKET")
+        end)
     end
     self:Drive(event)
 end
