@@ -211,8 +211,11 @@ function Gems:Stage(entry)
         local existingLink = C_ItemSocketInfo.GetExistingSocketLink(operation.socket)
         local decoded = WSGS.ItemLinkDecoder:Decode(existingLink)
         local existing = decoded and decoded.id or not existingLink and 0 or nil
-        if not sameInstance(entry) or IsInventoryItemLocked(entry.inventorySlot) then
-            return self:Stop("The equipped item changed or became locked", "STAGE")
+        -- SocketInventoryItem locks its equipped item for the owned session.
+        -- The pre-open lock check rejects unrelated locks; identity remains
+        -- authoritative while we stage proposals in this window.
+        if not sameInstance(entry) then
+            return self:Stop("The equipped target item or instance changed", "STAGE")
         end
         if difference and difference.state == "MISMATCH" and difference.expected == operation.expected and
             operation.socket <= C_ItemSocketInfo.GetNumSockets() and existing == difference.actual then
@@ -364,8 +367,9 @@ function Gems:Step(event)
                     matched and "result=matched" or "result=awaiting-observation", observed)
             end
         end
-        if verified and entry.success and not IsInventoryItemLocked(entry.inventorySlot) and
-            not (self.popup and self.popup:IsShown()) then
+        -- The session lock can remain until CloseWindow in NextItem. Native
+        -- success plus authoritative gem observations confirm this commit.
+        if verified and entry.success and not (self.popup and self.popup:IsShown()) then
             entry.phase = "VERIFIED"
             return self:NextItem(event)
         end
@@ -465,7 +469,9 @@ function Gems:Start(position)
     end
     if self.batch then
         self:Drive(self.event or "CLICK")
-        self:Publish("STARTED")
+        if self.batch then
+            self:Publish("STARTED")
+        end
     end
     return true
 end
