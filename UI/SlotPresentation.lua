@@ -63,7 +63,7 @@ local function itemValue(itemID, emptyText)
     local name, _, quality, _, _, _, _, _, _, texture = C_Item.GetItemInfo(itemID)
     local color = quality and ITEM_QUALITY_COLORS[quality]
     return {
-        text = name or ("Item " .. itemID),
+        text = name or (emptyText == "Empty" and "Required gem" or "Required material"),
         texture = texture or select(5, C_Item.GetItemInfoInstant(itemID)),
         itemID = itemID,
         color = color and {color.r, color.g, color.b} or nil
@@ -77,7 +77,7 @@ local function spellValue(spellID, fallback)
         }
     end
     return {
-        text = C_Spell.GetSpellName(spellID) or fallback or ("Spell " .. spellID),
+        text = C_Spell.GetSpellName(spellID) or fallback or "Required enhancement",
         texture = C_Spell.GetSpellTexture(spellID),
         spellID = spellID
     }
@@ -102,7 +102,7 @@ local function effectValue(fieldName, effectID, difference)
     local profession = catalog.profession[effectID]
     if profession then
         return spellValue(profession.spellID or profession.spellIDs and profession.spellIDs[1],
-            "Effect ID " .. effectID)
+            "Profession enhancement")
     end
     local inventory = fieldName == "enchant" and catalog.inventory[effectID]
     if inventory then
@@ -110,10 +110,10 @@ local function effectValue(fieldName, effectID, difference)
         if itemID then
             return itemValue(itemID)
         end
-        return spellValue(inventory.spellID, "Effect ID " .. effectID)
+        return spellValue(inventory.spellID, "Enchantment")
     end
     return {
-        text = (fieldName == "reforging" and "Reforge ID " or "Effect ID ") .. effectID
+        text = fieldName == "reforging" and WSGS:GetModule("NPCReforging"):EffectText(effectID) or "Enhancement"
     }
 end
 
@@ -311,6 +311,6 @@ function Presentation:ItemTooltip(target, actionState)
     end
     local name, _, quality = C_Item.GetItemInfo(target.id)
     local color = quality and ITEM_QUALITY_COLORS[quality]
-    return name or ("Item " .. target.id), color and color.r or 1, color and color.g or 1,
+    return name or "Target item", color and color.r or 1, color and color.g or 1,
         color and color.b or 1, actionState.clickText
 end

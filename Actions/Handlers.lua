@@ -28,10 +28,6 @@ Registry.SlotHandlers = {
     [17] = {"Gems", "ItemEnhancement"}
 }
 
-local function valueText(value)
-    return value == nil and "nil" or tostring(value)
-end
-
 local function executionRequest(context, method)
     return {
         method = method,
@@ -103,7 +99,7 @@ function AdditionalSockets:Prepare(context, operation)
         operation.spellID = material and material.spellID
         operation.method = "ITEM"
         if not material then
-            return nil, string.format("Belt buckle item %d is not in carried bags", definition.itemID)
+            return nil, "Not in your bags"
         end
         if material.locked then
             return nil, "Belt buckle is locked"
@@ -177,7 +173,7 @@ function Gems:Prepare(context, operation)
     operation.material, operation.materialItemID, operation.available = material, operation.expected, count
     operation.method = "GEM"
     if not material then
-        return nil, "Gem item " .. valueText(operation.expected) .. " is not in carried bags"
+        return nil, "Not in your bags"
     end
     if material.locked then
         return nil, "Gem is locked"
@@ -216,10 +212,10 @@ function ItemEnhancement:Prepare(context, operation)
     operation.material, operation.materialItemID = material, fixedItemID or material and material.itemID
     operation.spellID, operation.method = spellID or material and material.spellID, "ITEM"
     if not MaterialCatalog.actions.inventory[operation.expected] then
-        return nil, "No confirmed material mapping for enchant " .. valueText(operation.expected)
+        return nil, "Required enchantment material is not yet known"
     end
     if not material then
-        return nil, "Required enhancement item is not in carried bags"
+        return nil, "Not in your bags"
     end
     if material.locked then
         return nil, "Enhancement item is locked"

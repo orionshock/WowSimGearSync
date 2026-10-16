@@ -157,8 +157,11 @@ function Shopping:CreateRow(index)
     highlight:SetAllPoints()
     highlight:SetColorTexture(1, 1, 1, 0.08)
 
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(20, 20)
+    row.icon:SetPoint("LEFT", 0, 0)
     row.quantity = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.quantity:SetPoint("LEFT", 3, 0)
+    row.quantity:SetPoint("LEFT", row.icon, "RIGHT", 3, 0)
     row.quantity:SetWidth(32)
     row.quantity:SetJustifyH("RIGHT")
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -168,6 +171,21 @@ function Shopping:CreateRow(index)
     row.name:SetWordWrap(false)
     row:SetScript("OnClick", function(clicked)
         self:Search(clicked.entry)
+    end)
+    row:SetScript("OnEnter", function(hovered)
+        if hovered.entry and hovered.entry.name then
+            GameTooltip:SetOwner(hovered, "ANCHOR_RIGHT")
+            GameTooltip:SetItemByID(hovered.entry.itemID)
+            GameTooltip:Show()
+        end
+    end)
+    row:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    row:SetScript("OnHide", function(hidden)
+        if GameTooltip:IsOwned(hidden) then
+            GameTooltip:Hide()
+        end
     end)
     frame.rows[index] = row
     return row
@@ -180,16 +198,18 @@ function Shopping:Render(entries)
     frame.content:SetHeight(math.max(1, #entries * ROW_HEIGHT))
     for index, entry in ipairs(entries) do
         local row = self:CreateRow(index)
-        local name, _, quality = C_Item.GetItemInfo(entry.itemID)
+        local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(entry.itemID)
+        icon = icon or select(5, C_Item.GetItemInfoInstant(entry.itemID))
         entry.name = name
         row.entry = entry
         row.quantity:SetText(entry.quantity .. " ×")
-        row.name:SetText(name or "Item " .. entry.itemID)
+        row.name:SetText(name or "Required material")
+        row.icon:SetTexture(icon)
         local color = quality and ITEM_QUALITY_COLORS[quality]
         row.name:SetTextColor(color and color.r or 0.55, color and color.g or 0.7, color and color.b or 1)
         row:SetEnabled(name ~= nil)
         row:Show()
-        if not name and not self.requestedItems[entry.itemID] then
+        if (not name or not icon) and not self.requestedItems[entry.itemID] then
             self.requestedItems[entry.itemID] = true
             Equipment:RequestItemData(entry.itemID, "ShoppingList")
         end

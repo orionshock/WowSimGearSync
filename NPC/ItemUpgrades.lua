@@ -17,12 +17,15 @@ end
 local function collect(state)
     local entries, unresolved = {}, 0
     if not state or not state.comparison then
-        return entries, unresolved
+        return entries, state and 1 or 0
     end
     for position = 1, 16 do
         local slot = state.slots[position]
         local fields = slot and slot.comparison and slot.comparison.fields
-        if fields and fields.item.state == "MATCH" then
+        local managedItem = slot and slot.target and slot.target.id and slot.target.id > 0 and not slot.target.empty
+        if managedItem and fields and fields.item.state == "UNKNOWN" then
+            unresolved = unresolved + 1
+        elseif managedItem and fields and fields.item.state == "MATCH" then
             local observations = slot.current and slot.current.observations
             local eligible = observedValue(observations and observations.upgradeEligibility)
             local current = observedValue(observations and observations.upgradeStep)
@@ -82,7 +85,7 @@ local function costPresentation(cost, state)
     for _, required in ipairs(cost.currencies) do
         local currency = C_CurrencyInfo.GetCurrencyInfo(required.currencyID)
         parts[#parts + 1] = string.format("%d %s", required.cost,
-            currency and currency.name or "currency " .. required.currencyID)
+            currency and currency.name or "Required currency")
         diagnostic[#diagnostic + 1] = string.format("currency:%d=%d", required.currencyID, required.cost)
         if not currency or currency.quantity < required.cost then
             affordable = false
@@ -90,7 +93,7 @@ local function costPresentation(cost, state)
     end
     for _, required in ipairs(cost.items) do
         local name = C_Item.GetItemInfo(required.itemID)
-        parts[#parts + 1] = string.format("%d %s", required.cost, name or "item " .. required.itemID)
+        parts[#parts + 1] = string.format("%d %s", required.cost, name or "Required material")
         diagnostic[#diagnostic + 1] = string.format("item:%d=%d", required.itemID, required.cost)
         local count = state and state.bagItemCounts and state.bagItemCounts[required.itemID] or 0
         if count < required.cost then
@@ -115,13 +118,15 @@ function Upgrades:CreatePanel()
     if self.frame then
         return self.frame
     end
-    local frame = WSGS.NPCPanel:Create("WSGSItemUpgradeCompanion", "WowSimGearSync — Item Upgrades")
+    local frame = WSGS.NPCPanel:Create("WSGSItemUpgradeCompanion", "WowSimGearSync — Item Upgrades", function()
+        self.dismissed = true
+    end)
     self.frame = frame
     return frame
 end
 
 function Upgrades:Refresh(reason, state)
-    if not self.open then
+    if not self.open or self.dismissed then
         return
     end
     local frame = self:CreatePanel()
@@ -134,6 +139,21 @@ function Upgrades:Refresh(reason, state)
     state = state or (build and Equipment:GetState(build))
     local entries, unresolved = collect(state)
     self.entries = entries
+    if not build or #entries == 0 and unresolved == 0 then
+        frame:Hide()
+        return
+    end
+    if unresolved > 0 then
+        for _, slot in ipairs(state.slots or {}) do
+            local fields = slot.comparison and slot.comparison.fields
+            local itemID = slot.target and slot.target.id
+            if fields and (fields.item.state == "MATCH" or fields.item.state == "UNKNOWN") and
+                itemID and itemID > 0 and not C_Item.GetItemInfo(itemID) and not self.requestedItems[itemID] then
+                self.requestedItems[itemID] = true
+                Equipment:RequestItemData(itemID, "ItemUpgradeStaging")
+            end
+        end
+    end
     local rows = {}
     for index, entry in ipairs(entries) do
         local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(entry.itemID)
@@ -143,7 +163,7 @@ function Upgrades:Refresh(reason, state)
         rows[index] = {
             entry = entry,
             icon = icon,
-            displayName = name or "Item " .. entry.itemID,
+            displayName = name or "Equipped item",
             r = color and color.r or 0.55,
             g = color and color.g or 0.7,
             b = color and color.b or 1,
@@ -159,12 +179,8 @@ function Upgrades:Refresh(reason, state)
         end
     end
     local status
-    if not build then
-        status = "Import a WoW Sims build first."
-    elseif #entries == 0 and unresolved > 0 then
-        status = "Matching item upgrade information is still being resolved."
-    elseif #entries == 0 then
-        status = "All applicable items are fully upgraded."
+    if #entries == 0 and unresolved > 0 then
+        status = "Loading item upgrade information..."
     elseif self.blocker then
         status = self.blocker
     elseif unresolved > 0 then
@@ -172,7 +188,7 @@ function Upgrades:Refresh(reason, state)
     else
         status = "Click an item to stage it in Blizzard's upgrade window."
     end
-    WSGS.NPCPanel:RenderItemList(frame, "Blizzard's Upgrade button completes the purchase.", rows, status,
+    WSGS.NPCPanel:RenderItemList(frame, "Use Blizzard's Upgrade button to purchase.", rows, status,
         function(row)
             self:Stage(row)
         end)
@@ -297,7 +313,11 @@ function Upgrades:PLAYER_INTERACTION_MANAGER_FRAME_SHOW(event, interactionType)
     if interactionType ~= Enum.PlayerInteractionType.ItemUpgrade then
         return
     end
+    if self.open then
+        return self:QueueRefresh(event)
+    end
     self.open = true
+    self.dismissed = false
     self.blocker = nil
     self.costs = {}
     self.requestedItems = {}
@@ -351,7 +371,8 @@ end
 
 function Upgrades:WSGS_EQUIPMENT_STATE_INVALIDATED(_, reason)
     if self.open and not self.selecting and
-        (reason == "PLAYER_EQUIPMENT_CHANGED" or reason == "BAG_UPDATE_DELAYED") then
+        (reason == "PLAYER_EQUIPMENT_CHANGED" or reason == "BAG_UPDATE_DELAYED" or
+            reason == "ITEM_DATA_LOAD_RESULT") then
         self:QueueRefresh(reason)
     end
 end

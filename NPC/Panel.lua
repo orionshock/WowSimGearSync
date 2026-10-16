@@ -6,16 +6,26 @@ WSGS.NPCPanel = Panel
 local WIDTH, ROW_HEIGHT, ITEM_ROW_HEIGHT, ITEM_LIST_HEIGHT = 286, 20, 52, 364
 Panel.TRANSITION_ICON = "|TInterface\\Buttons\\UI-SpellbookIcon-NextPage-Up:16:16:0:0|t"
 
-function Panel:Create(name, title)
+function Panel:Create(name, title, onDismiss)
     local frame = CreateFrame("Frame", name, UIParent, "TooltipBackdropTemplate")
     frame:SetWidth(WIDTH)
     frame:SetFrameStrata("DIALOG")
     frame:SetClampedToScreen(true)
     frame:Hide()
 
-    frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     frame.title:SetPoint("TOPLEFT", 12, -12)
     frame.title:SetText(title)
+    frame.title:SetPoint("RIGHT", frame, "RIGHT", -28, 0)
+    frame.title:SetJustifyH("LEFT")
+
+    frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    frame.close:SetSize(24, 24)
+    frame.close:SetPoint("TOPRIGHT", 2, 2)
+    frame.close:SetScript("OnClick", function()
+        onDismiss()
+        frame:Hide()
+    end)
 
     frame.mode = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     frame.mode:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -6)
@@ -48,7 +58,7 @@ function Panel:Render(frame, mode, rows, status, buttonText, enabled)
     end
     frame.action:Show()
     frame.mode:SetText(mode or "")
-    local top = -50
+    local top = mode and mode ~= "" and -50 or -34
     for index, value in ipairs(rows or {}) do
         local row = frame.rows[index]
         if not row then

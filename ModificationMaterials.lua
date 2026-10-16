@@ -394,7 +394,8 @@ local function professionAvailability(bags, recipe, inventorySlot)
     end
     for itemID, quantity in pairs(recipe.reagents or {}) do
         if (bags.counts[itemID] or 0) < quantity then
-            return nil, string.format("Missing item %d (%d required)", itemID, quantity)
+            return nil, string.format("Not enough %s in your bags (%d required)",
+                C_Item.GetItemInfo(itemID) or "required reagent", quantity)
         end
     end
     local spellID = recipe.spellID or recipe.spellIDs and recipe.spellIDs[1]

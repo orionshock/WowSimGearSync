@@ -18,7 +18,7 @@ local function itemName(itemID, fallback)
     if type(itemID) ~= "number" or itemID <= 0 then
         return fallback
     end
-    return C_Item.GetItemInfo(itemID) or fallback or ("item " .. itemID)
+    return C_Item.GetItemInfo(itemID) or fallback or "Required material"
 end
 
 local function operationName(operation)
@@ -26,7 +26,7 @@ local function operationName(operation)
         return nil
     end
     if operation.type == "GEM" then
-        return itemName(operation.expected, "gem " .. tostring(operation.expected))
+        return itemName(operation.expected, "Required gem")
     end
     if operation.type == "BUCKLE" then
         return itemName(operation.materialItemID, "belt buckle")

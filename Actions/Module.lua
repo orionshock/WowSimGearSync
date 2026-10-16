@@ -305,8 +305,8 @@ local function submitGem(self, controller, request)
         return false
     end
     markPending(self, controller, operation, true)
-    controller.reason = string.format("Use Blizzard Socketing: place item %d in socket %d, then apply",
-        operation.materialItemID, operation.socket)
+    controller.reason = string.format("Use Blizzard Socketing: place %s in socket %d, then apply",
+        C_Item.GetItemInfo(operation.materialItemID) or "the required gem", operation.socket)
     self:SendMessage("WSGS_ACTIONS_CHANGED", "SOCKET_OPENED")
     return true
 end

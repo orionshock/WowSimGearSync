@@ -3,7 +3,6 @@ local Reforging = WSGS:NewModule("NPCReforging", "AceEvent-3.0")
 local Equipment = WSGS:GetModule("Equipment")
 
 local REFORGE_BASE, UNFORGE = 112, -1
-local REFORGE_TRANSITION_ICON = "|T450908:22:22:0:0|t"
 local REFORGE_STATS = {
     Enum.BonusStatIndex.Spirit,
     Enum.BonusStatIndex.DodgeRating,
@@ -45,9 +44,9 @@ local function effectPair(effectID)
 end
 
 local function collect(state)
-    local entries = {}
+    local entries, unresolved = {}, 0
     if not state or not state.comparison then
-        return entries
+        return entries, state and 1 or 0
     end
     for position = 1, 16 do
         local slot = state.slots[position]
@@ -66,9 +65,33 @@ local function collect(state)
                     name = WSGS.equipmentSlots[position].name
                 }
             end
+        elseif (item.state == "MATCH" or item.state == "UNKNOWN") and slot.target and
+            slot.target.id and slot.target.id > 0 and not slot.target.empty then
+            unresolved = unresolved + 1
         end
     end
-    return entries
+    return entries, unresolved
+end
+
+function Reforging:EffectText(effectID)
+    if effectID == 0 then
+        return "None"
+    end
+    local source, destination = effectPair(effectID)
+    local names = {
+        [Enum.BonusStatIndex.Spirit] = ITEM_MOD_SPIRIT_SHORT,
+        [Enum.BonusStatIndex.DodgeRating] = ITEM_MOD_DODGE_RATING_SHORT,
+        [Enum.BonusStatIndex.ParryRating] = ITEM_MOD_PARRY_RATING_SHORT,
+        [Enum.BonusStatIndex.HitRating] = ITEM_MOD_HIT_RATING_SHORT,
+        [Enum.BonusStatIndex.CritRating] = ITEM_MOD_CRIT_RATING_SHORT,
+        [Enum.BonusStatIndex.HasteRating] = ITEM_MOD_HASTE_RATING_SHORT,
+        [Enum.BonusStatIndex.ExpertiseRating] = ITEM_MOD_EXPERTISE_RATING_SHORT,
+        [Enum.BonusStatIndex.MasteryRating] = ITEM_MOD_MASTERY_RATING_SHORT
+    }
+    if source and names[source] and names[destination] then
+        return names[source] .. " to " .. names[destination]
+    end
+    return "Unknown reforge"
 end
 
 function Reforging:GetRFL()
@@ -89,15 +112,11 @@ function Reforging:CreatePanel()
     if self.frame then
         return self.frame
     end
-    local frame = WSGS.NPCPanel:Create("WSGSReforgingCompanion", "WowSimGearSync — Reforging")
+    local frame = WSGS.NPCPanel:Create("WSGSReforgingCompanion", "WowSimGearSync — Reforging", function()
+        self.dismissed = true
+    end)
     frame.action:SetScript("OnClick", function()
         self:Activate()
-    end)
-    frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    frame.close:SetPoint("TOPRIGHT", 2, 2)
-    frame.close:SetScript("OnClick", function()
-        self.dismissed = true
-        frame:Hide()
     end)
     self.frame = frame
     return frame
@@ -115,22 +134,31 @@ function Reforging:Refresh(reason)
     end
     local build = WSGS:GetActiveSimulationProfile()
     local state = build and Equipment:GetState(build) or nil
-    local entries = collect(state)
+    local entries, unresolved = collect(state)
     self.entries = entries
+    if #entries == 0 and unresolved == 0 then
+        self.rflRunning = nil
+        frame:Hide()
+        return
+    end
+    if unresolved > 0 then
+        for _, slot in ipairs(state.slots or {}) do
+            local item = slot.comparison and slot.comparison.fields.item
+            local itemID = slot.target and slot.target.id
+            if item and (item.state == "MATCH" or item.state == "UNKNOWN") and
+                itemID and itemID > 0 and not C_Item.GetItemInfo(itemID) then
+                Equipment:RequestItemData(itemID, "ReforgingPanel")
+            end
+        end
+    end
     local rows = {}
     for index, entry in ipairs(entries) do
-        rows[index] = string.format("%s   %s %s %s", entry.name, entry.actual == 0 and "None" or entry.actual,
-            REFORGE_TRANSITION_ICON, entry.expected == 0 and "None" or entry.expected)
+        rows[index] = string.format("%s: %s", entry.name, self:EffectText(entry.expected))
     end
     local rfl, rflActive = self:GetRFL()
-    local mode = rfl and "Executor: ReforgeLite (exact WoW Sims import)" or
-                     (rflActive and "Executor: ReforgeLite integration unavailable" or
-                         "Executor: WowSimGearSync native")
     local status
-    if not build then
-        status = "Import a WoW Sims build first."
-    elseif #entries == 0 then
-        status = "All managed reforges are complete."
+    if #entries == 0 then
+        status = "Loading reforge information..."
     elseif rflActive and not rfl then
         status = "ReforgeLite is loaded, but its exact-import interface is unavailable."
     elseif rfl and not build.sourceJSON then
@@ -148,8 +176,8 @@ function Reforging:Refresh(reason)
     local enabled = build ~= nil and #entries > 0 and not self.rflRunning and
                         (self.pending ~= nil or not self.running) and
                         (not rflActive or (rfl ~= nil and build.sourceJSON ~= nil))
-    WSGS.NPCPanel:Render(frame, mode, rows, status, rfl and "Apply with ReforgeLite" or
-        (self.started and "Continue" or "Apply All"), enabled)
+    WSGS.NPCPanel:Render(frame, nil, rows, status, rflActive and "Send to ReforgeLite" or "Apply All", enabled)
+    frame.action:SetShown(#entries > 0)
     frame:Show()
     debug("PLAN", string.format("reason=%s executor=%s remaining=%d pending=%s", value(reason),
         rfl and "RFL" or "NATIVE", #entries, self.pending and self.pending.serial or "none"))
@@ -220,7 +248,7 @@ end
 function Reforging:ResolveOption(effectID)
     local wantedSource, wantedDestination = effectPair(effectID)
     if not wantedSource then
-        return nil, "Unsupported WoW Sims reforge ID " .. tostring(effectID)
+        return nil, "Unsupported WoW Sims reforge"
     end
     for _, source in ipairs(C_Reforge.GetSourceReforgeStats() or {}) do
         if source.stat == wantedSource then
@@ -376,6 +404,9 @@ function Reforging:Activate()
 end
 
 function Reforging:FORGE_MASTER_OPENED(event)
+    if self.open then
+        return self:Refresh(event)
+    end
     self.open = true
     self.dismissed = false
     self.blocker, self.pending, self.running, self.started = nil, nil, false, nil
@@ -428,7 +459,8 @@ end
 
 function Reforging:WSGS_EQUIPMENT_STATE_INVALIDATED(_, reason)
     if self.open and not self.pending and not self.running and
-        (reason == "PLAYER_EQUIPMENT_CHANGED" or reason == "BAG_UPDATE_DELAYED") then
+        (reason == "PLAYER_EQUIPMENT_CHANGED" or reason == "BAG_UPDATE_DELAYED" or
+            reason == "ITEM_DATA_LOAD_RESULT") then
         C_Timer.After(0, function()
             self:Refresh(reason)
         end)
