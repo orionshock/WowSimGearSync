@@ -53,6 +53,22 @@ local function clickInstruction(operation)
     return "Apply " .. name
 end
 
+local function npcInstruction(controller)
+    local fields = controller.difference and controller.difference.fields
+    if not fields or not fields.item or fields.item.state ~= "MATCH" then
+        return nil
+    end
+    local upgrade = fields.upgradeStep and fields.upgradeStep.state == "MISMATCH"
+    local reforge = fields.reforging and fields.reforging.state == "MISMATCH"
+    if upgrade and reforge then
+        return "Visit an Item Upgrade NPC and an Arcane Reforger."
+    elseif upgrade then
+        return "Visit an Item Upgrade NPC to upgrade this item."
+    elseif reforge then
+        return "Visit an Arcane Reforger to reforge this item."
+    end
+end
+
 local function actionText(controller, operation)
     if not controller then
         return "Click to recheck"
@@ -67,17 +83,23 @@ local function actionText(controller, operation)
     if controller.state == "PENDING" and instruction then
         return instruction .. "..."
     end
+    local npc = npcInstruction(controller)
     if controller.state == "UNKNOWN" then
-        return "Click to recheck"
+        return "Click to recheck" .. (npc and "\n" .. npc or "")
     end
     if controller.state == "BLOCKED" then
-        return controller.reason or operation and operation.reason or "Modification blocked"
+        local blocker = controller.reason or operation and operation.reason or "Modification blocked"
+        return blocker .. (npc and "\n" .. npc or "")
     end
     for _, fieldName in ipairs({"upgradeStep", "reforging"}) do
         local field = controller.difference and controller.difference.fields[fieldName]
-        if field and (field.state == "MISMATCH" or field.state == "UNKNOWN") then
-            return "No click action available"
+        if field and field.state == "UNKNOWN" then
+            local unresolved = field.reason or "Modification information is not available yet."
+            return unresolved .. (npc and "\n" .. npc or "")
         end
+    end
+    if npc then
+        return npc
     end
     return "Configuration complete"
 end

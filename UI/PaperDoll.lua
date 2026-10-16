@@ -19,6 +19,18 @@ function UI:ShowSlotTooltip(button)
     UI.ModificationTooltip:Hide()
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
     GameTooltip:ClearLines()
+    if Presentation:IsConfigurationComplete(button.difference) then
+        local inventorySlot = button.difference.currentSlotId
+        if not GameTooltip:SetInventoryItem("player", inventorySlot) then
+            if button.current and button.current.link then
+                GameTooltip:SetHyperlink(button.current.link)
+            else
+                GameTooltip:SetItemByID(button.target.id)
+            end
+        end
+        GameTooltip:Show()
+        return
+    end
     local title, red, green, blue, action = Presentation:ItemTooltip(button.target,
         button.actionState or WSGS.Actions:GetSlotState(button.position))
     GameTooltip:AddLine(title, red, green, blue)
@@ -40,7 +52,9 @@ function UI:ShowModificationTooltip(icon)
         end
         status, icon.presentation = refreshed, refreshed
     end
-    if not status then
+    if not status or status.state == "COMPLETE" then
+        self.hoveredIcon = nil
+        GameTooltip:Hide()
         UI.ModificationTooltip:Hide()
         return
     end
@@ -294,6 +308,12 @@ function UI:CreatePaperDoll()
             statusIcon:SetScript("OnLeave", function()
                 self.hoveredIcon = nil
                 UI.ModificationTooltip:Hide()
+            end)
+            statusIcon:SetScript("OnHide", function(icon)
+                if self.hoveredIcon == icon then
+                    self.hoveredIcon = nil
+                    UI.ModificationTooltip:Hide()
+                end
             end)
             statusIcon:Hide()
         end

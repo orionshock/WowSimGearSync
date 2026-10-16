@@ -238,7 +238,11 @@ local function outstandingLine(fieldName, field, item, actionState)
     end
 end
 
-local function configurationComplete(fields)
+function Presentation:IsConfigurationComplete(difference)
+    local fields = difference and difference.fields
+    if not fields then
+        return false
+    end
     if not fields.item or fields.item.state ~= "MATCH" then
         return false
     end
@@ -288,7 +292,7 @@ function Presentation:ModificationIcons(difference, actionState)
             }
         end
     end
-    if #result == 0 and configurationComplete(difference.fields) then
+    if #result == 0 and self:IsConfigurationComplete(difference) then
         result[1] = {
             key = self.complete.key,
             label = self.complete.label,

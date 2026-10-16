@@ -131,7 +131,7 @@ function Upgrades:Refresh(reason, state)
     end
     local frame = self:CreatePanel()
     local owner = _G.ItemUpgradeFrame
-    if not owner or not owner:IsShown() or not WSGS.NPCPanel:Anchor(frame, owner) then
+    if not owner or not owner:IsShown() or not WSGS.NPCPanel:Anchor(frame, owner, true) then
         frame:Hide()
         return
     end
