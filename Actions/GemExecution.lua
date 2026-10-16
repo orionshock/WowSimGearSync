@@ -63,6 +63,15 @@ function Gems:Stop(reason, event)
     self.batch = nil
     self:ReturnCursor()
     self:CloseWindow()
+    -- Blizzard can handle the same SOCKET_INFO_UPDATE after us and show the
+    -- frame again. Finish UI cleanup once that event dispatch has returned.
+    -- A newer socket interaction invalidates this cleanup, even outside WSGS.
+    local windowGeneration = self.windowGeneration
+    C_Timer.After(0, function()
+        if not self.batch and self.windowGeneration == windowGeneration then
+            self:CloseWindow()
+        end
+    end)
     self:Publish(event or "FINISHED")
     if reason and entry and WSGS.Actions and WSGS:GetActiveSimulationProfile() == batch.build then
         WSGS.Actions:GemSocketingFailed(entry.position, entry.pending or entry.operations[1], reason)
@@ -482,11 +491,13 @@ function Gems:OnEnable()
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
     hooksecurefunc("SocketInventoryItem", function()
+        self.windowGeneration = (self.windowGeneration or 0) + 1
         if self.batch and not self.opening then
             self:Stop("Another socket interaction replaced the active item", "SocketInventoryItem")
         end
     end)
     hooksecurefunc(C_Container, "SocketContainerItem", function()
+        self.windowGeneration = (self.windowGeneration or 0) + 1
         if self.batch then
             self:Stop("Another socket interaction replaced the active item", "SocketContainerItem")
         end
