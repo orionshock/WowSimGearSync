@@ -49,6 +49,7 @@ Actions\Presentation.lua
 Actions\Handlers.lua
 Actions\Planner.lua
 Actions\ProfessionExecution.lua
+Actions\GemExecution.lua
 Actions\Module.lua
 UI\Module.lua
 UI\SlotPresentation.lua

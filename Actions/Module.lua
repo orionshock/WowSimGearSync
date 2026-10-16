@@ -43,7 +43,8 @@ local function configureButton(position)
     end
     local controller = controllers[position]
     local operation = controller and controller.state == "READY" and controller.prepared
-    local actionType = operation and operation.type ~= "GEM" and not operation.nativeProfession and "item" or nil
+    local actionType = not Internal.GemExecution.batch and operation and operation.type ~= "GEM" and
+        not operation.nativeProfession and "item" or nil
     button:SetAttribute("wsgs-type1", actionType)
     button:SetAttribute("type1", actionType)
     button:SetAttribute("item1",
@@ -210,6 +211,10 @@ function Actions:Refresh(state)
 end
 
 function Actions:GetSlotState(position)
+    local gemState = Internal.GemExecution:GetSlotState(position)
+    if gemState then
+        return gemState
+    end
     local controller = controllers[position]
     return Internal.Presentation:Build(controller, selectedOperation(controller))
 end
@@ -297,18 +302,24 @@ local function markUnknown(self, controller, operation, reason)
         operation.handlerName, reason))
     self:SendMessage("WSGS_ACTIONS_CHANGED", "UNRESOLVED")
 end
-local function submitGem(self, controller, request)
-    local operation = request.operation
-    local ok, problem = pcall(SocketInventoryItem, request.inventorySlot)
-    if not ok then
-        fail(self, controller, operation, "SocketInventoryItem failed: " .. tostring(problem), "OPERATION")
-        return false
+local function submitGem(self, controller, request, button)
+    local started, problem = Internal.GemExecution:Start(controller.position)
+    -- A synchronous completion can prepare an enchant during this PreClick.
+    -- Keep this hardware click dedicated to the gem batch.
+    if not InCombatLockdown() then
+        button:SetAttribute("type1", nil)
     end
-    markPending(self, controller, operation, true)
-    controller.reason = string.format("Use Blizzard Socketing: place %s in socket %d, then apply",
-        C_Item.GetItemInfo(operation.materialItemID) or "the required gem", operation.socket)
-    self:SendMessage("WSGS_ACTIONS_CHANGED", "SOCKET_OPENED")
-    return true
+    if not started then
+        fail(self, controller, request.operation, problem, "OPERATION")
+    end
+    return started
+end
+
+function Actions:GemSocketingFailed(position, operation, reason)
+    local controller = controllers[position]
+    if controller and operation then
+        fail(self, controller, operation, reason, "OPERATION")
+    end
 end
 
 local function submitProfession(self, controller, request, button)
@@ -378,7 +389,7 @@ end
 
 local function submitRequest(self, controller, request, button)
     if request.method == "GEM" then
-        return submitGem(self, controller, request)
+        return submitGem(self, controller, request, button)
     end
     if request.method == "PROFESSION" then
         return submitProfession(self, controller, request, button)
@@ -390,9 +401,9 @@ local function submitRequest(self, controller, request, button)
     return false
 end
 
-local function activeGemAtOtherPosition(position)
+local function activeModificationAtOtherPosition(position)
     for otherPosition, other in pairs(controllers) do
-        if otherPosition ~= position and other.pending and other.pending.type == "GEM" then
+        if otherPosition ~= position and (other.pending or other.submitting) then
             return true
         end
     end
@@ -406,8 +417,8 @@ local function validateClick(controller, operation, position)
     if CursorHasItem() then
         return "Place the held cursor item first"
     end
-    if operation.type == "GEM" and activeGemAtOtherPosition(position) then
-        return "Finish the active Blizzard Socketing interaction first"
+    if operation.type == "GEM" and activeModificationAtOtherPosition(position) then
+        return "Finish the active modification first"
     end
     if SpellIsTargeting() then
         return "Finish or cancel the active item-targeting cursor first"
@@ -424,6 +435,12 @@ end
 
 function Actions:ActivateSlot(position, button)
     button.wsgsSubmission = nil
+    if Internal.GemExecution.batch then
+        if not InCombatLockdown() then
+            button:SetAttribute("type1", nil)
+        end
+        return
+    end
     if synchronizeBuild() then
         return
     end
@@ -471,6 +488,7 @@ local function finishActivation(self, position, button)
     local submission = button.wsgsSubmission
     button.wsgsSubmission = nil
     if not submission then
+        configureButton(position)
         return
     end
     local controller = controllers[submission.position]
@@ -536,23 +554,6 @@ local function handleActiveEvent(self, event, ...)
     finishEvent(self, event, submitting, ...)
 end
 
-local function hasPendingGem()
-    for _, controller in pairs(controllers) do
-        if controller.pending and controller.pending.type == "GEM" then
-            return true
-        end
-    end
-    return false
-end
-
-local function handleSocketEvent(self, event, ...)
-    local active, submitting = activeState()
-    if not active or not hasPendingGem() then
-        return
-    end
-    finishEvent(self, event, submitting, ...)
-end
-
 function Actions:PLAYER_EQUIPMENT_CHANGED(event, inventorySlot, ...)
     local active, submitting = activeState()
     if not active then
@@ -589,53 +590,6 @@ end
 
 function Actions:PLAYER_REGEN_ENABLED(event, ...)
     handleActiveEvent(self, event, ...)
-end
-
-function Actions:SOCKET_INFO_UPDATE(event, ...)
-    handleSocketEvent(self, event, ...)
-end
-
-function Actions:SOCKET_INFO_SUCCESS(event, ...)
-    handleSocketEvent(self, event, ...)
-end
-
-function Actions:SOCKET_INFO_ACCEPT(event, ...)
-    local active, submitting = activeState()
-    if not active or not hasPendingGem() then
-        return
-    end
-    for _, controller in pairs(controllers) do
-        if controller.pending and controller.pending.type == "GEM" then
-            scheduleTimeout(self, controller)
-        end
-    end
-    finishEvent(self, event, submitting, ...)
-end
-
-function Actions:SOCKET_INFO_FAILURE(event, ...)
-    local active, submitting = activeState()
-    if not active or not hasPendingGem() then
-        return
-    end
-    for _, controller in pairs(controllers) do
-        if controller.pending and controller.pending.type == "GEM" then
-            controller.failure = "Blizzard socketing reported failure"
-        end
-    end
-    finishEvent(self, event, submitting, ...)
-end
-
-function Actions:SOCKET_INFO_CLOSE(event, ...)
-    local active, submitting = activeState()
-    if not active or not hasPendingGem() then
-        return
-    end
-    for _, controller in pairs(controllers) do
-        if controller.pending and controller.pending.type == "GEM" and not controller.timeoutScheduled then
-            controller.failure = "Blizzard Socketing closed before the change was submitted"
-        end
-    end
-    finishEvent(self, event, submitting, ...)
 end
 
 function Actions:UNIT_SPELLCAST_SENT(event, unit, target, castGUID, spellID)
@@ -754,11 +708,6 @@ function Actions:OnEnable()
     planSignatures = {}
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
-    self:RegisterEvent("SOCKET_INFO_UPDATE")
-    self:RegisterEvent("SOCKET_INFO_ACCEPT")
-    self:RegisterEvent("SOCKET_INFO_SUCCESS")
-    self:RegisterEvent("SOCKET_INFO_FAILURE")
-    self:RegisterEvent("SOCKET_INFO_CLOSE")
     self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
     self:RegisterEvent("UNIT_SPELLCAST_SENT")
     self:RegisterEvent("UNIT_SPELLCAST_FAILED")
