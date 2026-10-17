@@ -6,18 +6,8 @@ ignore:
   - .pkgmeta
   - .release
   - .packaging-tools
-  - .vscode
-  - .idea
-  - .agents
-  - .codex
-  - .aws
   - AGENTS.md
   - README.md
   - docs
-  - WTF
-  - SavedVariables
-  - WSGSDB.lua
-  - WSGSDB.lua.bak
-  - "*code-quality*review*"
 
 enable-nolib-creation: no
