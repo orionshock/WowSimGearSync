@@ -33,15 +33,12 @@ local function buildIdentity(build)
         return nil
     end
     return {
-        id = build.id,
         name = build.name,
         specialization = build.specialization and {
             id = build.specialization.id,
             name = build.specialization.name,
             class = build.specialization.class
-        } or nil,
-        equipmentSetID = build.equipmentSetID,
-        equipmentSetName = build.equipmentSetName
+        } or nil
     }
 end
 

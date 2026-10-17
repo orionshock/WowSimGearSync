@@ -12,8 +12,7 @@ local labels = {
 }
 
 function WSGS:CompareLatestEquipment()
-    local character = self.db.char
-    local profile = character.simulationProfiles[character.latestSimulationProfileId]
+    local profile = self:GetActiveSimulationProfile()
     if not profile then
         self:Print("[COMPARE] Import a WoW Sims build before comparing equipment.")
         return

@@ -203,7 +203,7 @@ function Reforging:Refresh(reason)
 end
 
 function Reforging:Handoff(rfl, build)
-    local signature = build.id .. "\031" .. build.sourceJSON
+    local signature = build.sourceJSON
     if self.rflSignature == signature and rfl.methodWindow then
         rfl:ShowMethodWindow(true)
         debug("RFL", string.format("build=%s action=use-existing-exact-queue", build.name))

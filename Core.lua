@@ -7,16 +7,15 @@ WSGS.version = "0.3.0"
 
 local defaults = {
     profile = {
-        recommendedEngineeringTinkers = true,
-        debug = true,
+        engineeringCloakFallback = true,
+        equipmentSets = true,
+        debug = false,
         minimap = {
             hide = true,
             minimapPos = 225
         }
     },
-    char = {
-        simulationProfiles = {}
-    }
+    char = {}
 }
 
 local commandOptions = {
@@ -73,17 +72,12 @@ local commandOptions = {
                 WSGS:ProbeEquipment(tonumber(value))
             end
         },
-        engineering = {
-            type = "toggle",
-            name = "Engineering defaults",
+        options = {
+            type = "execute",
+            name = "Options",
             order = 5,
-            desc = "Recommend glove and waist tinkers when the export omits them; Goblin Glider is always presumed.",
-            get = function()
-                return WSGS.db.profile.recommendedEngineeringTinkers
-            end,
-            set = function(_, enabled)
-                WSGS.db.profile.recommendedEngineeringTinkers = enabled
-                WSGS.UI:RefreshPaperDoll()
+            func = function()
+                Settings.OpenToCategory(WSGS.optionsCategory)
             end
         }
     }
@@ -194,6 +188,7 @@ end
 function WSGS:RegisterAceConfig()
     LibStub("AceConfig-3.0"):RegisterOptionsTable("WowSimGearSync", commandOptions)
     LibStub("AceConfigCmd-3.0"):CreateChatCommand("wsgs", "WowSimGearSync")
+    self:RegisterOptionsPanel()
 end
 
 function WSGS:RefreshDBIconSettings()
@@ -216,6 +211,5 @@ function WSGS:OnInitialize()
 end
 
 function WSGS:GetActiveSimulationProfile()
-    local character = self.db.char
-    return character.simulationProfiles[character.latestSimulationProfileId]
+    return self.db.char.activeImport
 end

@@ -154,7 +154,6 @@ Materials.actions = {
             profession = 202, -- Engineering skill line.
             spellID = 55016, -- Nitro Boosts recipe.
             slot = 6, -- Waist inventory slot.
-            recommended = true,
             reagents = tinkerReagents
         },
         [4697] = { -- Phase Fingers (hands); equipped use spell 108788.
@@ -173,15 +172,12 @@ Materials.actions = {
             profession = 202, -- Engineering skill line.
             spellID = 126392, -- Goblin Glider recipe.
             slot = 15, -- Back inventory slot.
-            recommended = true,
-            presumedWhenOmitted = true, -- Engineers default to Goblin Glider when the import has no cloak tinker.
             reagents = tinkerReagents
         },
         [4898] = { -- Synapse Springs (hands); equipped use spell 126734.
             profession = 202, -- Engineering skill line.
             spellID = 126731, -- Synapse Springs recipe.
             slot = 10, -- Hands inventory slot.
-            recommended = true,
             reagents = tinkerReagents
         },
 
@@ -353,7 +349,7 @@ function Materials:CharacterContext()
     end
     return {
         professions = professions,
-        recommendedProfessionEnhancements = WSGS.db.profile.recommendedEngineeringTinkers
+        engineeringCloakFallback = WSGS.db.profile.engineeringCloakFallback
     }
 end
 
@@ -361,12 +357,8 @@ function Materials:RecommendedProfessionEnhancement(inventorySlot, context)
     if not context then
         return nil
     end
-    for effectID, definition in pairs(self.actions.profession) do
-        local validSlot = definition.slot == inventorySlot or definition.slots and definition.slots[inventorySlot]
-        local enabled = definition.presumedWhenOmitted or context.recommendedProfessionEnhancements
-        if definition.recommended and enabled and validSlot and context.professions[definition.profession] then
-            return effectID, "RECOMMENDED"
-        end
+    if inventorySlot == 15 and context.engineeringCloakFallback and context.professions[202] then
+        return 4897, "RECOMMENDED"
     end
 end
 

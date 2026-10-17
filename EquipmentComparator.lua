@@ -257,7 +257,6 @@ function Comparator:Compare(profile, snapshot)
         return nil, "Equipment snapshot is unavailable."
     end
     local result = {
-        profileId = profile.id,
         profileName = profile.name,
         slots = {},
         assignments = {},

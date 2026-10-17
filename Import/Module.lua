@@ -195,6 +195,6 @@ function Import:ImportEquipment(text)
     WSGS:Debug("[IMPORT] API version: " .. profile.apiVersion)
     WSGS:Debug("[IMPORT] Equipment entries: " .. profile.metadata.entryCount)
     WSGS:Debug("[IMPORT] Profile saved: " .. profile.name)
-    self:SendMessage("WSGS_BUILD_IMPORTED", profile.id)
+    self:SendMessage("WSGS_BUILD_IMPORTED", profile)
     return profile
 end

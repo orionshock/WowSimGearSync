@@ -67,7 +67,7 @@ local function synchronizeBuild()
         if operation then
             debug("CANCEL", string.format(
                 "build=%s nextBuild=%s slot=%d serial=%s type=%s expected=%s count=%s guid=%s reason=build-replaced verification-only",
-                valueText(previousBuild and previousBuild.id), valueText(build and build.id),
+                valueText(previousBuild and previousBuild.name), valueText(build and build.name),
                 controller.inventorySlot, valueText(controller.serial), operation.type,
                 valueText(operation.expected), valueText(operation.expectedCount), valueText(controller.targetGuid)))
         end

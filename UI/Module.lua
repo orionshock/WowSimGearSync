@@ -26,11 +26,12 @@ end
 
 function UI:CommitBuildName()
     local input = self.paperDoll.buildName
-    local build, reason = WSGS.Import:RenameBuild(WSGS.db.char, input.buildId, input:GetText())
+    local build, reason = WSGS.Import:RenameBuild(WSGS.db.char, input.build, input:GetText())
     if build then
         self.profile = build
         input:SetText(build.name)
     else
+        WSGS:Print(reason)
         input:SetText(self.profile and self.profile.name or "No active build")
     end
     input:ClearFocus()

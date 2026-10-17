@@ -90,10 +90,10 @@ function UI:RenderPaperDoll(state)
     local comparison = state and state.comparison
     local reason = state and state.reason
     self.profile = profile
-    if not frame.buildName:HasFocus() or frame.buildName.buildId ~= (profile and profile.id) then
+    if not frame.buildName:HasFocus() or frame.buildName.build ~= WSGS:GetActiveSimulationProfile() then
         frame.buildName:SetText(profile and profile.name or "No active build")
     end
-    frame.buildName.buildId = profile and profile.id
+    frame.buildName.build = WSGS:GetActiveSimulationProfile()
     if profile then
         frame.buildName:Enable()
     else

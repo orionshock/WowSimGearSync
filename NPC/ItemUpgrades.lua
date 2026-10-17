@@ -193,7 +193,7 @@ function Upgrades:Refresh(reason, state)
             self:Stage(row)
         end)
     frame:Show()
-    local signature = string.format("%s:%d:%d:%s", build and build.id or "none", #entries, unresolved,
+    local signature = string.format("%s:%d:%d:%s", build and build.name or "none", #entries, unresolved,
         self.blocker or "")
     if signature ~= self.planSignature then
         self.planSignature = signature
