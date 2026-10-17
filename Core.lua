@@ -5,7 +5,7 @@ local LibDataBroker = LibStub("LibDataBroker-1.1")
 local LibDBIcon = LibStub("LibDBIcon-1.0")
 
 local version = C_AddOns.GetAddOnMetadata(addonName, "Version")
-WSGS.version = version == "@project-version@" and "Development" or version
+WSGS.version = version and not version:find("@", 1, true) and version or "Development"
 
 local defaults = {
     profile = {
