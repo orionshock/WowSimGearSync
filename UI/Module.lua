@@ -45,12 +45,8 @@ function UI:RefreshPaperDoll()
     self:RenderPaperDoll(state)
 end
 
-function UI:QueuePaperDollRefresh(event, itemId, success)
+function UI:QueuePaperDollRefresh()
     if not self.paperDoll or not self.paperDoll:IsShown() then
-        return
-    end
-    if not refreshEvents[event] and
-        (not itemDataEvents[event] or not success or not self.relevantItems[itemId]) then
         return
     end
     if self.refreshQueued then
@@ -64,12 +60,11 @@ function UI:QueuePaperDollRefresh(event, itemId, success)
 end
 
 
-function UI:WSGS_ACTIONS_CHANGED()
-    self:QueuePaperDollRefresh("PLAYER_EQUIPMENT_CHANGED")
-end
-
-function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED(_, event, ...)
-    self:QueuePaperDollRefresh(event, ...)
+function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED(_, event, itemID, success)
+    if refreshEvents[event] or
+        itemDataEvents[event] and success and self.relevantItems and self.relevantItems[itemID] then
+        self:QueuePaperDollRefresh()
+    end
 end
 
 function UI:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
@@ -77,14 +72,14 @@ function UI:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
         return
     end
     self.requestedItems[itemID] = nil
-    if success then
-        self:QueuePaperDollRefresh("ITEM_DATA_LOAD_RESULT", itemID, true)
+    if success and self.relevantItems and self.relevantItems[itemID] then
+        self:QueuePaperDollRefresh()
     end
 end
 
 function UI:OnEnable()
     self:RegisterMessage("WSGS_BUILD_IMPORTED", "RefreshPaperDoll")
-    self:RegisterMessage("WSGS_ACTIONS_CHANGED")
+    self:RegisterMessage("WSGS_ACTIONS_CHANGED", "QueuePaperDollRefresh")
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED", "UpdateEquipButton")
     self:RegisterMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED")
     self:RegisterMessage("WSGS_ITEM_DATA_RECEIVED")
