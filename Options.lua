@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 
 function WSGS:RegisterOptionsPanel()
     local options = {
@@ -15,21 +16,21 @@ function WSGS:RegisterOptionsPanel()
         args = {
             debug = {
                 type = "toggle",
-                name = "Enable debug logging",
+                name = L["Enable debug logging"],
                 order = 1,
                 width = "full"
             },
             engineeringCloakFallback = {
                 type = "toggle",
-                name = "Default Engineering cloak: Goblin Glider",
-                desc = "Use Goblin Glider when your import omits a cloak tinker. Imported enhancements take priority.",
+                name = L["Default Engineering cloak: Goblin Glider"],
+                desc = L["Use Goblin Glider when your import omits a cloak tinker. Imported enhancements take priority."],
                 order = 2,
                 width = "full"
             },
             equipmentSets = {
                 type = "toggle",
-                name = "Create/update Equipment Manager sets",
-                desc = "Save verified equipment using the active import's name. Other sets are left alone.",
+                name = L["Create/update Equipment Manager sets"],
+                desc = L["Save verified equipment using the active import's name. Other sets are left alone."],
                 order = 3,
                 width = "full"
             }

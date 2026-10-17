@@ -10,8 +10,7 @@ is asserted.
 
 LibDBIcon-1.0, minor 56, by Funkydude; credits Rabbit and copystring
 Upstream: https://www.wowace.com/projects/libdbicon-1-0
-License: GNU GPL version 2 or later, as identified in the locally installed
-LibDBIcon-1.0.toc at C:\WoWAddons\Gargul\Libs\LibDBIcon-1.0.
+License: GNU GPL version 2 or later, as identified in the upstream library distribution.
 The GPL v2 text is included in LibDBIcon-1.0/COPYING.txt, copied verbatim from
 the local AtlasLootClassic license. This applies to the library, not an invented
 license grant for unrelated source. Library source is unmodified.
