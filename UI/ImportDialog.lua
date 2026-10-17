@@ -26,6 +26,7 @@ function UI:SubmitImport(frame)
         return nil, reason
     end
     frame:Hide()
+    frame.importInput:SetText("")
     return profile
 end
 

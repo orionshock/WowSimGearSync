@@ -92,7 +92,7 @@ local ldbObjectDefinition = {
         if button == "LeftButton" then
             WSGS.UI:TogglePaperDoll()
         elseif button == "RightButton" then
-            WSGS.UI:ToggleImportDialog()
+            Settings.OpenToCategory(WSGS.optionsCategory)
         end
     end,
     OnTooltipShow = function(tooltip)
@@ -100,7 +100,7 @@ local ldbObjectDefinition = {
         tooltip:AddLine(ldbObjectName)
         tooltip:AddLine("Active build: " .. (build and build.name or "None"), 1, 1, 1)
         tooltip:AddLine("Left-click: Toggle equipment view", 0.8, 0.8, 0.8)
-        tooltip:AddLine("Right-click: Toggle import window", 0.8, 0.8, 0.8)
+        tooltip:AddLine("Right-click: Open options", 0.8, 0.8, 0.8)
     end
 }
 
