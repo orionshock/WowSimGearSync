@@ -444,7 +444,7 @@ function Actions:Click(position)
         local reason
         selectedPlan, reason = self:GetSlotEquipPlan(position, state)
         if not selectedPlan then
-            WSGS:Print("[EQUIP] " .. reason)
+            WSGS:Print("[EQUIP] " .. WSGS:FormatPlayerReason(reason))
             self:SendMessage("WSGS_ACTIONS_CHANGED", "SLOT_EQUIP_RECHECK")
             return
         end
@@ -459,9 +459,9 @@ function Actions:Click(position)
         return
     end
     if not position and self.state ~= "READY" then
-        WSGS:Print("[EQUIP] " ..
-                       (self.state == "COMBAT" and "Cannot equip in combat." or self.plan.blocked[1] or
-                           "No available equipment changes."))
+        WSGS:Print("[EQUIP] " .. WSGS:FormatPlayerReason(
+            self.state == "COMBAT" and "Cannot equip in combat." or self.plan.blocked[1] or
+                "No available equipment changes."))
         return
     end
     if GetCursorInfo() then

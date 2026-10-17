@@ -22,7 +22,7 @@ function UI:SubmitImport(frame)
     frame.importInput:ClearFocus()
     local profile, reason = WSGS.Import:ImportEquipment(frame.importInput:GetText())
     if not profile then
-        frame.importStatus:SetText("Import failed: " .. reason)
+        frame.importStatus:SetText("Import failed: " .. WSGS:FormatPlayerReason(reason))
         return nil, reason
     end
     frame:Hide()
@@ -73,7 +73,7 @@ function UI:CreateImportDialog()
 
     local inputLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     inputLabel:SetPoint("TOPLEFT", 74, -48)
-    inputLabel:SetText("Paste at least the Gear from WoW Sims JSON Export")
+    inputLabel:SetText("Paste your WoW Sims JSON export with Gear included.")
     local scroll = CreateFrame("ScrollFrame", "WSGSImportScrollFrame", frame, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 24, -72)
     scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -46, 116)

@@ -40,7 +40,7 @@ end
 function Sync:Block(profile, reason)
     WSGS:Debug(string.format("[SET][BLOCK] build=%s setID=%s reason=%s", shown(profile and profile.name),
         shown(profile and profile.equipmentSetID), reason))
-    WSGS:Print("[SET] Equipment set not synchronized: " .. reason)
+    WSGS:Print("[SET] Equipment set not saved: " .. WSGS:FormatPlayerReason(reason))
     return nil, reason
 end
 

@@ -3,7 +3,7 @@ local _, WSGS = ...
 local Panel = {}
 WSGS.NPCPanel = Panel
 
-local WIDTH, ROW_HEIGHT, ITEM_ROW_HEIGHT = 286, 20, 52
+local WIDTH, ITEM_ROW_HEIGHT = 286, 52
 Panel.TRANSITION_ICON = "|TInterface\\Buttons\\UI-SpellbookIcon-NextPage-Up:16:16:0:0|t"
 
 function Panel:Create(name, title, onDismiss)
@@ -32,7 +32,6 @@ function Panel:Create(name, title, onDismiss)
     frame.mode:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
     frame.mode:SetJustifyH("LEFT")
 
-    frame.rows = {}
     frame.status = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     frame.status:SetJustifyH("LEFT")
     frame.status:SetWordWrap(true)
@@ -55,39 +54,6 @@ function Panel:Anchor(frame, owner, matchHeight)
     return true
 end
 
-function Panel:Render(frame, mode, rows, status, buttonText, enabled)
-    for _, row in ipairs(frame.itemRows or {}) do
-        row:Hide()
-    end
-    frame.action:Show()
-    frame.mode:SetText(mode or "")
-    local top = mode and mode ~= "" and -50 or -34
-    for index, value in ipairs(rows or {}) do
-        local row = frame.rows[index]
-        if not row then
-            row = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            row:SetPoint("TOPLEFT", 12, top - ((index - 1) * ROW_HEIGHT))
-            row:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
-            row:SetJustifyH("LEFT")
-            row:SetWordWrap(false)
-            frame.rows[index] = row
-        end
-        row:SetText(value)
-        row:Show()
-    end
-    for index = #(rows or {}) + 1, #frame.rows do
-        frame.rows[index]:Hide()
-    end
-    local rowBottom = top - (#(rows or {}) * ROW_HEIGHT)
-    frame.status:ClearAllPoints()
-    frame.status:SetPoint("TOPLEFT", 12, rowBottom - 2)
-    frame.status:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
-    frame.status:SetText(status or "")
-    frame.action:SetText(buttonText or "Continue")
-    frame.action:SetEnabled(enabled == true)
-    frame:SetHeight(math.max(116, 82 + (#(rows or {}) * ROW_HEIGHT) + frame.status:GetStringHeight()))
-end
-
 local function createItemRow(frame, index)
     local row = CreateFrame("Button", nil, frame.itemContent)
     row:SetHeight(ITEM_ROW_HEIGHT)
@@ -104,7 +70,7 @@ local function createItemRow(frame, index)
     row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 7, 0)
     row.name:SetPoint("RIGHT", row, "RIGHT", -2, 0)
     row.name:SetJustifyH("LEFT")
-    row.name:SetWordWrap(false)
+    row.name:SetWordWrap(true)
     row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.detail:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -2)
     row.detail:SetPoint("RIGHT", row, "RIGHT", -2, 0)
@@ -126,10 +92,11 @@ local function updateItemScroll(scroll)
     local content = scroll:GetScrollChild()
     content:SetWidth(scroll:GetWidth())
     scroll:UpdateScrollChildRect()
+    scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), scroll:GetVerticalScrollRange()))
     ScrollFrame_OnScrollRangeChanged(scroll)
 end
 
-function Panel:RenderItemList(frame, mode, entries, status, onClick)
+function Panel:RenderItemList(frame, mode, entries, status, onClick, buttonText, enabled)
     frame.mode:ClearAllPoints()
     frame.mode:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -6)
     frame.mode:SetPoint("TOPRIGHT", frame.title, "BOTTOMRIGHT", 16, -6)
@@ -137,9 +104,9 @@ function Panel:RenderItemList(frame, mode, entries, status, onClick)
     frame.itemRows = frame.itemRows or {}
     frame.itemRowClick = onClick
     frame.status:ClearAllPoints()
-    frame.status:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 12)
-    frame.status:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 12)
-    frame.status:SetText(status or "")
+    frame.status:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, buttonText and 40 or 12)
+    frame.status:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, buttonText and 40 or 12)
+    frame.status:SetText(WSGS:FormatPlayerReason(status) or "")
     if not frame.itemScroll then
         frame.itemScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
         frame.itemScroll:SetPoint("TOPLEFT", frame.mode, "BOTTOMLEFT", -2, -8)
@@ -153,10 +120,11 @@ function Panel:RenderItemList(frame, mode, entries, status, onClick)
         frame.itemScroll:SetScrollChild(frame.itemContent)
         frame.itemScroll:SetScript("OnSizeChanged", updateItemScroll)
     end
-    for _, row in ipairs(frame.rows) do
-        row:Hide()
+    frame.action:SetShown(buttonText ~= nil)
+    if buttonText then
+        frame.action:SetText(buttonText)
+        frame.action:SetEnabled(enabled == true)
     end
-    frame.action:Hide()
     frame.itemContent:SetWidth(frame.itemScroll:GetWidth())
     local contentHeight = 0
     for index, entry in ipairs(entries or {}) do
@@ -169,7 +137,7 @@ function Panel:RenderItemList(frame, mode, entries, status, onClick)
         row.name:SetText(entry.displayName)
         row.name:SetTextColor(entry.r or 1, entry.g or 1, entry.b or 1)
         row.detail:SetText(entry.detail)
-        row.cost:SetText(entry.cost)
+        row.cost:SetText(entry.cost or "")
         row:SetHeight(math.max(ITEM_ROW_HEIGHT, math.ceil(row.name:GetStringHeight() +
             row.detail:GetStringHeight() + row.cost:GetStringHeight() + 17)))
         contentHeight = contentHeight + row:GetHeight()

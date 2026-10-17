@@ -110,7 +110,7 @@ local function costPresentation(cost, state)
     if #parts == 0 then
         return "Next: No cost reported", affordable, "none"
     end
-    return "Next: " .. table.concat(parts, ", ") .. (affordable and "" or " (unaffordable)"), affordable,
+    return "Next: " .. table.concat(parts, ", ") .. (affordable and "" or " (cannot afford)"), affordable,
         table.concat(diagnostic, ",")
 end
 
@@ -184,9 +184,9 @@ function Upgrades:Refresh(reason, state)
     elseif self.blocker then
         status = self.blocker
     elseif unresolved > 0 then
-        status = "Click an item to stage it. Some matching items are still being resolved."
+        status = "Click an item to select it for upgrading. Some item information is still loading."
     else
-        status = "Click an item to stage it in Blizzard's upgrade window."
+        status = "Click an item to select it in the upgrade window."
     end
     WSGS.NPCPanel:RenderItemList(frame, "Use Blizzard's Upgrade button to purchase.", rows, status,
         function(row)

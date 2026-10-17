@@ -228,13 +228,13 @@ local function outstandingLine(fieldName, field, item, actionState)
     end
     if actionState and actionState.nextField == fieldName then
         if actionState.state == "BLOCKED" and actionState.reason then
-            return actionState.reason
+            return WSGS:FormatPlayerReason(actionState.reason)
         elseif actionState.state == "PENDING" then
-            return "Awaiting client verification."
+            return "Waiting for the item to update."
         end
     end
     if field.state == "UNKNOWN" then
-        return field.reason or "Current configuration is temporarily unavailable."
+        return WSGS:FormatPlayerReason(field.reason) or "Current configuration is temporarily unavailable."
     end
 end
 
@@ -310,14 +310,15 @@ function Presentation:ModificationIcons(difference, actionState)
 end
 
 function Presentation:ItemTooltip(target, actionState)
+    local instruction = WSGS:FormatPlayerReason(actionState.clickText)
     if not target then
         return "No target item", 0.65, 0.65, 0.65, "Import a WoW Sims build"
     end
     if target.empty or not target.id or target.id == 0 then
-        return "Empty slot", 0.65, 0.65, 0.65, actionState.clickText
+        return "Empty slot", 0.65, 0.65, 0.65, instruction
     end
     local name, _, quality = C_Item.GetItemInfo(target.id)
     local color = quality and ITEM_QUALITY_COLORS[quality]
     return name or "Target item", color and color.r or 1, color and color.g or 1,
-        color and color.b or 1, actionState.clickText
+        color and color.b or 1, instruction
 end

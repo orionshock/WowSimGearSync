@@ -104,7 +104,7 @@ function UI:RenderPaperDoll(state)
     elseif comparison then
         local s = comparison.summary
         frame.summary:SetText(string.format(
-            "Matched: %d/16  |  UnMatched: %d\nDifference: %d  |  Unknown: %d",
+            "Equipped: %d/16  |  To equip: %d\nEnhancements needed: %d  |  Unknown: %d",
             s.matched, s.itemMismatches, s.configurationMismatches, s.unknown))
     else
         frame.summary:SetText(reason or "Comparison unavailable")
@@ -198,7 +198,7 @@ function UI:UpdateEquipButton()
             actions.batch.total, plan and plan.unresolvedCount or counts.STILL_PENDING) or plan and
                      (#plan.missing > 0 and ("Missing target items: " .. #plan.missing) or plan.blocked[1] or
                          plan.unresolvedCount > 0 and (plan.unresolvedCount .. " target slot(s) unresolved.")) or ""
-    self.paperDoll.equipNote:SetText(note)
+    self.paperDoll.equipNote:SetText(WSGS:FormatPlayerReason(note))
 end
 
 function UI:CreatePaperDoll()

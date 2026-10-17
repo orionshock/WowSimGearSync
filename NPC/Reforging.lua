@@ -73,7 +73,7 @@ local function collect(state)
     return entries, unresolved
 end
 
-function Reforging:EffectText(effectID)
+function Reforging:EffectText(effectID, transition)
     if effectID == 0 then
         return "None"
     end
@@ -89,7 +89,7 @@ function Reforging:EffectText(effectID)
         [Enum.BonusStatIndex.MasteryRating] = ITEM_MOD_MASTERY_RATING_SHORT
     }
     if source and names[source] and names[destination] then
-        return names[source] .. " to " .. names[destination]
+        return names[source] .. " " .. (transition or "to") .. " " .. names[destination]
     end
     return "Unknown reforge"
 end
@@ -128,7 +128,7 @@ function Reforging:Refresh(reason)
     end
     local frame = self:CreatePanel()
     local owner = _G.ReforgingFrame
-    if not owner or not owner:IsShown() or not WSGS.NPCPanel:Anchor(frame, owner) then
+    if not owner or not owner:IsShown() or not WSGS.NPCPanel:Anchor(frame, owner, true) then
         frame:Hide()
         return
     end
@@ -146,25 +146,43 @@ function Reforging:Refresh(reason)
             local item = slot.comparison and slot.comparison.fields.item
             local itemID = slot.target and slot.target.id
             if item and (item.state == "MATCH" or item.state == "UNKNOWN") and
-                itemID and itemID > 0 and not C_Item.GetItemInfo(itemID) then
+                itemID and itemID > 0 and not C_Item.GetItemInfo(itemID) and not self.requestedItems[itemID] then
+                self.requestedItems[itemID] = true
                 Equipment:RequestItemData(itemID, "ReforgingPanel")
             end
         end
     end
     local rows = {}
     for index, entry in ipairs(entries) do
-        rows[index] = string.format("%s: %s", entry.name, self:EffectText(entry.expected))
+        local slot = state.slots[entry.position]
+        local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(slot.current.link or entry.itemID)
+        icon = icon or select(5, C_Item.GetItemInfoInstant(entry.itemID))
+        local color = quality and ITEM_QUALITY_COLORS[quality]
+        rows[index] = {
+            icon = icon,
+            displayName = name or "Equipped item",
+            r = color and color.r or 0.55,
+            g = color and color.g or 0.7,
+            b = color and color.b or 1,
+            detail = WSGS.equipmentSlots[slot.physicalPosition].name .. "\n" ..
+                (entry.expected == 0 and "Remove reforge" or
+                    self:EffectText(entry.expected, WSGS.NPCPanel.TRANSITION_ICON))
+        }
+        if (not name or not icon) and not self.requestedItems[entry.itemID] then
+            self.requestedItems[entry.itemID] = true
+            Equipment:RequestItemData(entry.itemID, "ReforgingPanel")
+        end
     end
     local rfl, rflActive = self:GetRFL()
     local status
     if #entries == 0 then
         status = "Loading reforge information..."
     elseif rflActive and not rfl then
-        status = "ReforgeLite is loaded, but its exact-import interface is unavailable."
+        status = "ReforgeLite cannot accept this build. Check that it is up to date."
     elseif rfl and not build.sourceJSON then
-        status = "This build predates source-JSON preservation; import it again."
+        status = "Import this build again before sending it to ReforgeLite."
     elseif self.rflRunning then
-        status = "ReforgeLite owns the active transaction batch."
+        status = "ReforgeLite is applying your reforges."
     elseif self.blocker then
         status = self.blocker
     else
@@ -176,7 +194,8 @@ function Reforging:Refresh(reason)
     local enabled = build ~= nil and #entries > 0 and not self.rflRunning and
                         (self.pending ~= nil or not self.running) and
                         (not rflActive or (rfl ~= nil and build.sourceJSON ~= nil))
-    WSGS.NPCPanel:Render(frame, nil, rows, status, rflActive and "Send to ReforgeLite" or "Apply All", enabled)
+    WSGS.NPCPanel:RenderItemList(frame, "Target reforges", rows, status, nil,
+        rflActive and "Send to ReforgeLite" or "Apply All", enabled)
     frame.action:SetShown(#entries > 0)
     frame:Show()
     debug("PLAN", string.format("reason=%s executor=%s remaining=%d pending=%s", value(reason),
@@ -468,10 +487,21 @@ function Reforging:WSGS_EQUIPMENT_STATE_INVALIDATED(_, reason)
 end
 
 function Reforging:OnEnable()
+    self.requestedItems = {}
     self:RegisterEvent("FORGE_MASTER_OPENED")
     self:RegisterEvent("FORGE_MASTER_ITEM_CHANGED")
     self:RegisterEvent("FORGE_MASTER_CLOSED")
     self:RegisterEvent("UI_ERROR_MESSAGE")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
+    self:RegisterMessage("WSGS_ITEM_DATA_RECEIVED")
+end
+
+function Reforging:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
+    if requester == "ReforgingPanel" then
+        self.requestedItems[itemID] = nil
+        if success then
+            self:Refresh("item-data-received")
+        end
+    end
 end
