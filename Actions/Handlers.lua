@@ -28,16 +28,6 @@ Registry.SlotHandlers = {
     [17] = {"Gems", "ItemEnhancement"}
 }
 
-local function executionRequest(context, method)
-    return {
-        method = method,
-        operation = context.operation,
-        inventorySlot = context.inventorySlot,
-        targetItemID = context.target.id,
-        targetGUID = context.targetGuid
-    }
-end
-
 local function verify(context)
     local operation, difference = context.operation, context.difference
     if not difference then
@@ -120,9 +110,6 @@ function AdditionalSockets:Prepare(context, operation)
     end
     return operation
 end
-function AdditionalSockets:Apply(context)
-    return executionRequest(context, context.operation.method)
-end
 AdditionalSockets.Verify = verify
 
 local Gems = {}
@@ -180,9 +167,6 @@ function Gems:Prepare(context, operation)
     end
     return operation
 end
-function Gems:Apply(context)
-    return executionRequest(context, "GEM")
-end
 Gems.Verify = verify
 
 local ItemEnhancement = {}
@@ -221,9 +205,6 @@ function ItemEnhancement:Prepare(context, operation)
         return nil, "Enhancement item is locked"
     end
     return operation
-end
-function ItemEnhancement:Apply(context)
-    return executionRequest(context, "ITEM")
 end
 ItemEnhancement.Verify = verify
 
@@ -270,9 +251,6 @@ function ProfessionEnhancement:Prepare(context, operation)
         return nil, reason
     end
     return operation
-end
-function ProfessionEnhancement:Apply(context)
-    return executionRequest(context, "PROFESSION")
 end
 ProfessionEnhancement.Verify = verify
 

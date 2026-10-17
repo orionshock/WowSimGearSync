@@ -470,16 +470,13 @@ function Actions:ActivateSlot(position, button)
             operation.nativeProfession and "native" or "secure"))
     debug("EXEC", string.format("slot=%d handler=%s check=READY method=%s", controller.inventorySlot,
         operation.handlerName, operation.method))
-    local request = operation.handler:Apply({
+    local request = {
+        method = operation.method,
         operation = operation,
         inventorySlot = controller.inventorySlot,
-        target = controller.target,
-        targetGuid = controller.targetGuid
-    })
-    if not request then
-        fail(self, controller, operation, "Handler did not provide an execution request")
-        return
-    end
+        targetItemID = controller.target.id,
+        targetGUID = controller.targetGuid
+    }
     submitRequest(self, controller, request, button)
 end
 
