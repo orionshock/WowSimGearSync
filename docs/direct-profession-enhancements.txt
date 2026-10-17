@@ -1,15 +1,15 @@
-Task 024: Direct profession enhancements — MoP Classic only
+Direct profession enhancements (MoP Classic, Interface 50504)
 
 Execution contract
 
-Direct item-targeting recipes reuse the slot-click sequence already proven for
+Direct item-targeting recipes reuse the slot-click sequence used for
 Engineering: open the profession through its profession spellbook button, find
 the exact recipe link, verify reagents/tools/cooldown and selection, call
 DoTradeSkill, and target the equipped item with UseInventoryItem. No protected
-step is deferred to an event or timer. Events only verify the resulting equipped
-state and close the TradeSkill frame after UNIT_SPELLCAST_SUCCEEDED.
+step is deferred to an event or timer. Events correlate casts, verify the equipped result, and close the TradeSkill
+frame after a matching UNIT_SPELLCAST_SUCCEEDED.
 
-Confirmed direct mappings
+Configured direct mappings
 
 Blacksmithing (skill line 164; effect is an added socket):
 - Wrist: recipes 113263 or 55628; SpellItemEnchantment 3717; 4 Strong Flux (3466)
@@ -40,18 +40,18 @@ Enchanting (skill line 333; 2 Spirit Dust, item 74249):
 Inscription boundary
 
 Secret Inscription profession recipes create BoP enhancement items instead of
-starting item targeting. Creating them would be intermediate-item crafting, so
-it is deliberately not automated. Already-carried finished items remain usable:
+starting item targeting. WSGS does not automate that intermediate crafting. Already-carried finished items remain usable:
 4912/87581 (Ox Horn), 4913/87585 (Tiger Fang), 4914/87584 (Tiger Claw), and
 4915/87582 (Crane Wing).
 
 Socket observation
 
-C_Item.GetItemNumSockets(target item ID) establishes the native socket count.
-An imported Wrist or Hands gem position beyond that count requests the
-Blacksmithing socket. C_Item.GetItemNumAddedSockets(equipped link) independently
-verifies the added socket before gem planning advances. Native sockets are not
-treated as profession-added sockets.
+EquipmentScanner observes the equipped link with C_Item.GetItemNumSockets and
+C_Item.GetItemNumAddedSockets, and considers populated link gem positions.
+The comparator compares the highest imported positive gem position against the
+observed socket count. Wrist/hands socket work applies only to Blacksmiths;
+without that profession the prerequisite is NOT_APPLICABLE. An unavailable count
+stays UNKNOWN. A verified socket prerequisite allows gem planning to advance.
 
 Sources
 
@@ -60,7 +60,5 @@ Sources
   SelectTradeSkill, GetTradeSkillSelectionIndex, and DoTradeSkill behavior.
 - Installed Blizzard generated Item API documentation for
   C_Item.GetItemNumSockets and C_Item.GetItemNumAddedSockets.
-- Wowhead MoP Classic spell pages for every listed recipe/effect pair and its
-  reagents. The Secret Inscription recipe pages identify Create Item effects;
-  their item-effect pages identify enchant IDs 4912 through 4915.
-
+Recipe/effect/reagent values above describe the configured mappings in
+ModificationMaterials.lua. They do not claim live validation of every recipe.

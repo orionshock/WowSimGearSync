@@ -1,136 +1,33 @@
-Task 012: Broker launcher and read-only differential paper doll
+Equipment view and launcher (MoP Classic, Interface 50504)
 
-LIBRARIES
-Unmodified local copies from C:\WoWAddons\AtlasLootClassic\Libs:
-LibDataBroker-1.1 minor 4 and LibDBIcon-1.0 minor 56. Both load after existing
-LibStub/CallbackHandler; no duplicate dependencies. License/provenance notices
-are in Libs/Broker-NOTICES.txt, the original LDB README is retained, and the
-GPL v2 text for LibDBIcon is included. The maintainer explicitly documents LDB
-hard-embedding at https://www.wowace.com/projects/libdatabroker-1-1.
-No missing upstream license grant is invented.
+Core registers the WowSimGearSync LibDataBroker launcher. Left-click toggles the
+equipment view; right-click opens Blizzard options. LibDBIcon uses
+db.profile.minimap with hide=true and minimapPos=225 defaults. AceDB callbacks
+refresh its profile binding. SavedVariables persist position and settings.
+Bundled broker licenses and provenance remain under Libs.
 
-LAUNCHER AND DATABASE
-Core.lua registers the WowSimGearSync LDB object with type "launcher", with the existing WoW
-INV_Chest_Plate04 texture. Left-click toggles PaperDoll; right-click toggles the
-existing import window. Tooltip shows active/latest build and mouse actions.
-LibDBIcon registers the same object. db.profile.minimap stores hide=false and
-minimapPos=225 defaults; dragging uses LibDBIcon's own position storage. AceDB
-profile changes/copies/resets rebind the minimap configuration. SavedVariables
-remains disabled, so position/settings/builds last only for this session.
-Active means db.char.latestSimulationProfileId, as in compare; importing selects
-the specialization-managed build. No build selector or persistence is introduced. Slash registration/dispatch is unchanged.
+The 350 by 550 equipment view renders Equipment State targets and comparisons.
+It has 16 reusable item buttons, an editable active-import name, Import, and the
+global Equip/Sync Set control. The name editor commits on Enter and cancels on
+Escape or focus loss. Successful imports close and clear the editor; failures
+retain the pasted JSON and show a readable error.
+Names and textures use client item data. Unresolved names use loading text.
 
-PAPER DOLL
-UI/Module.lua owns frame lifecycle and event binding. UI/PaperDoll.lua owns
-paper-doll construction and rendering; UI/SlotPresentation.lua owns compact
-status text and player-facing tooltip translation. No scanner or comparator
-logic is copied. Opening calls Equipment:RefreshCurrentBuild, which invokes the
-existing scanner and comparator once; rendering binds their exact targets,
-snapshot slots, differences and assignment
-objects. Empty/selected builds share the same 16 reusable buttons. Import sends an
-AceEvent message after saving; visible paper dolls refresh immediately.
-Two equipment columns, with Main Hand then Off Hand below Wrist on the left,
-use the authoritative
-EquipmentSlots tokens with GetInventorySlotInfo for empty-slot textures.
-The existing portrait, close, and panel-button templates supply the frame shell.
-Escape closes it; background dragging moves it. The top build name is editable;
-Enter commits a rename, while Escape/focus loss cancels pending edits. Import shows the existing editor.
-Equip stays disabled and explicitly says automation is not implemented.
-Plain slot buttons have no click, drag, item-use or secure equipment handlers.
+A confirmed item mismatch, including an empty equipped slot, has a red border
+and the imported target icon. Modification icons and completion checks stay
+hidden until identity matches. UNKNOWN remains distinct from missing gear.
+Hover explains availability/blockers; clicking routes to selected-slot planning.
+Rings/trinkets use resolved physical assignments. Hiding icons does not change
+underlying comparison fields or summary counts.
 
-Target item icons/names/quality come from C_Item.GetItemInfo/GetItemInfoInstant.
-Unknown names fall back to item IDs; unknown icons to the question mark. Quality
-borders remain intact. Status is displayed only beside the icon; the old
-bottom-right text badge and its black background have been removed.
-Normal tooltips show target/current names and concise applicable-step statuses.
-Upgrade progress includes current/maximum and remaining upgrades. Debug mode
-appends raw states, observation sources/reasons and resolved inventory assignment. Resolved ring and
-trinket physical slots are taken directly from currentPosition/currentSlotId;
-assignment labels distinguish inferred pairing from observed inventory data.
+Matching items show applicable modification icons with current/target tooltips.
+Item clicks route to the next available modification. Completed items show a
+completion check and normal Blizzard inventory tooltip. Reforge and upgrade
+icons direct the player to the corresponding NPC workflow.
 
-EVENTS AND CLIENT-SOURCE EVIDENCE
-C:\WoWAddons\BlizzardInterfaceCode\Interface\AddOns:
-Blizzard_SharedXML/Classic/SharedUIPanelTemplates.xml defines PortraitFrameTemplate,
-TitleContainer.TitleText, PortraitContainer.portrait, CloseButton and panel buttons.
-Blizzard_CharacterFrame/Cata/PaperDollFrame.lua:2476 calls GetInventorySlotInfo;
-PaperDollFrame.xml lists the same HeadSlot/Finger0Slot/SecondaryHandSlot conventions.
-The shared Classic/Cata character implementation is a local MoP reference, not
-a compatibility layer. Mists/PaperDollFrameUtil.lua is present in that addon.
-PLAYER_EQUIPMENT_CHANGED is registered by that source at lines 422,2522.
-Blizzard_APIDocumentationGenerated/ItemDocumentation.lua documents C_Item item
-info/instant/request APIs and GET_ITEM_INFO_RECEIVED/ITEM_DATA_LOAD_RESULT with
-itemID/success payloads. Classic/DressUpFrames.lua:165 uses C_Timer.After(0).
-
-OnShow registers those item/equipment events plus SKILL_LINES_CHANGED; OnHide unregisters all. Relevant item IDs
-are target/current IDs in the current render. Successful item-data events are
-filtered to those IDs; requests for uncached target data occur once per item per
-opening. Event bursts are coalesced with one deferred C_Timer.After(0) callback.
-There is no addon OnUpdate loop. Pending callbacks recheck visibility, so a closed
-doll does not scan. Metadata and scanner data remain separate responsibilities.
-
-EXACT IN-GAME CHECKS
-/reload
-Left-click the minimap icon (or LDB display entry); expect empty slots/import prompt.
-Right-click toggles the import window independently; /wsgs import still toggles it.
-Use the doll's Import button to show the editor. Paste/import your build.
-Expect 16 target slots, latest build heading, and comparator summary immediately.
-Hover all slots, especially rings/trinkets: verify resolved physical assignments.
-Check quality borders, adjacent status text and per-field tooltips.
-Close with X/Escape; reopen. Confirm reuse and retained editor contents.
-With the doll visible, manually change gear if desired and observe refresh;
-the addon never changes gear. Check previously uncached target names/icons load.
-Verify Equip is disabled and slot clicks do nothing.
-KNOWN LIMITATIONS / VALIDATION
-Static checks only: manifests/load order, source-copy hashes, license retention,
-registration/API/source review, and git whitespace.
-No game-client run or visual inspection is claimed.
-Actual frame layout, LDB/minimap clicks, item metadata caching and client events
-require the above runtime validation. Existing scanner UNKNOWN behavior remains;
-upgrade/tinker behavior is preserved. Buckle evidence is described below. No 3D character model,
-automation, Equip queue, Equipment Manager, LDB settings UI, or Tab work is added.
-
-TASK 013: SLOT STATUS AND WAIST BUCKLE
-Colored full-word states beside each icon appear in this order: Equipped,
-Upgraded, Gemmed, Enchant/Buckle, Tinker, Reforged (only applicable steps).
-Green means matched, amber means pending, red means wrong/missing item,
-and blue means unknown. Missing/pending steps have a leading !; matched steps
-have no symbol. Words are comma-separated and wrap within each slot's column.
-Adjacent slot names are removed; names remain in tooltips. The center contains
-only a small hover hint. Bottom counts, quality borders and disabled Equip remain. Icon corners stay clear.
-
-Buckle requirement is implied only by a positive target gems[3] at waist (export
-position 8, inventory 6). A populated third observed gem proves the implied socket
-is present. Otherwise the scanner uses C_Item.GetItemNumAddedSockets(equippedLink)
-only after C_Item.GetItemInfo returns cached item information. Local generated
-ItemDocumentation.lua:572-584 documents itemInfo -> socketCount:number.
-Positive added sockets mean present; zero means missing. API failure/unavailable
-data stays UNKNOWN. An empty third gem alone never proves a missing buckle.
-No hardcoded belt/socket database or tooltip-text guess is used.
-
-The third-gem rule is an addon policy/inference, not identification of a buckle
-enchantment. An empty added socket counts as buckle present but may still need a
-gem. Added socket API runtime availability and equipped-link semantics need
-confirmation on this MoP client; generated shared documentation is source
-evidence, not live verification. If unavailable, empty-third-position belts stay
-UNKNOWN. Wrong items block buckle matches. Gems and buckle are separate steps,
-so both can contribute to configuration differences.
-
-Exact runtime validation:
- /reload
- Import your build and open the paper doll with the launcher.
- Hover waist: verify I/G/R/U/B badges and readable names/statuses.
- /wsgs probe 8
- /run local l=GetInventoryItemLink("player",6); print(l and C_Item.GetItemNumAddedSockets(l))
- Compare that number with the belt's actual added socket, including an empty one.
- /wsgs compare
- Toggle /wsgs debug as needed to check normal versus diagnostic tooltips; restore
- your original debug setting afterward. Normal tooltips omit raw states and
- non-applicable lines. Verify upgrade text such as 0/2 (2 remaining), small
- center hint, bottom summary and no actions from slot clicks.
- No client or visual verification is claimed from static review.
-
-TASK 017 SUPERSEDES DISABLED GLOBAL EQUIP
-The global Equip button is now active when an exact-source item operation is
-actionable. Per-slot UI remains non-actionable; modification differences are not
-resolved automatically. See equip-notes.txt for planning, event verification,
-hardware restrictions and manual validation.
+Equipment owns observation invalidation and item-data requests. UI messages
+coalesce relevant visible-window refreshes with C_Timer.After(0). Equipment,
+bag, lock, cursor, combat, skill, and spell changes refresh relevant presentation.
+Item-data completions are requester-filtered. Hidden equipment views do not
+poll; execution owners can still verify pending operations. The import editor's
+scrolling EditBox update handler is separate from inventory observation.

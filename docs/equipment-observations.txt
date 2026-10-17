@@ -1,104 +1,44 @@
-Equipment observations — MoP Classic, interface 50504
+Equipment observations and comparisons (MoP Classic, Interface 50504)
 
-Implementation: EquipmentSlots.lua, ItemLinkDecoder.lua, EquipmentScanner.lua,
-EquipmentComparator.lua, EquipmentDiagnostics.lua. Read-only; no polling.
+Equipment State owns captures, invalidation, shared item-data requests, and
+read-only results. Captures include equipped observations, carried candidates,
+modification-material indexes, character context, normalized target slots,
+physical assignments, and comparison summaries. The two bag traversals remain
+separate: EquipmentInventory retains instances and general bag destinations;
+ModificationMaterials derives preferred material/use-spell lookups. Execution
+always revalidates live data.
 
-VERIFIED LIVE LINK FIELDS (user-supplied Task 005 evidence)
-Positions exclude the literal item prefix:
-1 item ID; 2 enchant ID; 3-6 gem IDs; 9 player level; 10 reforge ID.
-strsplit preserves empty fields in the live client. The decoder's delimiter
-iterator likewise preserves all internal and trailing empty positions.
-An explicitly empty/zero modification field is KNOWN absence, represented
-as value=0, absent=true. It is distinct from unreadable data (UNKNOWN).
-Field 11 remains unidentified; it is NOT treated as specialization.
-No fields are interpreted as upgrade eligibility, progress, maximum, or tinker.
-Raw payloads and standard colored/uncolored item hyperlinks are supported.
-Links with fewer than ten fields, invalid IDs/modifications, or inconsistent
-inventory/link item IDs do not establish modification observations.
+GetInventoryItemID plus GetInventoryItemLink establishes equipped identity.
+Nil ID and nil link establish an empty slot; errors/inconsistent reads stay
+UNKNOWN. C_Item.GetItemGUID supplies instance identity when available.
+ItemLinkDecoder preserves empty fields and accepts raw/colored item links.
+Verified fields after the item prefix:
+1 item ID; 2 ordinary enchant; 3-6 gems; 9 player level; 10 reforge.
+No link field supplies upgrade progress or tinkers. Field 11 is not interpreted
+as specialization. Explicit zero/empty values differ from unreadable data.
+EquipmentInspector supplies upgrades and profession-effect observations; see
+upgrade-and-tinker-notes.txt.
 
-Captured client regression links:
-item:102250:4424:76667::::::90:131:66::::::::
-item:99027:4803:76699:76699:::::90:160:66::::::::
-Against supplied Paladin gear: cloak gem 76667 differs from target 76699;
-shoulders reforge 160 differs from target 167. Both are MISMATCH.
+The scanner captures professions once in context.professions. Action preparation
+reuses this table; profession execution rescans the live profession/spellbook.
+SKILL_LINES_CHANGED and SPELLS_CHANGED invalidate observations for a new capture.
 
-LOCAL SOURCE EVIDENCE
-Source root: C:\WoWAddons\BlizzardInterfaceCode\Interface\AddOns
-- GetInventoryItemID("player", slot): Blizzard_UIPanels_Game/Classic/
-  ContainerFrame_Shared.lua:255,422; Blizzard_FrameXML/Wrath/
-  EquipmentManager.lua:88,170. Positive ID identifies the equipped item.
-  Nil ID plus nil link means empty; API read errors remain UNKNOWN.
-- GetInventoryItemLink: Blizzard_CharacterFrame/Cata/PaperDollFrame.lua:2629
-  and Wrath/PaperDollFrame.lua:1478. Full returned link is retained.
-- GetInventorySlotInfo: Classic/DressUpFrames.lua:189. The authoritative
-  export-position mapping lives only in EquipmentSlots.lua, using inventory
-  IDs from Blizzard_FrameXMLBase/Classic/Constants.lua:173-189.
-- Item-link item ID prefix: Blizzard_SharedXML/LinkUtil.lua:120-125.
-- C_Item.GetItemGUID(ItemLocation): Blizzard_APIDocumentationGenerated/
-  ItemDocumentation.lua:290-302. CreateFromEquipmentSlot is used in Cata/
-  PaperDollFrame.lua:2625. Returned GUID retained; unavailable GUID UNKNOWN.
-  Physical inventory-slot identity enforces one-to-one assignments regardless.
-- C_Item.GetItemGem signatures remain documented, but scanner no longer calls
-  it. Verified links supply FOUR positions without gem-cache queries. Classic
-  MAX_NUM_SOCKETS=3 is not used to truncate the link's verified gem fields.
-- Item info/level APIs do not establish upgrade steps. Vendor C_Reforge APIs
-  inspect the selected vendor item, not arbitrary equipped slots; unused here.
+The comparator returns profileName, slots, assignments, and summary. Rings and
+trinkets evaluate direct/swapped pairings, prioritizing item identity and then
+known modification differences. Exact ties keep direct mapping. An assignment
+cannot reuse a physical slot. Different item IDs never match.
+Only imported gem positions are compared. Omitted enchant/reforge targets are
+not removal requests. Explicit tinkers win over the optional cloak fallback.
+Wrong or unknown items cannot receive modification MATCH claims.
 
-UPGRADE POLICY AND REMAINING UNKNOWNS
-Every nonempty target is evaluated under policy=MAXIMUM independently of
-export upgradeStep. EquipmentInspector.lua reads current/maximum only from
-GameTooltip:SetInventoryItem using ITEM_UPGRADE_TOOLTIP_FORMAT, derives remaining
-and FULLY_UPGRADED/PARTIALLY_UPGRADED/UNUPGRADED, and never hardcodes the maximum.
-Empty, failed, inconsistent, stale, or uncached tooltip information stays UNKNOWN.
-Confirmed MoP behavior: a populated, identity-verified tooltip without an upgrade
-line establishes KNOWN false eligibility and NOT_APPLICABLE upgrade progress.
-Item 95757 is a confirmed example; no item exceptions are hardcoded.
-Empty inventory slots are NOT_APPLICABLE.
-Glove use effects from C_Item.GetItemSpell map to tinkers 4898, 4697, and 4698
-using corroborated local MoP SpellItemEnchantment data. Missing/unmapped use
-spells stay UNKNOWN. Neither tooltip inspection nor item-use-spell queries
-change equipment or invoke vendor operations. See upgrade-and-tinker-notes.txt
-for complete reference evidence, restrictions, and live validation commands.
+Upgrade policy is MAXIMUM independently of imported upgradeStep. Configuration
+mismatches count fields, not actions; unknown required gem sockets can contribute
+separately. Hiding icons on wrong items does not change totals. Buckle and
+profession socket requirements remain independent prerequisites.
 
-STRUCTURES AND RULES
-Snapshot: {capturedAt, slots[1..16]}; each slot includes position, slotId,
-slotName, id/link when available, observations[field]={status,value,source,
-reason}. Item includes present=false for known empty; empty-slot modifications
-are NOT_APPLICABLE. Gems contain four values[index] observation records.
-Decoder also reports playerLevel; this is not specialization metadata.
-
-Comparison: {profileId,profileName,slots,assignments,summary}. Each slot has
-physical/target positions and inventory IDs, per-field states and expected/
-actual values, evidence source/reasons, and per-socket gem details. Only
-explicitly specified gem positions are compared. Omitted enchant/reforge/
-tinker properties are NOT_APPLICABLE and never removal instructions.
-Unknown or wrong items cannot receive modification MATCH claims.
-Unmapped mixed scalar representations remain UNKNOWN.
-
-Rings (11,12) and trinkets (13,14): evaluate direct/swapped assignments by item
-mismatches; when both assignments match both IDs, known modification differences
-break ties. Exact ties keep direct mapping. Assignments never reuse a slot.
-Summary counts item matches including intended empties; configuration mismatches
-count fields, not actions. Unknown counts required scalar/item fields and
-individual compared gem sockets; blocked gem fields count once. Maximum-upgrade
-uncertainty contributes UNKNOWN even if upgradeStep is omitted from the export.
-
-DATABASE AND FUTURE EVENTS
-Settings: db.profile.debug. Builds and latest/sequence tracking: db.char.
-SavedVariables remains disabled. Reimport after each /reload.
-Scanner.rescanEvents lists PLAYER_EQUIPMENT_CHANGED (PaperDollInfoDocumentation:
-209 and Cata/PaperDollFrame.lua:2522), GET_ITEM_INFO_RECEIVED and
-ITEM_DATA_LOAD_RESULT (ItemDocumentation.lua:1119,1130). UI/Module.lua filters
-these events to the visible paper doll and coalesces relevant refreshes with C_Timer.After.
-There is no OnUpdate polling; handlers ignore hidden windows.
-
-RUNTIME VERIFICATION
-/reload; import the supplied Paladin export; /wsgs debug; /wsgs compare.
-/wsgs probe 4: cloak (expect gem 76667 from the captured current link).
-/wsgs probe 3: shoulders (expect enchant 4803, gems 76699/76699, reforge 160).
-These probe arguments are export positions, not inventory IDs. Probes print
-raw payload, decoded enchant/reforge, four gem positions, upgrade/tinker and
-GUID status. If actual gear still matches the captured links, comparison must
-show cloak gem MISMATCH and shoulders reforge MISMATCH. Supply glove probe 7
-plus its returned engineering spell ID and tooltip text for live confirmation. No unverified
-fields will be decoded from field 11 or from unrelated colon positions.
+Equipment State caches the current build capture and invalidates on relevant
+equipment, bag, lock, profession/spellbook, and import events. Item-data requests
+share subscribers, with ITEM_DATA_LOAD_RESULT as authoritative request completion.
+UI refreshes are deferred/coalesced, not polled.
+/wsgs compare prints the active comparison; /wsgs probe 1..16 inspects export
+positions, not inventory slot IDs. /wsgs debug controls verbose logging.
