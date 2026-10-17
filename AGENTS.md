@@ -8,7 +8,7 @@ Keep related behavior together and dependency direction clear. Avoid cross-impor
 
 ## Build, Test, and Development Commands
 
-Release packaging runs through `.github/workflows/release.yml` on version tags such as `v0.3.0` and `v0.3.0-alpha1`, using BigWigsMods/packager@v2. Use annotated tags. The workflow fetches full history and uses GitHub's built-in token for Releases; no external upload credentials are needed. For local staging without publishing, run the upstream `release.sh -d -z -n "{package-name}-{project-version}"` under Bash with Git and the standard Unix tools available. This command skips ZIP creation; the hosted workflow creates the ZIP. No automated tests or local WoW runner are configured. Use `Get-ChildItem -Force` to inspect the repository, including hidden configuration files.
+Release packaging runs through `.github/workflows/release.yml` on version tags such as `v0.3.0` and `v0.3.0-alpha1`, using BigWigsMods/packager@v2. Use annotated tags. The workflow fetches full history and uses GitHub's built-in token for Releases; no external upload credentials are needed. For local staging without publishing, run the upstream `release.sh -d -z -n "{package-name}-{project-version}"` under Bash with Git and the standard Unix tools available. This command skips ZIP creation; the hosted workflow creates the ZIP. Unpackaged checkouts use the TOC version placeholder and report Development in addon diagnostics; packaged versions come from the tag. No automated tests or local WoW runner are configured. Use `Get-ChildItem -Force` to inspect the repository, including hidden configuration files.
 
 ## Coding Style & Naming Conventions
 

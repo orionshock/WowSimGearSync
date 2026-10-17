@@ -7,12 +7,7 @@
 ## X-Credits: Codex/OpenAI
 ## IconTexture: Interface\Icons\INV_Chest_Plate04
 ## OptionalDeps: ReforgeLiteMopClassic
-#@debug@
-## Version: 0.3.0
-#@end-debug@
-#@non-debug@
-# ## Version: @project-version@
-#@end-non-debug@
+## Version: @project-version@
 ## SavedVariables: WSGSDB
 
 Libs\LibStub\LibStub.lua

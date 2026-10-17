@@ -4,7 +4,8 @@ LibStub("AceAddon-3.0"):NewAddon(WSGS, addonName, "AceConsole-3.0", "AceEvent-3.
 local LibDataBroker = LibStub("LibDataBroker-1.1")
 local LibDBIcon = LibStub("LibDBIcon-1.0")
 
-WSGS.version = C_AddOns.GetAddOnMetadata(addonName, "Version")
+local version = C_AddOns.GetAddOnMetadata(addonName, "Version")
+WSGS.version = version == "@project-version@" and "Development" or version
 
 local defaults = {
     profile = {
