@@ -98,7 +98,7 @@ function AdditionalSockets:Prepare(context, operation)
     end
     local mapping = MaterialCatalog.actions.prerequisites.professionSockets[context.inventorySlot]
     local recipe, reason, recipeName, professionName, professionSpellIndex =
-        MaterialCatalog:SocketAvailability(context.bags, context.inventorySlot)
+        MaterialCatalog:SocketAvailability(context.bags, context.inventorySlot, context.professions)
     operation.spellID = recipe and (recipe.spellID or recipe.spellIDs and recipe.spellIDs[1])
     operation.recipeSpellIDs = recipe and recipe.spellIDs
     operation.spellName, operation.professionName = recipeName, professionName
@@ -242,7 +242,7 @@ function ProfessionEnhancement:Prepare(context, operation)
     local mapping = MaterialCatalog.actions.profession[operation.expected]
     local recipe, reason, recipeName, professionName, professionSpellIndex =
         MaterialCatalog:ProfessionEnhancementAvailability(context.bags, operation.expected,
-            context.inventorySlot)
+            context.inventorySlot, context.professions)
     operation.professionSkillLine = mapping and mapping.profession
     operation.spellID, operation.spellName = recipe and recipe.spellID, recipeName
     operation.professionName, operation.professionSpellIndex = professionName, professionSpellIndex

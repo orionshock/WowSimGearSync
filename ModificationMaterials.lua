@@ -384,11 +384,11 @@ function Materials:ProfessionEffect(inventorySlot, useSpellID)
     return nil, supportedSkillLine, supportedSkillLine ~= nil
 end
 
-local function professionAvailability(bags, recipe, inventorySlot)
+local function professionAvailability(bags, recipe, inventorySlot, professions)
     if recipe.slot and recipe.slot ~= inventorySlot or recipe.slots and not recipe.slots[inventorySlot] then
         return nil, "Direct profession recipe is not valid for this equipment slot"
     end
-    local profession = Materials:GetProfession(recipe.profession)
+    local profession = professions[recipe.profession]
     if not profession then
         return nil, (Materials.professionNames[recipe.profession] or "Required profession") .. " is unavailable"
     end
@@ -458,18 +458,18 @@ function Materials:ForInventoryEnhancement(bags, enchantID)
     return bags.bySpell[definition.spellID], nil, definition.spellID
 end
 
-function Materials:SocketAvailability(bags, inventorySlot)
+function Materials:SocketAvailability(bags, inventorySlot, professions)
     local recipe = self.actions.prerequisites.professionSockets[inventorySlot]
     if not recipe then
         return nil, "No confirmed Blacksmithing socket recipe for this slot"
     end
-    return professionAvailability(bags, recipe, inventorySlot)
+    return professionAvailability(bags, recipe, inventorySlot, professions)
 end
 
-function Materials:ProfessionEnhancementAvailability(bags, enchantID, inventorySlot)
+function Materials:ProfessionEnhancementAvailability(bags, enchantID, inventorySlot, professions)
     local recipe = self.actions.profession[enchantID]
     if not recipe then
         return nil, "No confirmed direct profession enhancement mapping"
     end
-    return professionAvailability(bags, recipe, inventorySlot)
+    return professionAvailability(bags, recipe, inventorySlot, professions)
 end

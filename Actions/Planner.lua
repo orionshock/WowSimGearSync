@@ -64,7 +64,8 @@ function Planner:Build(position, state)
         inventorySlot = controller.inventorySlot,
         target = target,
         fields = difference.fields,
-        bags = state.materials
+        bags = state.materials,
+        professions = state.context.professions
     }
     local professionSocket = difference.fields.professionSocket
     local buckle = difference.fields.buckle
