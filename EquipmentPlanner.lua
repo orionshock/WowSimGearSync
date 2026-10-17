@@ -82,9 +82,10 @@ local function cost(target, candidate, position)
     return result
 end
 
-local function captureInputs(state)
+local function captureInputs(state, selectedPosition)
     local context = {
         state = state,
+        selectedPosition = selectedPosition,
         snapshot = {
             slots = state.equipped,
             context = state.context
@@ -111,6 +112,11 @@ local function captureInputs(state)
         end
     end
     return context
+end
+
+local function selected(context, position)
+    return not context.selectedPosition or position == context.selectedPosition or
+        context.selectedPosition >= 15 and position >= 15
 end
 
 local function collectCandidates(context)
@@ -141,16 +147,18 @@ local function reserveResolvedAssignments(context)
             local itemState = comparison.slots[position].fields.item.state
             if itemState == "MATCH" then
                 context.used[identity(current)] = true
-            elseif itemState == "UNKNOWN" or current.locked then
-                context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
-                                                                         ": equipped identity unavailable or locked."
-            else
-                context.targetGroups[target.id] = context.targetGroups[target.id] or {}
-                context.targetGroups[target.id][#context.targetGroups[target.id] + 1] = {
-                    position = position,
-                    physical = physical,
-                    target = target
-                }
+            elseif selected(context, position) then
+                if itemState == "UNKNOWN" or current.locked then
+                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                        ": equipped identity unavailable or locked."
+                else
+                    context.targetGroups[target.id] = context.targetGroups[target.id] or {}
+                    context.targetGroups[target.id][#context.targetGroups[target.id] + 1] = {
+                        position = position,
+                        physical = physical,
+                        target = target
+                    }
+                end
             end
         end
     end
@@ -245,7 +253,7 @@ end
 local function allocateBagDestinations(context)
     local freeIndex = 1
     for position, target in ipairs(context.state.target) do
-        if not present(target) then
+        if selected(context, position) and not present(target) then
             local current = context.snapshot.slots[position]
             if current.observations.item.status ~= "KNOWN" then
                 context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
@@ -385,8 +393,8 @@ local function orderOperations(context)
     end)
 end
 
-function Planner:Plan(state)
-    local context = captureInputs(state)
+function Planner:Plan(state, selectedPosition)
+    local context = captureInputs(state, selectedPosition)
     if not context.comparison then
         context.plan.blocked[1] = state.reason
         return context.plan
@@ -395,7 +403,9 @@ function Planner:Plan(state)
     reserveResolvedAssignments(context)
     matchTargetInstances(context)
     allocateBagDestinations(context)
-    resolveWeaponDependencies(context)
+    if not selectedPosition or selectedPosition >= 15 then
+        resolveWeaponDependencies(context)
+    end
     orderOperations(context)
     return context.plan
 end

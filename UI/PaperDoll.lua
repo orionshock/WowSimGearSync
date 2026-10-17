@@ -31,8 +31,14 @@ function UI:ShowSlotTooltip(button)
         GameTooltip:Show()
         return
     end
-    local title, red, green, blue, action = Presentation:ItemTooltip(button.target,
-        button.actionState or WSGS.Actions:GetSlotState(button.position))
+    local actionState = button.actionState or WSGS.Actions:GetSlotState(button.position)
+    local item = button.difference and button.difference.fields.item
+    if item and item.state ~= "MATCH" then
+        local state = Equipment:GetState(WSGS:GetActiveSimulationProfile())
+        local _, reason = Equipment:GetSlotEquipPlan(button.position, state)
+        actionState = {clickText = reason}
+    end
+    local title, red, green, blue, action = Presentation:ItemTooltip(button.target, actionState)
     GameTooltip:AddLine(title, red, green, blue)
     if action then
         GameTooltip:AddLine(action, 1, 1, 1, true)
@@ -132,8 +138,19 @@ function UI:RenderPaperDoll(state)
         end
         button.icon:SetTexture(texture)
         local color = quality and ITEM_QUALITY_COLORS[quality]
-        button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
+        local item = button.difference and button.difference.fields.item
+        if item and item.state == "MISMATCH" then
+            button.quality:SetVertexColor(1, 0, 0)
+        else
+            button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
+        end
         local actionState = WSGS.Actions:GetSlotState(button.position)
+        for _, record in ipairs(Equipment.batch and Equipment.batch.records or {}) do
+            if record.operation.targetPosition == button.position and record.status == "STILL_PENDING" then
+                actionState.pending = true
+                break
+            end
+        end
         button.actionState = actionState
         local statuses = Presentation:ModificationIcons(button.difference, actionState)
         for index, icon in ipairs(button.statusIcons) do

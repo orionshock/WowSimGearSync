@@ -433,6 +433,18 @@ local function validateClick(controller, operation, position)
     end
 end
 
+function Actions.IsModificationPending()
+    if Internal.GemExecution.batch then
+        return true
+    end
+    for _, controller in pairs(controllers) do
+        if controller.pending or controller.submitting then
+            return true
+        end
+    end
+    return false
+end
+
 function Actions:ActivateSlot(position, button)
     button.wsgsSubmission = nil
     if Internal.GemExecution.batch then
@@ -446,6 +458,18 @@ function Actions:ActivateSlot(position, button)
     end
     local controller = controllers[position]
     if not controller then
+        return
+    end
+    if controller.difference.fields.item.state ~= "MATCH" then
+        if not InCombatLockdown() then
+            button:SetAttribute("type1", nil)
+        end
+        Equipment:Click(position)
+        -- Equipment events can prepare a modification synchronously. This
+        -- hardware click belongs only to equipment, even if the new item matches.
+        if not InCombatLockdown() then
+            button:SetAttribute("type1", nil)
+        end
         return
     end
     if controller.state == "BLOCKED" or controller.state == "UNKNOWN" then

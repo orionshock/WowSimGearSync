@@ -46,7 +46,7 @@ local function logResult(operation, index, ok, reason)
     end
 end
 
--- Called only synchronously by the Equip button's OnClick. Never from an event
+-- Called only synchronously by equipment button clicks. Never from an event
 -- or timer. Native cursor restrictions/confirmation dialogs remain authoritative.
 function Execution:Perform(operation, index, total)
     local source, before = operation.source, GetInventoryItemID("player", operation.slotId)

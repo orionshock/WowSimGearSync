@@ -244,7 +244,7 @@ function Actions:LogDone(state)
         self.batch.total, attempted, counts.VERIFIED, counts.FAILED, counts.BLOCKED, counts.STILL_PENDING,
         counts.VERIFIED + counts.FAILED + counts.BLOCKED, #unresolved,
         #unresolved > 0 and table.concat(unresolved, ",") or "none"))
-    if not self.batch.setSyncAttempted then
+    if not self.batch.setSyncAttempted and (not self.batch.selectedPosition or self.plan.unresolvedCount == 0) then
         self.batch.setSyncAttempted = true
         WSGS.EquipmentSetSync:Synchronize(self.stateBuild, state, self.batch)
     end
@@ -372,15 +372,16 @@ function Actions:SubmitBatch(batch)
     return self:OutcomeCounts()
 end
 
-function Actions:LogPlan(profile)
+function Actions:LogPlan(profile, plan)
+    plan = plan or self.plan
     WSGS:Debug(string.format("[EQUIP][PLAN] click cursor=%s operations=%d unresolved=%d missing=%d blocked=%d",
-        cursorState(), #self.plan.operations, self.plan.unresolvedCount, #self.plan.missing, #self.plan.blocked))
+        cursorState(), #plan.operations, plan.unresolvedCount, #plan.missing, #plan.blocked))
     local comparison = self.equipmentState and self.equipmentState.comparison
     local byTarget, missing = {}, {}
-    for index, operation in ipairs(self.plan.operations) do
+    for index, operation in ipairs(plan.operations) do
         byTarget[operation.targetPosition] = index
     end
-    for _, item in ipairs(self.plan.missing) do
+    for _, item in ipairs(plan.missing) do
         missing[item.position] = item.id
     end
     for position, target in ipairs(profile.equipment) do
@@ -400,7 +401,7 @@ function Actions:LogPlan(profile)
             shown(current and current.id), shown(current and current.guid), shown(target and target.id), state,
             decision, reason))
     end
-    for index, operation in ipairs(self.plan.operations) do
+    for index, operation in ipairs(plan.operations) do
         local source = operation.source
         local sourceLocation = source.bag ~= nil and ("bag:" .. source.bag .. ":" .. source.bagSlot) or
                                    ("equipped:" .. shown(source.position))
@@ -409,12 +410,12 @@ function Actions:LogPlan(profile)
             operation.kind, operation.targetPosition, operation.slotId, shown(operation.id), shown(source.guid),
             sourceLocation, shown(source.equipLoc), operation.direct and "C_Item.EquipItemByName" or "cursor APIs"))
     end
-    for _, item in ipairs(self.plan.missing) do
+    for _, item in ipairs(plan.missing) do
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] excluded pos=%d inv=%d item=%s reason=not found in equipped gear or carried bags",
             item.position, WSGS.equipmentSlots[item.position].id, shown(item.id)))
     end
-    for _, reason in ipairs(self.plan.blocked) do
+    for _, reason in ipairs(plan.blocked) do
         WSGS:Debug("[EQUIP][PLAN] excluded reason=" .. reason)
     end
     local grip = self.snapshot.context and self.snapshot.context.titansGrip and "yes" or "no"
@@ -429,23 +430,35 @@ function Actions:LogPlan(profile)
     end
 end
 
-function Actions:Click()
+function Actions:Click(position)
     -- A terminal batch may be retried; an overlapping pending batch may not.
     if self:PendingCount() > 0 then
         return
     end
     self.fault, self.batch = nil, nil
     local profile = WSGS:GetActiveSimulationProfile()
-    local state = self:RefreshState(profile, "GlobalEquipClick")
+    local state = self:RefreshState(profile, position and "SlotEquipClick" or "GlobalEquipClick")
     self:Refresh(state)
-    if profile then
-        self:LogPlan(profile)
+    local operations, selectedPlan = self.plan.operations
+    if position then
+        local reason
+        selectedPlan, reason = self:GetSlotEquipPlan(position, state)
+        if not selectedPlan then
+            WSGS:Print("[EQUIP] " .. reason)
+            self:SendMessage("WSGS_ACTIONS_CHANGED", "SLOT_EQUIP_RECHECK")
+            return
+        end
+        operations = selectedPlan.operations
+        WSGS:Debug(string.format("[EQUIP][PLAN] selected=%d operations=%d", position, #operations))
     end
-    if self.state == "COMPLETE" then
+    if profile then
+        self:LogPlan(profile, selectedPlan)
+    end
+    if not position and self.state == "COMPLETE" then
         WSGS.EquipmentSetSync:Synchronize(profile, state)
         return
     end
-    if self.state ~= "READY" then
+    if not position and self.state ~= "READY" then
         WSGS:Print("[EQUIP] " ..
                        (self.state == "COMBAT" and "Cannot equip in combat." or self.plan.blocked[1] or
                            "No available equipment changes."))
@@ -455,7 +468,8 @@ function Actions:Click()
         WSGS:Print("[EQUIP] Place the held cursor item first.");
         return
     end
-    local batch = self:BeginBatch(self.plan.operations, self.snapshot, GetTime())
+    local batch = self:BeginBatch(operations, self.snapshot, GetTime())
+    batch.selectedPosition = position
     self:SendMessage("WSGS_EQUIPMENT_STATE_CHANGED")
     self:SubmitBatch(batch)
     for _, record in ipairs(batch.records) do
@@ -468,6 +482,9 @@ function Actions:Click()
     -- the original button callback.
     state = self:RefreshState(WSGS:GetActiveSimulationProfile(), "GlobalEquipImmediateVerify")
     self:Refresh(state)
+    if position then
+        self:SendMessage("WSGS_ACTIONS_CHANGED", "SLOT_EQUIP_SUBMITTED")
+    end
     C_Timer.After(4, function()
         if self.batch == batch and self:PendingCount() > 0 then
             WSGS:Debug(string.format("[EQUIP][EVENT] name=VERIFY_TIMEOUT pending=%d", self:PendingCount()))

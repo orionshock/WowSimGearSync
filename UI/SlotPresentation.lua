@@ -263,6 +263,9 @@ function Presentation:ModificationIcons(difference, actionState)
         return result
     end
     local item = difference.fields.item
+    if not item or item.state ~= "MATCH" then
+        return result
+    end
     for _, definition in ipairs(self.modifications) do
         local fieldName, field = fieldFor(definition, difference.fields)
         local state = field and presentationState(fieldName, field, item, actionState)
