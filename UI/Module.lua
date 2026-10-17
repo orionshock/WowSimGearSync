@@ -64,16 +64,8 @@ function UI:QueuePaperDollRefresh(event, itemId, success)
 end
 
 
-function UI:WSGS_BUILD_IMPORTED()
-    self:RefreshPaperDoll()
-end
-
 function UI:WSGS_ACTIONS_CHANGED()
     self:QueuePaperDollRefresh("PLAYER_EQUIPMENT_CHANGED")
-end
-
-function UI:WSGS_EQUIPMENT_STATE_CHANGED()
-    self:UpdateEquipButton()
 end
 
 function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED(_, event, ...)
@@ -91,9 +83,9 @@ function UI:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
 end
 
 function UI:OnEnable()
-    self:RegisterMessage("WSGS_BUILD_IMPORTED")
+    self:RegisterMessage("WSGS_BUILD_IMPORTED", "RefreshPaperDoll")
     self:RegisterMessage("WSGS_ACTIONS_CHANGED")
-    self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED")
+    self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED", "UpdateEquipButton")
     self:RegisterMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED")
     self:RegisterMessage("WSGS_ITEM_DATA_RECEIVED")
 end

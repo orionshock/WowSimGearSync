@@ -130,10 +130,6 @@ function Equipment:RefreshState(build, consumer)
     self.equipmentState = state
     self.stateInvalid = false
     self.stateBuild = build
-    self.stateSerial = (self.stateSerial or 0) + 1
-    WSGS:Debug(string.format("[STATE][PUBLISH] serial=%d build=%s consumer=%s", self.stateSerial,
-        shown(state.build and state.build.name), shown(consumer)))
-    self:SendMessage("WSGS_EQUIPMENT_STATE_PUBLISHED", state, consumer)
     return state
 end
 

@@ -83,7 +83,7 @@ function UI:RenderPaperDoll(state)
     local profile = state and state.build
     local comparison = state and state.comparison
     local reason = state and state.reason
-    self.profile, self.state, self.comparison, self.error = profile, state, comparison, reason
+    self.profile = profile
     if not frame.buildName:HasFocus() or frame.buildName.buildId ~= (profile and profile.id) then
         frame.buildName:SetText(profile and profile.name or "No active build")
     end

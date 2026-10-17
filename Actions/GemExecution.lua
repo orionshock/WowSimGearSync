@@ -409,7 +409,7 @@ function Gems:GetSlotState(position)
         return
     end
     local text = entry.phase == "VERIFYING" and "Verifying installed gems..." or "Socketing managed gems..."
-    return {state = "PENDING", pending = true, clickText = text, tooltipLines = {text},
+    return {state = "PENDING", pending = true, clickText = text,
         nextField = "gems", nextType = "GEM", reason = text}
 end
 

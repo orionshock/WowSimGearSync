@@ -177,9 +177,6 @@ function Actions:Reconcile(state, snapshot, bags, combat, now, event)
                 end
             end
         end
-        if self:PendingCount() == 0 then
-            self.pending = nil
-        end
     end
     self.plan = WSGS.EquipmentPlanner:Plan(state)
     if self.batch and self:PendingCount() == 0 then
@@ -437,7 +434,7 @@ function Actions:Click()
     if self:PendingCount() > 0 then
         return
     end
-    self.fault, self.batch, self.pending = nil, nil, nil
+    self.fault, self.batch = nil, nil
     local profile = WSGS:GetActiveSimulationProfile()
     local state = self:RefreshState(profile, "GlobalEquipClick")
     self:Refresh(state)

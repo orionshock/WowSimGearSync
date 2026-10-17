@@ -110,7 +110,6 @@ function Presentation:Build(controller, operation)
         state = controller and controller.state or "COMPLETE",
         pending = controller and controller.state == "PENDING" or false,
         clickText = clickText,
-        tooltipLines = {clickText},
         nextField = operation and operation.field or nil,
         nextType = operation and operation.type or nil,
         reason = controller and (controller.reason or operation and operation.reason) or nil
