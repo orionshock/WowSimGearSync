@@ -118,7 +118,7 @@ function Upgrades:CreatePanel()
     if self.frame then
         return self.frame
     end
-    local frame = WSGS.NPCPanel:Create("WSGSItemUpgradeCompanion", "WowSimGearSync — Item Upgrades", function()
+    local frame = WSGS.NPCPanel:Create("WSGSItemUpgradeCompanion", "Item Upgrades", function()
         self.dismissed = true
     end)
     local footer = CreateFrame("Frame", nil, frame)
@@ -220,7 +220,7 @@ function Upgrades:Refresh(reason, state)
     elseif unresolved > 0 then
         status = "Some item information is still loading."
     end
-    WSGS.NPCPanel:RenderItemList(frame, "Use Blizzard's Upgrade button to purchase.", rows, status,
+    WSGS.NPCPanel:RenderItemList(frame, "Click to stage Item Upgrade", rows, status,
         function(row)
             self:Stage(row)
         end, nil, nil, frame.currencyFooter)
