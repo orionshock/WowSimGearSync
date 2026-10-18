@@ -96,7 +96,7 @@ local function updateItemScroll(scroll)
     ScrollFrame_OnScrollRangeChanged(scroll)
 end
 
-function Panel:RenderItemList(frame, mode, entries, status, onClick, buttonText, enabled)
+function Panel:RenderItemList(frame, mode, entries, status, onClick, buttonText, enabled, footer)
     frame.mode:ClearAllPoints()
     frame.mode:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -6)
     frame.mode:SetPoint("TOPRIGHT", frame.title, "BOTTOMRIGHT", 16, -6)
@@ -104,8 +104,12 @@ function Panel:RenderItemList(frame, mode, entries, status, onClick, buttonText,
     frame.itemRows = frame.itemRows or {}
     frame.itemRowClick = onClick
     frame.status:ClearAllPoints()
-    frame.status:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, buttonText and 40 or 12)
-    frame.status:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, buttonText and 40 or 12)
+    local statusInset = footer and 0 or 12
+    local statusOffset = footer and 8 or buttonText and 40 or 12
+    frame.status:SetPoint("BOTTOMLEFT", footer or frame, footer and "TOPLEFT" or "BOTTOMLEFT",
+        statusInset, statusOffset)
+    frame.status:SetPoint("BOTTOMRIGHT", footer or frame, footer and "TOPRIGHT" or "BOTTOMRIGHT",
+        -statusInset, statusOffset)
     frame.status:SetText(WSGS:FormatPlayerReason(status) or "")
     if not frame.itemScroll then
         frame.itemScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")

@@ -50,8 +50,8 @@ local function collect(state)
     return entries, unresolved
 end
 
-local function costKey(entry)
-    return (entry.guid or (entry.itemID .. ":" .. entry.inventorySlot)) .. ":" .. entry.current
+local function costKey(entry, step)
+    return (entry.guid or (entry.itemID .. ":" .. entry.inventorySlot)) .. ":" .. (step or entry.current)
 end
 
 local function captureCost(nextLevel)
@@ -121,6 +121,40 @@ function Upgrades:CreatePanel()
     local frame = WSGS.NPCPanel:Create("WSGSItemUpgradeCompanion", "WowSimGearSync — Item Upgrades", function()
         self.dismissed = true
     end)
+    local footer = CreateFrame("Frame", nil, frame)
+    footer:SetPoint("BOTTOMLEFT", 12, 12)
+    footer:SetPoint("BOTTOMRIGHT", -12, 12)
+    footer:SetHeight(32)
+    local line = footer:CreateTexture(nil, "ARTWORK")
+    line:SetPoint("TOPLEFT")
+    line:SetPoint("TOPRIGHT")
+    line:SetHeight(1)
+    line:SetColorTexture(1, 1, 1, 0.2)
+    footer.label = footer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    footer.label:SetPoint("LEFT", 0, -5)
+    footer.currencies = {}
+    for index, currencyID in ipairs({395, 396}) do
+        local currency = CreateFrame("Frame", nil, footer)
+        currency:SetSize(82, 24)
+        currency:SetPoint("BOTTOMRIGHT", (index - 2) * 86, 0)
+        currency.icon = currency:CreateTexture(nil, "ARTWORK")
+        currency.icon:SetSize(18, 18)
+        currency.icon:SetPoint("LEFT")
+        currency.amount = currency:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        currency.amount:SetPoint("RIGHT")
+        currency:EnableMouse(true)
+        currency:SetScript("OnEnter", function(owner)
+            GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+            GameTooltip:SetCurrencyByID(currencyID)
+            GameTooltip:Show()
+        end)
+        currency:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        currency:SetScript("OnHide", function(owner)
+            if GameTooltip:IsOwned(owner) then GameTooltip:Hide() end
+        end)
+        footer.currencies[currencyID] = currency
+    end
+    frame.currencyFooter = footer
     self.frame = frame
     return frame
 end
@@ -184,14 +218,13 @@ function Upgrades:Refresh(reason, state)
     elseif self.blocker then
         status = self.blocker
     elseif unresolved > 0 then
-        status = "Click an item to select it for upgrading. Some item information is still loading."
-    else
-        status = "Click an item to select it in the upgrade window."
+        status = "Some item information is still loading."
     end
     WSGS.NPCPanel:RenderItemList(frame, "Use Blizzard's Upgrade button to purchase.", rows, status,
         function(row)
             self:Stage(row)
-        end)
+        end, nil, nil, frame.currencyFooter)
+    self:RefreshTotals(frame, entries, unresolved)
     frame:Show()
     local signature = string.format("%s:%d:%d:%s", build and build.name or "none", #entries, unresolved,
         self.blocker or "")
@@ -199,6 +232,38 @@ function Upgrades:Refresh(reason, state)
         self.planSignature = signature
         debug("PLAN", string.format("reason=%s build=%s items=%d unresolved=%d", value(reason),
             build and build.name or "nil", #entries, unresolved))
+    end
+end
+
+function Upgrades:RefreshTotals(frame, entries, unresolved)
+    local totals, incomplete = {[395] = 0, [396] = 0}, unresolved > 0
+    for _, entry in ipairs(entries) do
+        for step = entry.current, entry.maximum - 1 do
+            local cost = self.costs[costKey(entry, step)]
+            if cost then
+                for _, currency in ipairs(cost.currencies) do
+                    if totals[currency.currencyID] then
+                        totals[currency.currencyID] = totals[currency.currencyID] + currency.cost
+                    end
+                end
+            else
+                incomplete = true
+            end
+        end
+    end
+    local footer = frame.currencyFooter
+    footer.label:SetText(incomplete and "Known total" or "Total")
+    for currencyID, total in pairs(totals) do
+        local currency = footer.currencies[currencyID]
+        local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
+        local basic = C_CurrencyInfo.GetBasicCurrencyInfo(currencyID)
+        currency.icon:SetTexture(basic and basic.icon)
+        currency.amount:SetText(BreakUpLargeNumbers(total))
+        if info and info.quantity < total then
+            currency.amount:SetTextColor(1, 0.25, 0.25)
+        else
+            currency.amount:SetTextColor(0.8, 0.8, 0.8)
+        end
     end
 end
 
@@ -272,8 +337,10 @@ function Upgrades:Stage(clicked)
             entry.inventorySlot, entry.itemID, value(entry.guid), value(selectedID)))
         return self:Refresh("selection-mismatch", state)
     end
-    local nextLevel = info.upgradeLevelInfos and info.upgradeLevelInfos[info.currUpgrade + 2]
-    self.costs[costKey(entry)] = captureCost(nextLevel)
+    for step = info.currUpgrade, info.maxUpgrade - 1 do
+        local level = info.upgradeLevelInfos and info.upgradeLevelInfos[step + 2]
+        self.costs[costKey(entry, step)] = captureCost(level)
+    end
     local _, affordable, diagnostic = costPresentation(self.costs[costKey(entry)], state)
     debug("STAGE", string.format(
         "slot=%d item=%d guid=%s current=%d maximum=%d cost=%s affordable=%s result=selected api=C_ItemUpgrade.SetItemUpgradeFromCursorItem",
