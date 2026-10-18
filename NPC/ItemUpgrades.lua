@@ -300,6 +300,14 @@ function Upgrades:Stage(clicked)
         return self:Refresh("identity-changed", state)
     end
     local location = ItemLocation:CreateFromEquipmentSlot(entry.inventorySlot)
+    local selectedInfo = C_ItemUpgrade.GetItemUpgradeItemInfo()
+    local selectedLink = C_ItemUpgrade.GetItemHyperlink()
+    local equippedLink = GetInventoryItemLink("player", entry.inventorySlot)
+    if selectedInfo and selectedLink and selectedLink == equippedLink and
+        selectedInfo.currUpgrade == entry.current and selectedInfo.maxUpgrade == entry.maximum and
+        IsInventoryItemLocked(entry.inventorySlot) then
+        return self:Refresh("already-staged", state)
+    end
     if not C_ItemUpgrade.CanUpgradeItem(location) then
         self.blocker = "The client does not currently consider this item upgradeable."
         debug("BLOCK", string.format("slot=%d item=%d guid=%s reason=not-upgradeable", entry.inventorySlot,
