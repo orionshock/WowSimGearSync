@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local Reforging = WSGS:NewModule("NPCReforging", "AceEvent-3.0")
 local Equipment = WSGS:GetModule("Equipment")
 
@@ -112,7 +113,7 @@ function Reforging:CreatePanel()
     if self.frame then
         return self.frame
     end
-    local frame = WSGS.NPCPanel:Create("WSGSReforgingCompanion", "WowSimGearSync — Reforging", function()
+    local frame = WSGS.NPCPanel:Create("WSGSReforgingCompanion", L["Reforging"], function()
         self.dismissed = true
     end)
     frame.action:SetScript("OnClick", function()
@@ -185,8 +186,6 @@ function Reforging:Refresh(reason)
         status = "ReforgeLite is applying your reforges."
     elseif self.blocker then
         status = self.blocker
-    else
-        status = string.format("%d reforge%s remaining.", #entries, #entries == 1 and "" or "s")
     end
     if self.rflRunning and #entries == 0 then
         self.rflRunning = nil
@@ -339,7 +338,7 @@ function Reforging:SubmitNext()
     if transaction ~= UNFORGE and GetMoney() < cost then
         self.skipped = self.skipped or {}
         self.skipped[entry.position] = "Insufficient gold"
-        self.blocker = self.blocker or "Insufficient gold for one or more reforges."
+        self.blocker = self.blocker or L["Not enough gold."]
         debug("BLOCK", string.format("slot=%d item=%d cost=%d money=%d", entry.inventorySlot, entry.itemID,
             cost, GetMoney()))
         return self:SubmitNext()
@@ -407,7 +406,7 @@ function Reforging:Activate()
     end
     if self.pending then
         if not self:VerifyPending("CONTINUE_CLICK") then
-            self.blocker = "The previous reforge has not been observed yet."
+            self.blocker = L["Waiting for the previous reforge to finish."]
             return self:Refresh("still-pending")
         end
     end

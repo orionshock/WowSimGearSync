@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local Internal = WSGS.ActionsInternal or {}
 WSGS.ActionsInternal = Internal
 
@@ -63,9 +64,9 @@ local function npcInstruction(controller)
     if upgrade and reforge then
         return "Visit an Item Upgrade NPC and an Arcane Reforger."
     elseif upgrade then
-        return "Visit an Item Upgrade NPC to upgrade this item."
+        return L["Visit an Item Upgrade NPC."]
     elseif reforge then
-        return "Visit an Arcane Reforger to reforge this item."
+        return L["Visit an Arcane Reforger."]
     end
 end
 

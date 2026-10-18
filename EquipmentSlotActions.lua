@@ -1,11 +1,12 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local Equipment = WSGS:GetModule("Equipment")
 
 -- Selected clicks use the ordinary planner and executor. Weapons remain a pair
 -- because clearing/replacing the other hand can be required for a safe layout.
 function Equipment:GetSlotEquipPlan(position, state)
     if self:PendingCount() > 0 then
-        return nil, "Equipment changes are awaiting verification", "PENDING"
+        return nil, L["Waiting for equipment to update"], "PENDING"
     end
     if WSGS.Actions.IsModificationPending() then
         return nil, "Finish the active modification first", "BLOCKED"
@@ -39,7 +40,7 @@ function Equipment:GetSlotEquipPlan(position, state)
         end
     end
     if selected then
-        return plan, position >= 15 and "Click to equip the target weapon layout" or
+        return plan, position >= 15 and L["Click to equip target weapons"] or
             slot.target.empty and "Click to empty this slot" or "Click to equip the target item", "READY"
     end
     -- Classify the planner's rejected candidates using its existing capture.

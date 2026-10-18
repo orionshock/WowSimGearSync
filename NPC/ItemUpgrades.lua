@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local Upgrades = WSGS:NewModule("NPCItemUpgrades", "AceEvent-3.0")
 local Equipment = WSGS:GetModule("Equipment")
 
@@ -252,7 +253,7 @@ function Upgrades:RefreshTotals(frame, entries, unresolved)
         end
     end
     local footer = frame.currencyFooter
-    footer.label:SetText(incomplete and "Known total" or "Total")
+    footer.label:SetText(incomplete and L["Known total"] or L["Total"])
     for currencyID, total in pairs(totals) do
         local currency = footer.currencies[currencyID]
         local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
@@ -294,7 +295,7 @@ function Upgrades:Stage(clicked)
     end
     if not entry or entry.itemID ~= clicked.itemID or entry.inventorySlot ~= clicked.inventorySlot or
         clicked.guid and entry.guid ~= clicked.guid then
-        self.blocker = "The equipped item changed; choose it again from the refreshed list."
+        self.blocker = L["Equipped item changed. Select it again."]
         debug("BLOCK", string.format("slot=%s item=%s guid=%s reason=identity-changed", value(clicked.inventorySlot),
             value(clicked.itemID), value(clicked.guid)))
         return self:Refresh("identity-changed", state)
@@ -309,13 +310,13 @@ function Upgrades:Stage(clicked)
         return self:Refresh("already-staged", state)
     end
     if not C_ItemUpgrade.CanUpgradeItem(location) then
-        self.blocker = "The client does not currently consider this item upgradeable."
+        self.blocker = L["This item can't be upgraded right now."]
         debug("BLOCK", string.format("slot=%d item=%d guid=%s reason=not-upgradeable", entry.inventorySlot,
             entry.itemID, value(entry.guid)))
         return self:Refresh("not-upgradeable", state)
     end
     if IsInventoryItemLocked(entry.inventorySlot) then
-        self.blocker = "The item is locked; try again when it becomes available."
+        self.blocker = L["Item is locked. Try again shortly."]
         debug("BLOCK", string.format("slot=%d item=%d guid=%s reason=item-locked", entry.inventorySlot,
             entry.itemID, value(entry.guid)))
         return self:Refresh("item-locked", state)
@@ -330,7 +331,7 @@ function Upgrades:Stage(clicked)
     ClearCursor()
     self.selecting = nil
     if not staged then
-        self.blocker = "Blizzard's upgrade window could not stage the item."
+        self.blocker = L["Couldn't select the item for upgrading."]
         debug("BLOCK", string.format("slot=%d item=%d guid=%s reason=%s", entry.inventorySlot,
             entry.itemID, value(entry.guid), value(stageProblem)))
         return self:Refresh("staging-failed", state)

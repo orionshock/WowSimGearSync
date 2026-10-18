@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local UI = WSGS.UI
 
 function UI:ShowImportDialog()
@@ -66,7 +67,7 @@ function UI:CreateImportDialog()
         WSGS:Debug("Import dialog closed.")
     end)
 
-    frame.TitleContainer.TitleText:SetText("Import Equipment from WoWSims JSON")
+    frame.TitleContainer.TitleText:SetText(L["Import WoW Sims Gear"])
     frame.PortraitContainer.portrait:SetTexture("Interface\\Icons\\INV_Misc_Note_01")
     frame.CloseButton:SetScript("OnClick", function()
         frame:Hide()
@@ -74,7 +75,7 @@ function UI:CreateImportDialog()
 
     local inputLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     inputLabel:SetPoint("TOPLEFT", 74, -48)
-    inputLabel:SetText("Paste your WoW Sims JSON export with Gear included.")
+    inputLabel:SetText(L["Paste your WoW Sims gear export."])
     local scroll = CreateFrame("ScrollFrame", "WSGSImportScrollFrame", frame, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 24, -72)
     scroll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -46, 116)

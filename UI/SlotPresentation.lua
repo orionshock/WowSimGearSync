@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 -- Owns player-facing translation only. Scanner/comparator remain authoritative.
 local Presentation = {}
 WSGS.UI.SlotPresentation = Presentation
@@ -234,7 +235,7 @@ local function outstandingLine(fieldName, field, item, actionState)
         end
     end
     if field.state == "UNKNOWN" then
-        return WSGS:FormatPlayerReason(field.reason) or "Current configuration is temporarily unavailable."
+        return WSGS:FormatPlayerReason(field.reason) or L["Item information isn't available yet."]
     end
 end
 

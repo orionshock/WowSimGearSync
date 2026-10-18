@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local Shopping = WSGS:NewModule("ShoppingList", "AceEvent-3.0")
 local Equipment = WSGS:GetModule("Equipment")
 local Materials = WSGS.ModificationMaterials
@@ -130,7 +131,7 @@ function Shopping:CreatePanel()
     title:SetPoint("TOPLEFT", 12, -11)
     title:SetPoint("RIGHT", frame, "RIGHT", -28, 0)
     title:SetJustifyH("LEFT")
-    title:SetText("WowSimGearSync — Shopping")
+    title:SetText(L["Shopping List"])
 
     local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
     close:SetSize(24, 24)
@@ -221,7 +222,7 @@ function Shopping:Render(entries)
         icon = icon or select(5, C_Item.GetItemInfoInstant(entry.itemID))
         entry.name = name
         row.entry = entry
-        row.quantity:SetText("Need: " .. entry.quantity)
+        row.quantity:SetText(string.format(L["× %d"], entry.quantity))
         row.name:SetText(name or "Required material")
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 0, -contentHeight)

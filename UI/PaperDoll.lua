@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local UI = WSGS.UI
 local Equipment = WSGS:GetModule("Equipment")
 
@@ -100,7 +101,7 @@ function UI:RenderPaperDoll(state)
         frame.buildName:Disable()
     end
     if not profile then
-        frame.summary:SetText("Import a WoW Sims build to display target equipment.")
+        frame.summary:SetText(L["Import a WoW Sims build to get started."])
     elseif comparison then
         local s = comparison.summary
         frame.summary:SetText(string.format(
@@ -235,7 +236,7 @@ function UI:CreatePaperDoll()
     frame.buildName:SetScript("OnEnter", function(input)
         GameTooltip:SetOwner(input, "ANCHOR_TOP")
         GameTooltip:AddLine("Build name")
-        GameTooltip:AddLine("Enter saves; Escape or leaving the field cancels.", 1, 1, 1)
+        GameTooltip:AddLine(L["Enter to save. Escape to cancel."], 1, 1, 1)
         GameTooltip:Show()
     end)
     frame.buildName:SetScript("OnLeave", function()
