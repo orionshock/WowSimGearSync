@@ -110,7 +110,7 @@ local function costPresentation(cost, state)
     if #parts == 0 then
         return "Next: No cost reported", affordable, "none"
     end
-    return "Next: " .. table.concat(parts, ", ") .. (affordable and "" or " (cannot afford)"), affordable,
+    return "Next: " .. table.concat(parts, ", "), affordable,
         table.concat(diagnostic, ",")
 end
 
