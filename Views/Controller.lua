@@ -1,6 +1,6 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local UI = WSGS:NewModule("UI", "AceEvent-3.0")
+local UI = WSGS:NewModule("Views", "AceEvent-3.0")
 local Equipment = WSGS.Equipment
 Modules.Views.Runtime = UI
 

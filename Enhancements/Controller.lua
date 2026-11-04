@@ -1,8 +1,8 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local Actions = WSGS:NewModule("Actions", "AceEvent-3.0")
+local Controller = WSGS:NewModule("Enhancements", "AceEvent-3.0")
 local Equipment = WSGS.Equipment
-Modules.Enhancements.Runtime = Actions
+Modules.Enhancements.Runtime = Controller
 
 local Internal = Modules.Enhancements
 local controllers, buttons, planSignatures = {}, {}, {}
@@ -51,7 +51,7 @@ local function synchronizeBuild()
         configureButton(position)
     end
     if previousBuild then
-        Actions:SendMessage("WSGS_ACTIONS_CHANGED", "BUILD_REPLACED")
+        Controller:SendMessage("WSGS_ACTIONS_CHANGED", "BUILD_REPLACED")
     end
     return true
 end
@@ -115,7 +115,7 @@ local function rebuildController(position, state)
     configureButton(position)
 end
 
-function Actions:Refresh(state)
+function Controller:Refresh(state)
     synchronizeBuild()
     if not state or not state.build or not state.comparison or not controllerBuild or
         state.target ~= controllerBuild.equipment then
@@ -130,7 +130,7 @@ function Actions:Refresh(state)
     end
 end
 
-function Actions:GetSlotState(position)
+function Controller:GetSlotState(position)
     local controller = controllers[position]
     return Internal.Presentation:Build(controller, selectedOperation(controller))
 end
@@ -211,7 +211,7 @@ local function validateClick(controller, operation, position)
     end
 end
 
-function Actions.IsModificationPending()
+function Controller.IsModificationPending()
     for _, controller in pairs(controllers) do
         if controller.pending or controller.submitting then
             return true
@@ -220,7 +220,7 @@ function Actions.IsModificationPending()
     return false
 end
 
-function Actions:ActivateSlot(position, button)
+function Controller:ActivateSlot(position, button)
     button.wsgsSubmission = nil
     if synchronizeBuild() then
         return
@@ -296,7 +296,7 @@ local function finishActivation(self, position, button)
     self:SendMessage("WSGS_ACTIONS_CHANGED", "PENDING")
 end
 
-function Actions:RegisterSlotButton(position, button)
+function Controller:RegisterSlotButton(position, button)
     buttons[position] = button
     button:SetScript("PreClick", function(clicked)
         self:ActivateSlot(position, clicked)
@@ -310,8 +310,8 @@ end
 Pending = Internal.CreatePendingApplication({
     synchronizeBuild = synchronizeBuild,
     controllerAt = function(position) return controllers[position] end,
-    refresh = function(reason) refreshFromClient(Actions, reason) end,
-    changed = function(reason) Actions:SendMessage("WSGS_ACTIONS_CHANGED", reason) end
+    refresh = function(reason) refreshFromClient(Controller, reason) end,
+    changed = function(reason) Controller:SendMessage("WSGS_ACTIONS_CHANGED", reason) end
 })
 
 Internal.Events:Configure({

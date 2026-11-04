@@ -1,6 +1,6 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local Import = WSGS:NewModule("Import", "AceEvent-3.0")
+local Import = WSGS:NewModule("Builds", "AceEvent-3.0")
 Modules.Builds.Runtime = Import
 
 local function importBuild(text)

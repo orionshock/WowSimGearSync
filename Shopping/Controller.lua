@@ -1,6 +1,6 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local Shopping = WSGS:NewModule("ShoppingList", "AceEvent-3.0")
+local Shopping = WSGS:NewModule("Shopping", "AceEvent-3.0")
 Modules.Shopping.Runtime = Shopping
 local Equipment = WSGS.Equipment
 

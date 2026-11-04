@@ -1,6 +1,6 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local Actions = Modules.Equipment.Runtime
+local Controller = Modules.Equipment.Runtime
 local verificationEvents = {
     PLAYER_EQUIPMENT_CHANGED = true,
     BAG_UPDATE_DELAYED = true,
@@ -27,11 +27,11 @@ local function eventArguments(...)
     return #values > 0 and table.concat(values, ",") or "none"
 end
 
-function Actions:PendingCount()
+function Controller:PendingCount()
     return self.batch and self.batch:PendingCount() or 0
 end
 
-function Actions:Reconcile(state, snapshot, bags, combat, now, event)
+function Controller:Reconcile(state, snapshot, bags, combat, now, event)
     if self.batch then self.batch:Reconcile(snapshot, bags, now, event) end
     self.plan = Modules.Equipment.Planning:Plan(state)
     if self.batch and self:PendingCount() == 0 then
@@ -59,7 +59,7 @@ function Actions:Reconcile(state, snapshot, bags, combat, now, event)
     return self.batch and self.batch:Counts() or nil
 end
 
-function Actions:UnresolvedSlots(state)
+function Controller:UnresolvedSlots(state)
     local comparison = state.comparison
     local unresolved = {}
     if not comparison then
@@ -73,7 +73,7 @@ function Actions:UnresolvedSlots(state)
     return unresolved
 end
 
-function Actions:LogDone(state)
+function Controller:LogDone(state)
     if not self.batch or self.batch.summaryLogged or self:PendingCount() > 0 then
         return
     end
@@ -105,7 +105,7 @@ function Actions:LogDone(state)
     end
 end
 
-function Actions:Refresh(state)
+function Controller:Refresh(state)
     if not state then
         state = self:GetState(nil)
     end
@@ -131,7 +131,7 @@ function Actions:Refresh(state)
     return self.plan
 end
 
-function Actions:QueueRefresh(event, ...)
+function Controller:QueueRefresh(event, ...)
     if verificationEvents[event] then
         self.verificationEvent = event
     end
@@ -145,7 +145,7 @@ function Actions:QueueRefresh(event, ...)
     end)
 end
 
-function Actions:UI_ERROR_MESSAGE(event, ...)
+function Controller:UI_ERROR_MESSAGE(event, ...)
     local active = self.batch and self:PendingCount() > 0
     if active then
         WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
@@ -157,7 +157,7 @@ function Actions:UI_ERROR_MESSAGE(event, ...)
     end
 end
 
-function Actions:LogPlan(profile, plan)
+function Controller:LogPlan(profile, plan)
     plan = plan or self.plan
     WSGS:Debug(string.format("[EQUIP][PLAN] click cursor=%s operations=%d unresolved=%d missing=%d blocked=%d",
         cursorState(), #plan.operations, plan.unresolvedCount, #plan.missing, #plan.blocked))
@@ -215,7 +215,7 @@ function Actions:LogPlan(profile, plan)
     end
 end
 
-function Actions:Click(position)
+function Controller:Click(position)
     local reason = Modules.Availability:Reason()
     if reason then
         WSGS:Print("[EQUIP] " .. WSGS:FormatPlayerReason(reason))
@@ -282,7 +282,7 @@ function Actions:Click(position)
     end)
 end
 
-function Actions:GetStatus()
+function Controller:GetStatus()
     local plan, batch = self.plan, self.batch
     local pendingSlots = {}
     for _, record in ipairs(batch and batch.records or {}) do
