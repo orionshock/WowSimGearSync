@@ -1,5 +1,4 @@
 local L = LibStub("AceLocale-3.0"):NewLocale("WowSimGearSync", "enUS", true)
-local Modules = WSGS.Private
 if not L then return end
 
 -- Register other locales after this file and before Core.lua in the TOC.

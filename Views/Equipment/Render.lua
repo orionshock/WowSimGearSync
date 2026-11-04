@@ -83,6 +83,7 @@ end
 
 function UI:RenderPaperDoll(state)
     local frame = self:CreatePaperDoll()
+    local equipmentStatus = Equipment:GetStatus()
     local profile = state and state.build
     local comparison = state and state.comparison
     local reason = state and state.reason
@@ -142,7 +143,7 @@ function UI:RenderPaperDoll(state)
             button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
         end
         local actionState = WSGS.Enhancements:GetSlotState(button.position)
-        actionState.pending = actionState.pending or Equipment:GetStatus().pendingSlots[button.position] or false
+        actionState.pending = actionState.pending or equipmentStatus.pendingSlots[button.position] or false
         button.actionState = actionState
         local statuses = Presentation:ModificationIcons(button.difference, actionState)
         for index, icon in ipairs(button.statusIcons) do

@@ -3,7 +3,7 @@ local Modules = WSGS.Private
 local Import = WSGS:NewModule("Import", "AceEvent-3.0")
 Modules.Builds.Runtime = Import
 
-function Import:ImportInto(character, text)
+local function importBuild(text)
     local document, reason = Modules.Builds.ExportV2:Deserialize(text)
     if not document then
         return nil, reason
@@ -14,12 +14,12 @@ function Import:ImportInto(character, text)
         return nil, reason
     end
     profile.sourceJSON = text
-    return Modules.Builds.ActiveBuild:SaveBuild(character, profile)
+    return Modules.Builds.ActiveBuild:SaveBuild(profile)
 end
 
 function Import:ImportEquipment(text)
     WSGS:Debug("[IMPORT] Starting import")
-    local profile, reason = self:ImportInto(WSGS.db.char, text)
+    local profile, reason = importBuild(text)
     if not profile then
         WSGS:Debug("[IMPORT] Import failed: " .. reason)
         return nil, reason

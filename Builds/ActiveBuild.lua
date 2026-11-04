@@ -3,7 +3,8 @@ local Modules = WSGS.Private
 local Store = {}
 Modules.Builds.ActiveBuild = Store
 
-function Store:SaveBuild(character, build)
+function Store:SaveBuild(build)
+    local character = WSGS.db.char
     local specialization = build.specialization
     if not specialization or not specialization.id or specialization.class == "Unknown" then
         return nil, "Export must contain one recognizable specialization before importing."
@@ -16,7 +17,8 @@ function Store:SaveBuild(character, build)
     return build
 end
 
-function Store:RenameBuild(character, expectedBuild, name)
+function Store:RenameBuild(expectedBuild, name)
+    local character = WSGS.db.char
     local build = character.activeImport
     if not build or build ~= expectedBuild then
         return nil, "Select a build before renaming."

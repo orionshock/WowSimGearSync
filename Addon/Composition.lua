@@ -9,7 +9,7 @@ local Views = Modules.Views.Runtime
 function WSGS.Builds:GetActive() return Builds:Get() end
 function WSGS.Builds:Import(text) return Modules.Builds.Runtime:ImportEquipment(text) end
 function WSGS.Builds:Rename(expectedBuild, name)
-    return Builds:RenameBuild(WSGS.db.char, expectedBuild, name)
+    return Builds:RenameBuild(expectedBuild, name)
 end
 function WSGS.Character:GetSnapshot() return Character:GetSnapshot() end
 function WSGS.Character:Invalidate(reason) Character:Invalidate(reason) end
@@ -53,6 +53,12 @@ function Modules.Reconcile()
     WSGS:SendMessage("WSGS_STATE_CHANGED", state)
     return state
 end
+local Shopping = Modules.Shopping.Runtime
+Shopping:AttachPanel(Modules.Views.CreateShoppingPanel({
+    dismiss = function() Shopping:Dismiss() end,
+    search = function(entry) Modules.Shopping.Navigation:Search(entry) end,
+    changed = function() Shopping:QueueRefresh() end
+}))
 Modules.Availability:Configure(
     function() return Equipment:PendingCount() > 0 end,
     function() return Enhancements.IsModificationPending() end)

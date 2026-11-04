@@ -87,12 +87,15 @@ function Shopping:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
     end
 end
 
+function Shopping:AttachPanel(panel)
+    self.panel = panel
+end
+
+function Shopping:Dismiss()
+    self.dismissed = true
+end
+
 function Shopping:OnEnable()
-    self.panel = Modules.Views.CreateShoppingPanel({
-        dismiss = function() self.dismissed = true end,
-        search = function(entry) Modules.Shopping.Navigation:Search(entry) end,
-        changed = function() self:QueueRefresh() end
-    })
     self.auctionOpen = false
     Modules.Shopping.Navigation:SetOpen(false)
     self.dismissed = false
