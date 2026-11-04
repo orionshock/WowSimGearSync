@@ -112,20 +112,19 @@ function ProfessionEnhancement:Check(context)
             field = "tinker",
             expected = tinker.expected,
             observationUnknown = tinker.state == "UNKNOWN",
-            reason = tinker.reason,
-            targetSource = tinker.targetSource
+            reason = tinker.reason
         }
     end
     return results
 end
 function ProfessionEnhancement:Prepare(context, operation)
     local mapping = MaterialCatalog.actions.profession[operation.expected]
-    local recipe, reason, recipeName, professionName, professionSpellIndex =
+    local recipe, reason, recipeName, professionName =
         MaterialCatalog:ProfessionEnhancementAvailability(context.bags, operation.expected,
             context.inventorySlot, context.professions)
     operation.professionSkillLine = mapping and mapping.profession
     operation.spellID, operation.spellName = recipe and recipe.spellID, recipeName
-    operation.professionName, operation.professionSpellIndex = professionName, professionSpellIndex
+    operation.professionName = professionName
     operation.nativeProfession, operation.method = true, "PROFESSION"
     if reason then
         return nil, reason

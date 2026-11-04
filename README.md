@@ -1,6 +1,8 @@
 # WowSimGearSync
 
-WowSimGearSync helps bring your gear in line with a WoW Sims configuration in WoW Forever. It compares your equipment and helps you equip items and apply enhancements.
+WowSimGearSync helps bring your gear in line with a WoW Sims configuration in WoW Forever, using its retail client APIs. It compares your equipment and helps you equip items and apply enhancements.
+
+Target client: WoW Forever 1.60.1 (interface 16001). This branch uses retail APIs directly and has no Classic compatibility path.
 
 ## Getting started
 
@@ -16,6 +18,10 @@ Gems, additional gem sockets, reforging, and item upgrades are not part of the F
 
 At the Auction House, the Shopping List shows missing materials and opens the corresponding listings when clicked. Purchases remain up to you.
 
+Profession recipes load asynchronously. If a click opens a profession before its data is ready, click the item again once loading finishes. Crafting is never deferred to a timer or event.
+
+The API v3 import schema is retained pending a Forever export sample. Enhancement mappings still need verification against Forever game data; recipe execution checks the client's learned recipes and target eligibility.
+
 ## Equipment Manager
 
 The import's name is also its Equipment Manager set name. Edit it at the top of the equipment view to choose where WSGS saves the outfit once the target gear is equipped.
@@ -24,4 +30,4 @@ Using different names lets you keep separate Blizzard equipment sets while WSGS 
 
 ## Options
 
-Open `/wsgs options` or right-click the launcher. You can toggle debug logging, Equipment Manager integration, and the Goblin Glider fallback for Engineers whose import omits a cloak tinker. Imported enhancements take priority.
+Open `/wsgs options` or right-click the launcher. You can toggle debug logging and Equipment Manager integration. Profession enhancements must be explicitly included in the import.

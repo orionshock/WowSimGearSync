@@ -26,18 +26,6 @@ local function eventArguments(...)
     return #values > 0 and table.concat(values, ",") or "none"
 end
 
-local function sourceAt(operation, snapshot, bags)
-    local source = operation.source
-    if source.bag == nil then
-        return snapshot.slots[source.position]
-    end
-    for _, item in ipairs(bags.items) do
-        if item.bag == source.bag and item.bagSlot == source.bagSlot then
-            return item
-        end
-    end
-end
-
 function Actions:Verify(operation, snapshot, bags)
     local destination = snapshot.slots[operation.position]
     if operation.kind == "UNEQUIP" then
@@ -49,16 +37,10 @@ function Actions:Verify(operation, snapshot, bags)
         end
         for _, item in ipairs(bags.items) do
             if item.bag == operation.destination.bag and item.bagSlot == operation.destination.bagSlot then
-                if operation.source.guid then
-                    return item.guid == operation.source.guid,
-                        item.guid == operation.source.guid and
-                            "destination is empty and intended instance is in the planned bag slot" or
-                            "planned bag slot contains a different instance", destination
-                end
-                return item.fingerprint == operation.source.fingerprint,
-                    item.fingerprint == operation.source.fingerprint and
-                        "destination is empty and intended fingerprint is in the planned bag slot" or
-                        "planned bag slot contains a different fingerprint", destination
+                return item.guid == operation.source.guid,
+                    item.guid == operation.source.guid and
+                        "destination is empty and intended instance is in the planned bag slot" or
+                        "planned bag slot contains a different instance", destination
             end
         end
         return false, "planned bag destination is empty or unreadable", destination
@@ -66,19 +48,9 @@ function Actions:Verify(operation, snapshot, bags)
     if destination.id ~= operation.id then
         return false, "observed item ID does not match target", destination
     end
-    if operation.source.guid then
-        return destination.guid == operation.source.guid,
-            destination.guid == operation.source.guid and "observed item ID and instance match target" or
-                "observed item ID matches but instance GUID does not", destination
-    end
-    local oldSource = sourceAt(operation, snapshot, bags)
-    if destination.fingerprint ~= operation.source.fingerprint then
-        return false, "observed item ID matches but fingerprint does not", destination
-    end
-    if oldSource and oldSource.fingerprint == operation.source.fingerprint then
-        return false, "matching fingerprint remains at the planned source", destination
-    end
-    return true, "observed item ID and fingerprint match and source moved", destination
+    return destination.guid == operation.source.guid,
+        destination.guid == operation.source.guid and "observed item ID and instance match target" or
+            "observed item ID matches but instance GUID does not", destination
 end
 
 function Actions:BeginBatch(operations, snapshot, now)
@@ -140,8 +112,7 @@ function Actions:LogVerification(record, snapshot, verified, reason, event)
     local operation = record.operation
     local observed = snapshot.slots[operation.position]
     local expected = operation.kind == "UNEQUIP" and "empty" or shown(operation.id)
-    local instanceMatch = operation.source.guid and observed.guid == operation.source.guid and "yes" or
-                              operation.source.guid and "no" or "fingerprint"
+    local instanceMatch = observed.guid == operation.source.guid and "yes" or "no"
     local weapon = operation.position == 15 and "MH" or operation.position == 16 and "OH" or "no"
     WSGS:Debug(string.format(
         "[EQUIP][VERIFY] op=%d weapon=%s inv=%d intended=%s intendedGUID=%s observed=%s observedGUID=%s instanceMatch=%s event=%s decision=%s reason=%s",
@@ -408,7 +379,7 @@ function Actions:LogPlan(profile, plan)
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] order=%d kind=%s targetPos=%d inv=%d item=%s GUID=%s source=%s equipLoc=%s API=%s", index,
             operation.kind, operation.targetPosition, operation.slotId, shown(operation.id), shown(source.guid),
-            sourceLocation, shown(source.equipLoc), operation.direct and "C_Item.EquipItemByName" or "cursor APIs"))
+            sourceLocation, shown(source.equipLoc), "cursor APIs"))
     end
     for _, item in ipairs(plan.missing) do
         WSGS:Debug(string.format(

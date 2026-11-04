@@ -270,7 +270,7 @@ Materials.equippedProfessionEffects = {
         },
         [15] = { -- Back.
             [126389] = {effectID = 4897}, -- Goblin Glider.
-            [55001] = {different = true, name = "Parachute"} -- Flexweave/Springy alternate; Goblin Glider takes precedence.
+            [55001] = {different = true, name = "Parachute"} -- Alternate parachute effect.
         }
     }
 }
@@ -284,7 +284,7 @@ function Materials:ScanProfessions()
     local first, second = GetProfessions()
     local professions = {}
     for _, professionIndex in pairs({first, second}) do
-        local name, _, rank, maxRank, numSpells, spellOffset, skillLine = GetProfessionInfo(professionIndex)
+        local name, _, rank, maxRank, _, _, skillLine = GetProfessionInfo(professionIndex)
         if skillLine then
             professions[skillLine] = {
                 name = name,
@@ -292,8 +292,6 @@ function Materials:ScanProfessions()
                 rank = rank,
                 maxRank = maxRank,
                 skillLine = skillLine,
-                spellBookIndex = type(numSpells) == "number" and numSpells > 0 and type(spellOffset) == "number" and
-                    spellOffset + 1 or nil
             }
         end
     end
@@ -318,18 +316,8 @@ function Materials:CharacterContext()
         WSGS:Debug("[ACTION][PLAN] professions=" .. (signature ~= "" and signature or "none"))
     end
     return {
-        professions = professions,
-        engineeringCloakFallback = WSGS.db.profile.engineeringCloakFallback
+        professions = professions
     }
-end
-
-function Materials:RecommendedProfessionEnhancement(inventorySlot, context)
-    if not context then
-        return nil
-    end
-    if inventorySlot == 15 and context.engineeringCloakFallback and context.professions[202] then
-        return 4897, "RECOMMENDED"
-    end
 end
 
 function Materials:ProfessionEffect(inventorySlot, useSpellID)
@@ -360,8 +348,8 @@ local function professionAvailability(bags, recipe, inventorySlot, professions)
                 C_Item.GetItemInfo(itemID) or "required reagent", quantity)
         end
     end
-    local spellID = recipe.spellID or recipe.spellIDs and recipe.spellIDs[1]
-    return recipe, nil, C_Spell.GetSpellName(spellID), profession.name, profession.spellBookIndex
+    local spellID = recipe.spellID
+    return recipe, nil, C_Spell.GetSpellName(spellID), profession.name
 end
 
 function Materials:ScanBags()
@@ -370,7 +358,7 @@ function Materials:ScanBags()
         bySpell = {},
         counts = {}
     }
-    for bag = 0, NUM_BAG_SLOTS do
+    for bag = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local info = C_Container.GetContainerItemInfo(bag, slot)
             if info and info.itemID then

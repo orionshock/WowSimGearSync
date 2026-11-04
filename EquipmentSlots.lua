@@ -1,6 +1,6 @@
 local _, WSGS = ...
 
--- WoW Sims index -> MoP inventory slot ID. Shirt/tabard/ranged are excluded.
+-- WoW Sims index -> retail inventory slot ID. Shirt and tabard are excluded.
 WSGS.equipmentSlots = {{
     name = "Head",
     token = "HeadSlot",

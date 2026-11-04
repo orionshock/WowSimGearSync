@@ -9,7 +9,7 @@ local ARROW_WIDTH, ARROW_HEIGHT = 26, 22
 local PADDING = 12
 local MAX_WIDTH = 440
 local MIN_WIDTH = 180
-local ARROW_TEXTURE = "Interface\\TalentFrame\\TalentFrame-Parts"
+local ARROW_ATLAS = "common-icon-forwardarrow"
 
 local function measuredWidth(frame, text)
     frame.measure:SetText(text or "")
@@ -62,8 +62,8 @@ local function acquireArrow(frame)
     local arrow = frame.arrows[index]
     if not arrow then
         arrow = frame:CreateTexture(nil, "ARTWORK")
-        arrow:SetTexture(ARROW_TEXTURE)
-        arrow:SetTexCoord(0.78515625, 0.99218750, 0.54687500, 0.58789063)
+        arrow:SetAtlas(ARROW_ATLAS)
+        arrow:SetRotation(-math.pi / 2)
         arrow:SetSize(ARROW_WIDTH, ARROW_HEIGHT)
         frame.arrows[index] = arrow
     end

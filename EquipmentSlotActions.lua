@@ -50,7 +50,7 @@ function Equipment:GetSlotEquipPlan(position, state)
         if candidate.id == slot.target.id then
             found = true
             unlocked = unlocked or not candidate.locked
-            unresolved = unresolved or not candidate.fingerprint or not candidate.equipLoc
+            unresolved = unresolved or not candidate.guid or not candidate.equipLoc
         end
     end
     if found and not unlocked then

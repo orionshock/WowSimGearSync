@@ -9,6 +9,9 @@ local refreshEvents = {
     ITEM_LOCK_CHANGED = true,
     SPELLS_CHANGED = true,
     SKILL_LINES_CHANGED = true,
+    TRADE_SKILL_LIST_UPDATE = true,
+    TRADE_SKILL_DATA_SOURCE_CHANGED = true,
+    PLAYER_SPECIALIZATION_CHANGED = true,
     PLAYER_REGEN_DISABLED = true,
     PLAYER_REGEN_ENABLED = true,
     CURSOR_CHANGED = true
@@ -87,6 +90,10 @@ function UI:OnEnable()
 end
 
 function UI:TogglePaperDoll()
+    if not self.paperDoll and InCombatLockdown() then
+        WSGS:Print("Open the equipment view after combat.")
+        return
+    end
     local frame = self:CreatePaperDoll()
     if frame:IsShown() then
         frame:Hide()

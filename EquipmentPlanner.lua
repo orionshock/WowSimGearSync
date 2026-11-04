@@ -58,9 +58,6 @@ local locations = {
         INVTYPE_2HWEAPON = true
     }
 }
-local function identity(item)
-    return item.guid or item.key
-end
 local function present(target)
     return target and target.id and target.id > 0 and not target.empty
 end
@@ -68,12 +65,8 @@ end
 -- Ranking reuses actual comparator results, not a second modification comparator.
 local function cost(target, candidate, position)
     local fields = WSGS.EquipmentComparator:CompareSlot(target, candidate, position, position).fields
-    local result = 0
-    for _, name in ipairs({"enchant"}) do
-        local field = fields[name]
-        result = result + (field.state == "MISMATCH" and 100 or field.state == "UNKNOWN" and 1 or 0)
-    end
-    return result
+    local field = fields.enchant
+    return field.state == "MISMATCH" and 100 or field.state == "UNKNOWN" and 1 or 0
 end
 
 local function captureInputs(state, selectedPosition)
@@ -87,7 +80,6 @@ local function captureInputs(state, selectedPosition)
         inventory = state.bags,
         comparison = state.comparison,
         candidates = {},
-        fingerprintCounts = {},
         used = {},
         targetGroups = {},
         plan = {
@@ -120,12 +112,6 @@ local function collectCandidates(context)
     for _, item in ipairs(context.inventory.items) do
         context.candidates[#context.candidates + 1] = item
     end
-    for _, item in ipairs(context.candidates) do
-        if item.id and item.fingerprint then
-            context.fingerprintCounts[item.fingerprint] =
-                (context.fingerprintCounts[item.fingerprint] or 0) + 1
-        end
-    end
 end
 
 -- The comparator has already resolved interchangeable ring/trinket positions.
@@ -140,7 +126,9 @@ local function reserveResolvedAssignments(context)
             local current = snapshot.slots[physical]
             local itemState = comparison.slots[position].fields.item.state
             if itemState == "MATCH" then
-                context.used[identity(current)] = true
+                if current.guid then
+                    context.used[current.guid] = true
+                end
             elseif selected(context, position) then
                 if itemState == "UNKNOWN" or current.locked then
                     context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
@@ -161,7 +149,7 @@ end
 local function matchTargetGroup(context, id, targets)
     local available = {}
     for _, item in ipairs(context.candidates) do
-        if item.id == id and not context.used[identity(item)] then
+        if item.id == id and item.guid and not context.used[item.guid] then
             available[#available + 1] = item
         end
     end
@@ -188,12 +176,11 @@ local function matchTargetGroup(context, id, targets)
         assigned[index] = nil
         choose(index + 1, score + 100000, reserved)
         for _, item in ipairs(available) do
-            local key = identity(item)
-            if not reserved[key] and not item.locked and item.fingerprint and
+            local key = item.guid
+            if not reserved[key] and not item.locked and item.guid and
                 locations[target.position][item.equipLoc] and
                 (target.position ~= 16 or item.equipLoc ~= "INVTYPE_2HWEAPON" or context.snapshot.context and
-                    context.snapshot.context.titansGrip) and
-                (item.guid or context.fingerprintCounts[item.fingerprint] == 1) then
+                    context.snapshot.context.titansGrip) then
                 reserved[key], assigned[index] = true, item
                 choose(index + 1, score + cost(target.target, item, target.position), reserved)
                 reserved[key], assigned[index] = nil, nil
@@ -204,7 +191,7 @@ local function matchTargetGroup(context, id, targets)
 
     local unique = {}
     for _, item in ipairs(available) do
-        unique[identity(item)] = true
+        unique[item.guid] = true
     end
     local physicalCount = 0
     for _ in pairs(unique) do
@@ -214,15 +201,14 @@ local function matchTargetGroup(context, id, targets)
     for index, target in ipairs(targets) do
         local item = best[index]
         if item then
-            context.used[identity(item)] = true
+            context.used[item.guid] = true
             context.plan.operations[#context.plan.operations + 1] = {
                 kind = "EQUIP",
                 source = item,
                 position = target.physical,
                 targetPosition = target.position,
                 slotId = WSGS.equipmentSlots[target.physical].id,
-                id = id,
-                direct = context.fingerprintCounts[item.fingerprint] == 1
+                id = id
             }
         elseif shortage > 0 then
             shortage = shortage - 1
@@ -254,7 +240,7 @@ local function allocateBagDestinations(context)
                                                                          ": equipped identity is unavailable."
             elseif current.id then
                 local destination = context.inventory.free[freeIndex]
-                if current.locked or not (current.guid or current.fingerprint) then
+                if current.locked or not current.guid then
                     context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
                                                                              ": equipped item is locked or unreadable."
                 elseif not destination then

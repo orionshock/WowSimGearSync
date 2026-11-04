@@ -72,7 +72,7 @@ local function effectValue(fieldName, effectID, difference)
     local catalog = WSGS.ModificationMaterials.actions
     local profession = catalog.profession[effectID]
     if profession then
-        return spellValue(profession.spellID or profession.spellIDs and profession.spellIDs[1],
+        return spellValue(profession.spellID,
             "Profession enhancement")
     end
     local inventory = fieldName == "enchant" and catalog.inventory[effectID]

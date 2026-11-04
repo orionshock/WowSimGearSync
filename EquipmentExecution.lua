@@ -57,7 +57,7 @@ function Execution:Perform(operation, index, total)
     WSGS:Debug(string.format(
         "[EQUIP][EXEC] op=%s/%s kind=%s source=%s item=%s GUID=%s destInv=%d API=%s cursorBefore=%s itemBefore=%s sourceLocked=%s destLocked=%s",
         shown(index), shown(total), operation.kind, sourceLocation(source), shown(source.id or operation.id),
-        shown(source.guid), operation.slotId, operation.direct and "C_Item.EquipItemByName" or "cursor APIs",
+        shown(source.guid), operation.slotId, "cursor APIs",
         cursorState(), shown(before), shown(sourceLocked and true or false), shown(destinationLocked and true or false)))
 
     if InCombatLockdown() or UnitAffectingCombat("player") then
@@ -90,26 +90,10 @@ function Execution:Perform(operation, index, total)
     local location = source.bag ~= nil and ItemLocation:CreateFromBagAndSlot(source.bag, source.bagSlot) or
                          ItemLocation:CreateFromEquipmentSlot(WSGS.equipmentSlots[source.position].id)
     local guidOK, guid = pcall(C_Item.GetItemGUID, location)
-    if source.guid and (not guidOK or guid ~= source.guid) then
+    if not source.guid or not guidOK or guid ~= source.guid then
         local reason = "Source instance changed; rescan required."
         logResult(operation, index, false, reason)
         return false, reason
-    end
-    local link = source.bag ~= nil and C_Container.GetContainerItemLink(source.bag, source.bagSlot) or
-                     GetInventoryItemLink("player", WSGS.equipmentSlots[source.position].id)
-    local decoded = WSGS.ItemLinkDecoder:Decode(link)
-    if not decoded or decoded.payload ~= source.fingerprint then
-        local reason = "Source link changed; rescan required."
-        logResult(operation, index, false, reason)
-        return false, reason
-    end
-
-    if operation.kind == "EQUIP" and operation.direct then
-        WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=C_Item.EquipItemByName linkItem=%s destInv=%d", shown(index),
-            shown(operation.id), operation.slotId))
-        C_Item.EquipItemByName(link, operation.slotId)
-        logResult(operation, index, true, "SUBMITTED")
-        return true, "SUBMITTED"
     end
     if IsInventoryItemLocked(operation.slotId) then
         local reason = "Equipment slot is locked."

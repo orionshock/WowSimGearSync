@@ -35,9 +35,6 @@ function WSGS:CompareLatestEquipment()
                 if difference.source then
                     detail = detail .. " via " .. difference.source
                 end
-                if difference.targetSource then
-                    detail = detail .. " target=" .. difference.targetSource
-                end
                 if difference.progressState then
                     detail = detail .. " " .. difference.progressState
                 end

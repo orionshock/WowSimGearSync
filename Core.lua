@@ -9,7 +9,6 @@ WSGS.version = version and not version:find("@", 1, true) and version or "Develo
 
 local defaults = {
     profile = {
-        engineeringCloakFallback = true,
         equipmentSets = true,
         debug = false,
         minimap = {
@@ -143,7 +142,6 @@ local playerReasons = {
     ["player.class must be a class name or positive numeric identifier."] = "The export contains invalid class information.",
     ["Required recipe did not appear in the unfiltered profession list"] = "The required recipe is not available in your profession window",
     ["Resolved profession entry is not an executable recipe"] = "The required profession recipe cannot be used",
-    ["DoTradeSkill did not begin item targeting"] = "The recipe did not let you select an item",
     ["The equipped target item or instance changed before application"] = "The equipped item changed; select it again",
 }
 
@@ -175,7 +173,7 @@ function WSGS:FormatPlayerReason(reason)
         :gsub("combat lockdown", "combat")
         :gsub("could not stage the item", "could not select the item")
         :gsub("Item staging is unavailable", "Item selection is unavailable")
-        :gsub("DoTradeSkill failed:", "Crafting failed:"))
+        :gsub("CraftEnchant failed:", "Crafting failed:"))
 end
 
 function WSGS:RegisterAceConfig()
@@ -200,7 +198,9 @@ function WSGS:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("WSGSDB", defaults, true)
     self:RegisterAceConfig()
     self:RegisterDBIcon()
-    self:Debug("Loaded version " .. self.version .. ".")
+    local clientVersion, build, _, interface = GetBuildInfo()
+    self:Debug(string.format("[CLIENT] version=%s build=%s interface=%s addon=%s",
+        clientVersion, build, tostring(interface), self.version))
 end
 
 function WSGS:GetActiveSimulationProfile()

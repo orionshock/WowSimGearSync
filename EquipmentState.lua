@@ -6,6 +6,9 @@ local observationEvents = {
     BAG_UPDATE_DELAYED = true,
     ITEM_LOCK_CHANGED = true,
     SPELLS_CHANGED = true,
+    TRADE_SKILL_LIST_UPDATE = true,
+    TRADE_SKILL_DATA_SOURCE_CHANGED = true,
+    PLAYER_SPECIALIZATION_CHANGED = true,
     SKILL_LINES_CHANGED = true
 }
 
@@ -210,11 +213,13 @@ function Equipment:OnEnable()
     self:RegisterEvent("PLAYER_REGEN_DISABLED", "OnEquipmentStateEvent")
     self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnEquipmentStateEvent")
     self:RegisterEvent("UI_ERROR_MESSAGE")
-    -- Match the Classic Item continuation API: one authoritative completion
-    -- event, rather than consuming both cache and explicit-load notifications.
+    -- Item continuations complete through ITEM_DATA_LOAD_RESULT.
     self:RegisterEvent("ITEM_DATA_LOAD_RESULT", "OnItemDataEvent")
     self:RegisterEvent("SPELLS_CHANGED", "OnEquipmentStateEvent")
     self:RegisterEvent("SKILL_LINES_CHANGED", "OnEquipmentStateEvent")
+    self:RegisterEvent("TRADE_SKILL_LIST_UPDATE", "OnEquipmentStateEvent")
+    self:RegisterEvent("TRADE_SKILL_DATA_SOURCE_CHANGED", "OnEquipmentStateEvent")
+    self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED", "OnEquipmentStateEvent")
     self:RegisterEvent("CURSOR_CHANGED", "OnEquipmentStateEvent")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
 end

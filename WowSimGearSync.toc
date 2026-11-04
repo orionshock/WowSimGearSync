@@ -1,4 +1,4 @@
-## Interface: 50504
+## Interface: 16001
 ## Title: WowSimGearSync
 ## Notes: Match your gear and enhancements to a WoW Sims configuration.
 ## Author: Orionshock <Orionshock@gmail.com> with Codex/OpenAI
@@ -34,7 +34,7 @@ Import\Module.lua
 Import\Specialization.lua
 Import\ManagedBuilds.lua
 ModificationMaterials.lua
-ItemLinkDecoder.lua
+ItemEnchantment.lua
 EquipmentInspector.lua
 EquipmentScanner.lua
 EquipmentComparator.lua

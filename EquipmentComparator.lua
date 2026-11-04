@@ -65,14 +65,6 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
     end
     for _, field in ipairs(fields) do
         local expected = target[field]
-        local targetSource
-        if field == "tinker" then
-            expected, targetSource = target.tinker, target.tinker ~= nil and "SIMULATION" or nil
-            if expected == nil then
-                expected, targetSource =
-                    WSGS.ModificationMaterials:RecommendedProfessionEnhancement(slot.id, context)
-            end
-        end
         local difference
         if field == "tinker" and not emptyTarget and expected ~= nil and result.fields.item.state == "MATCH" and
             observations.tinker and observations.tinker.status == "KNOWN" and observations.tinker.different then
@@ -97,7 +89,6 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
         else
             difference = scalar(expected, observations[field])
         end
-        difference.targetSource = targetSource
         result.fields[field] = difference
     end
     return result

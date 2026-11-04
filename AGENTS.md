@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository is a MoP Classic Lua addon with production modules at the root, bundled libraries under `Libs/`, and implementation notes under `docs/`. Organize new code around stable domain, capability, runtime, or ownership boundaries. Create folders when they improve discovery or isolate meaningful dependencies, not merely to reduce file counts.
+This repository is a WoW Forever Lua addon using the retail client APIs with production modules at the root, bundled libraries under `Libs/`, and implementation notes under `docs/`. Organize new code around stable domain, capability, runtime, or ownership boundaries. Create folders when they improve discovery or isolate meaningful dependencies, not merely to reduce file counts.
 
 Keep related behavior together and dependency direction clear. Avoid cross-imports into unrelated sibling internals and bidirectional dependencies. Use names that describe the owned concept or responsibility; avoid dumping grounds such as `utils`, `helpers`, `common`, and `misc`.
 
@@ -22,7 +22,7 @@ Treat roughly **300 lines of handwritten source** as a review trigger, not a lim
 
 ## Runtime Validation Guidelines
 
-Do not create automated test suites or mock-client tests. Validate behavior in the actual MoP Classic client and use structured runtime debug logging to investigate behavior. Tests must not be reintroduced without explicit instruction.
+Do not create automated test suites or mock-client tests. Validate behavior in the actual WoW Forever client and use structured runtime debug logging to investigate behavior. Tests must not be reintroduced without explicit instruction.
 
 ## Commit & Pull Request Guidelines
 

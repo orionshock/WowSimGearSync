@@ -49,12 +49,12 @@ function Inspector:Inspect(slotId, link)
             result.tinker.spellId, result.tinker.spellName = spellId, name
         end
         if ok and not spellId then
-            local decoded = WSGS.ItemLinkDecoder:Decode(link)
+            local itemID = C_Item.GetItemID(ItemLocation:CreateFromEquipmentSlot(slotId))
             self.requestedTinkerItems = self.requestedTinkerItems or {}
-            if decoded and not self.requestedTinkerItems[decoded.id] then
-                self.requestedTinkerItems[decoded.id] = true
+            if itemID and not self.requestedTinkerItems[itemID] then
+                self.requestedTinkerItems[itemID] = true
                 requestedItemData = true
-                WSGS:GetModule("Equipment"):RequestItemData(decoded.id, "EquipmentInspector:tinker")
+                WSGS:GetModule("Equipment"):RequestItemData(itemID, "EquipmentInspector:tinker")
             end
         end
         local rawLink = type(link) == "string" and (link:match("|H(item:[^|]+)|h") or link) or tostring(link)

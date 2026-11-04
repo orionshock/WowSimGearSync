@@ -70,17 +70,9 @@ function Scanner:Scan(onlyPosition)
                     source = "C_Item.GetItemGUID"
                 }
             end
-            local decoded, reason = WSGS.ItemLinkDecoder:Decode(current.link)
-            if decoded and observations.item.status == "KNOWN" and decoded.id == current.id then
-                observations.enchant = decoded.enchant
-                for field, observed in pairs(WSGS.EquipmentInspector:Inspect(slot.id, current.link)) do
-                    observations[field] = observed
-                end
-            else
-                local problem = reason or "Item link and inventory item identity do not agree"
-                for _, field in ipairs({"enchant"}) do
-                    observations[field] = unknown(problem)
-                end
+            observations.enchant = WSGS.ItemEnchantment:Observe(current.link)
+            for field, observed in pairs(WSGS.EquipmentInspector:Inspect(slot.id, current.link)) do
+                observations[field] = observed
             end
         end
     end

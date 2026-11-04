@@ -20,18 +20,11 @@ function WSGS:RegisterOptionsPanel()
                 order = 1,
                 width = "full"
             },
-            engineeringCloakFallback = {
-                type = "toggle",
-                name = L["Default Engineering cloak: Goblin Glider"],
-                desc = L["Use Goblin Glider when your import omits a cloak tinker. Imported enhancements take priority."],
-                order = 2,
-                width = "full"
-            },
             equipmentSets = {
                 type = "toggle",
                 name = L["Create/update Equipment Manager sets"],
                 desc = L["Save verified equipment using the active import's name. Other sets are left alone."],
-                order = 3,
+                order = 2,
                 width = "full"
             }
         }

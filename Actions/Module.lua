@@ -140,8 +140,7 @@ local function controllerSignature(controller)
                          operation and valueText(operation.expected) or "nil", valueText(controller.targetGuid),
                          controller.reason or operation and operation.reason or "none",
                          valueText(operation and operation.material and operation.material.bag),
-                         valueText(operation and operation.material and operation.material.slot),
-                         valueText(operation and operation.targetSource)}, ":"), operation
+                         valueText(operation and operation.material and operation.material.slot)}, ":"), operation
 end
 
 local function logPlan(position, controller)
@@ -159,11 +158,11 @@ local function logPlan(position, controller)
     if controller.state == "READY" then
         local prepared = controller.prepared
         debug("READY", string.format(
-            "slot=%d handler=%s type=%s material=%s materialGuid=%s profession=%s recipe=%s spellName=%s professionSpell=%s effect=%s guid=%s source=%s",
+            "slot=%d handler=%s type=%s material=%s materialGuid=%s profession=%s recipe=%s spellName=%s effect=%s guid=%s",
             controller.inventorySlot, prepared.handlerName, prepared.type, valueText(prepared.materialItemID),
             valueText(prepared.material and prepared.material.guid), valueText(prepared.professionName),
-            valueText(prepared.spellID), valueText(prepared.spellName), valueText(prepared.professionSpellIndex),
-            valueText(prepared.expected), valueText(controller.targetGuid), valueText(prepared.targetSource)))
+            valueText(prepared.spellID), valueText(prepared.spellName),
+            valueText(prepared.expected), valueText(controller.targetGuid)))
         return
     end
     if controller.state == "BLOCKED" then
@@ -320,7 +319,6 @@ local function submitProfession(self, controller, request, button)
     operation.spellID = result.spellID
     operation.spellName = result.spellName
     operation.professionName = result.professionName
-    operation.professionSpellIndex = result.professionSpellIndex
     operation.executionToken = result
     return true
 end
@@ -554,7 +552,7 @@ function Actions:TRADE_SKILL_SHOW(event, ...)
     handleActiveEvent(self, event, ...)
 end
 
-function Actions:TRADE_SKILL_UPDATE(event, ...)
+function Actions:TRADE_SKILL_LIST_UPDATE(event, ...)
     handleActiveEvent(self, event, ...)
 end
 
@@ -571,9 +569,6 @@ function Actions:UNIT_SPELLCAST_SENT(event, unit, target, castGUID, spellID)
         local operation = controller.submitting
         if operation then
             local matches = operation.spellID == spellID
-            for _, recipeSpellID in ipairs(operation.recipeSpellIDs or {}) do
-                matches = matches or recipeSpellID == spellID
-            end
             if matches then
                 operation.castGUID = castGUID
             end
@@ -683,7 +678,7 @@ function Actions:OnEnable()
     self:RegisterEvent("UNIT_SPELLCAST_FAILED")
     self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
     self:RegisterEvent("TRADE_SKILL_SHOW")
-    self:RegisterEvent("TRADE_SKILL_UPDATE")
+    self:RegisterEvent("TRADE_SKILL_LIST_UPDATE")
     self:RegisterEvent("REPLACE_ENCHANT")
     self:RegisterEvent("BIND_ENCHANT")
     self:RegisterEvent("ACTION_WILL_BIND_ITEM")

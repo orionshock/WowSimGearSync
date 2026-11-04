@@ -1,7 +1,7 @@
 local _, WSGS = ...
 local Sync = WSGS:NewModule("EquipmentSets", "AceEvent-3.0")
 WSGS.EquipmentSetSync = Sync
-local shirtSlot, rangedSlot, tabardSlot = INVSLOT_BODY, INVSLOT_RANGED, INVSLOT_TABARD
+local shirtSlot, tabardSlot = INVSLOT_BODY, INVSLOT_TABARD
 
 local function shown(value)
     if value == nil or value == "" then
@@ -30,7 +30,7 @@ local function specializationIcon(profile)
     if type(specID) ~= "number" then
         return nil, specID
     end
-    local ok, returnedID, _, _, icon = pcall(GetSpecializationInfoForSpecID, specID)
+    local ok, returnedID, _, _, icon = pcall(GetSpecializationInfoByID, specID)
     if not ok or returnedID ~= specID or type(icon) ~= "number" or icon <= 0 then
         return nil, specID
     end
@@ -118,7 +118,7 @@ end
 
 local function captureSaveSelection()
     local ignored = {}
-    for slot = 1, 19 do
+    for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
         ignored[slot] = C_EquipmentSet.IsSlotIgnoredForSave(slot)
     end
     return ignored
@@ -126,7 +126,6 @@ end
 
 local function configureManagedSlots(ignored)
     C_EquipmentSet.ClearIgnoredSlotsForSave()
-    C_EquipmentSet.IgnoreSlotForSave(rangedSlot)
     if ignored[shirtSlot] then
         C_EquipmentSet.IgnoreSlotForSave(shirtSlot)
     end
@@ -137,7 +136,7 @@ end
 
 local function restoreSaveSelection(ignored)
     C_EquipmentSet.ClearIgnoredSlotsForSave()
-    for slot = 1, 19 do
+    for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
         if ignored[slot] then
             C_EquipmentSet.IgnoreSlotForSave(slot)
         end
@@ -179,10 +178,10 @@ function Sync:SetMatchesState(setID, state)
     end
     local mismatches = {}
     for position, slot in ipairs(WSGS.equipmentSlots) do
-        local expected = state.equipped[position].id or EQUIPMENT_SET_EMPTY_SLOT or 0
+        local expected = state.equipped[position].id or EQUIPMENT_SET_EMPTY_SLOT
         local actual = itemIDs[slot.id]
         if actual == nil then
-            actual = EQUIPMENT_SET_EMPTY_SLOT or 0
+            actual = EQUIPMENT_SET_EMPTY_SLOT
         end
         if actual ~= expected then
             mismatches[#mismatches + 1] = slot.id .. ":" .. shown(expected) .. "/" .. shown(actual)
