@@ -13,7 +13,7 @@ end
 function Execution:Submit(request)
     local operation = request.operation
     local skillLine = operation.professionSkillLine
-    local profession = WSGS.ModificationMaterials:GetProfession(skillLine)
+    local profession = WSGS.Professions:GetProfession(skillLine)
     if not profession then
         return result("FAILED", "Required profession is unavailable")
     end

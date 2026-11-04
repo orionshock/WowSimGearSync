@@ -275,51 +275,6 @@ Materials.equippedProfessionEffects = {
     }
 }
 
-local function guidFor(bag, slot)
-    local ok, guid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(bag, slot))
-    return ok and guid or nil
-end
-
-function Materials:ScanProfessions()
-    local first, second = GetProfessions()
-    local professions = {}
-    for _, professionIndex in pairs({first, second}) do
-        local name, _, rank, maxRank, _, _, skillLine = GetProfessionInfo(professionIndex)
-        if skillLine then
-            professions[skillLine] = {
-                name = name,
-                index = professionIndex,
-                rank = rank,
-                maxRank = maxRank,
-                skillLine = skillLine,
-            }
-        end
-    end
-    return professions
-end
-
-function Materials:GetProfession(skillLineID)
-    return self:ScanProfessions()[skillLineID]
-end
-
-function Materials:CharacterContext()
-    local professions = self:ScanProfessions()
-    local details = {}
-    for skillLine, profession in pairs(professions) do
-        details[#details + 1] = string.format("%s(%d)=%s/%s", profession.name or "unknown", skillLine,
-            tostring(profession.rank), tostring(profession.maxRank))
-    end
-    table.sort(details)
-    local signature = table.concat(details, ",")
-    if self.professionSignature ~= signature then
-        self.professionSignature = signature
-        WSGS:Debug("[ACTION][PLAN] professions=" .. (signature ~= "" and signature or "none"))
-    end
-    return {
-        professions = professions
-    }
-end
-
 function Materials:ProfessionEffect(inventorySlot, useSpellID)
     local supportedSkillLine
     for skillLine, slots in pairs(self.equippedProfessionEffects) do
@@ -350,42 +305,6 @@ local function professionAvailability(bags, recipe, inventorySlot, professions)
     end
     local spellID = recipe.spellID
     return recipe, nil, C_Spell.GetSpellName(spellID), profession.name
-end
-
-function Materials:ScanBags()
-    local result = {
-        byItem = {},
-        bySpell = {},
-        counts = {}
-    }
-    for bag = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local info = C_Container.GetContainerItemInfo(bag, slot)
-            if info and info.itemID then
-                local location = {
-                    bag = bag,
-                    slot = slot,
-                    itemID = info.itemID,
-                    guid = guidFor(bag, slot),
-                    locked = info.isLocked,
-                    link = info.hyperlink,
-                    count = info.stackCount or 1
-                }
-                result.counts[info.itemID] = (result.counts[info.itemID] or 0) + location.count
-                if not result.byItem[info.itemID] or result.byItem[info.itemID].locked and not location.locked then
-                    result.byItem[info.itemID] = location
-                end
-                local ok, _, spellID = pcall(C_Item.GetItemSpell, info.hyperlink or info.itemID)
-                if ok and spellID then
-                    location.spellID = spellID
-                    if not result.bySpell[spellID] or result.bySpell[spellID].locked and not location.locked then
-                        result.bySpell[spellID] = location
-                    end
-                end
-            end
-        end
-    end
-    return result
 end
 
 function Materials:ForInventoryEnhancement(bags, enchantID)

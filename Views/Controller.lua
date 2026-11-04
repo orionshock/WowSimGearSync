@@ -45,7 +45,7 @@ function UI:RefreshPaperDoll()
     if not self.paperDoll or not self.paperDoll:IsShown() then
         return
     end
-    local state = Equipment:RefreshCurrentBuild()
+    local state = Equipment:GetState(WSGS:GetActiveSimulationProfile())
     self:RenderPaperDoll(state)
 end
 
@@ -81,11 +81,16 @@ function UI:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
     end
 end
 
+function UI:OnStateChanged(_, state)
+    if self.paperDoll and self.paperDoll:IsShown() then
+        self:RenderPaperDoll(state)
+    end
+end
+
 function UI:OnEnable()
-    self:RegisterMessage("WSGS_BUILD_IMPORTED", "RefreshPaperDoll")
+    self:RegisterMessage("WSGS_STATE_CHANGED", "OnStateChanged")
     self:RegisterMessage("WSGS_ACTIONS_CHANGED", "QueuePaperDollRefresh")
     self:RegisterMessage("WSGS_EQUIPMENT_STATE_CHANGED", "UpdateEquipButton")
-    self:RegisterMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED")
     self:RegisterMessage("WSGS_ITEM_DATA_RECEIVED")
 end
 

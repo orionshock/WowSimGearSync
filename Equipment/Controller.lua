@@ -259,32 +259,15 @@ function Actions:QueueRefresh(event, ...)
     if verificationEvents[event] then
         self.verificationEvent = event
     end
-    self:SendMessage("WSGS_EQUIPMENT_REFRESH_REQUESTED", event, ...)
-    if self:PendingCount() == 0 then
-        return
-    end
     if self.refreshQueued then
         return
     end
     self.refreshQueued = true
     C_Timer.After(0, function()
         self.refreshQueued = false
-        if self:PendingCount() > 0 then
-            local state = self:GetState(WSGS:GetActiveSimulationProfile())
-            self:Refresh(state)
-        end
+        local state = self:RefreshCurrentBuild()
+        self:SendMessage("WSGS_STATE_CHANGED", state)
     end)
-end
-
-function Actions:OnEquipmentStateEvent(event, ...)
-    if self:IsObservationEvent(event) then
-        self:InvalidateState(event, ...)
-    end
-    local active = self.batch and self:PendingCount() > 0
-    if active and verificationEvents[event] then
-        WSGS:Debug(string.format("[EQUIP][EVENT] name=%s args=%s", event, eventArguments(...)))
-    end
-    self:QueueRefresh(event)
 end
 
 function Actions:UI_ERROR_MESSAGE(event, ...)

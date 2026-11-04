@@ -48,7 +48,7 @@ local function configureButton(position)
     button:SetAttribute("type1", actionType)
     button:SetAttribute("item1",
         actionType == "item" and operation.material and
-            string.format("%d %d", operation.material.bag, operation.material.slot) or nil)
+            string.format("%d %d", operation.material.bag, operation.material.bagSlot) or nil)
     button:SetAttribute("spell1", nil)
     button:SetAttribute("macrotext1", nil)
     button:SetAttribute("action1", nil)
@@ -140,7 +140,7 @@ local function controllerSignature(controller)
                          operation and valueText(operation.expected) or "nil", valueText(controller.targetGuid),
                          controller.reason or operation and operation.reason or "none",
                          valueText(operation and operation.material and operation.material.bag),
-                         valueText(operation and operation.material and operation.material.slot)}, ":"), operation
+                         valueText(operation and operation.material and operation.material.bagSlot)}, ":"), operation
 end
 
 local function logPlan(position, controller)
@@ -330,19 +330,19 @@ local function submitItem(self, controller, request, button)
         fail(self, controller, operation, "Prepared material location is unavailable", "OPERATION")
         return false
     end
-    local current = C_Container.GetContainerItemInfo(material.bag, material.slot)
+    local current = C_Container.GetContainerItemInfo(material.bag, material.bagSlot)
     if not current or current.itemID ~= material.itemID or current.isLocked then
         fail(self, controller, operation, "Prepared material moved or became locked", "OPERATION")
         return false
     end
     local guidOK, currentGuid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(material.bag,
-        material.slot))
+        material.bagSlot))
     if material.guid and (not guidOK or currentGuid ~= material.guid) then
         fail(self, controller, operation, "Prepared material instance moved; rescan before retrying", "OPERATION")
         return false
     end
     configureButton(controller.position)
-    local expectedItem = string.format("%d %d", material.bag, material.slot)
+    local expectedItem = string.format("%d %d", material.bag, material.bagSlot)
     if button:GetAttribute("type1") ~= "item" or button:GetAttribute("target-slot1") ~= controller.inventorySlot or
         button:GetAttribute("item1") ~= expectedItem then
         fail(self, controller, operation, "Secure action could not be prepared", "OPERATION")

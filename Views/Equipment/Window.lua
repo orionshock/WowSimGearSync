@@ -78,7 +78,7 @@ local function registerTooltipItems(self, frame, status)
                 self.relevantItems[itemID] = true
                 if frame:IsShown() and not C_Item.GetItemInfo(itemID) and not self.requestedItems[itemID] then
                     self.requestedItems[itemID] = true
-                    Equipment:RequestItemData(itemID, "PaperDoll:modification-tooltip")
+                    WSGS.ItemData:RequestItemData(itemID, "PaperDoll:modification-tooltip")
                 end
             end
         end
@@ -134,7 +134,7 @@ function UI:RenderPaperDoll(state)
                           "Interface\\Icons\\INV_Misc_QuestionMark"
             if not name and frame:IsShown() and not self.requestedItems[target.id] then
                 self.requestedItems[target.id] = true
-                Equipment:RequestItemData(target.id, "PaperDoll:target")
+                WSGS.ItemData:RequestItemData(target.id, "PaperDoll:target")
             end
         end
         button.icon:SetTexture(texture)

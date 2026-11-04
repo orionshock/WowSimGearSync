@@ -228,7 +228,7 @@ function Shopping:Render(entries)
         end
         if (not name or not icon) and not self.requestedItems[entry.itemID] then
             self.requestedItems[entry.itemID] = true
-            Equipment:RequestItemData(entry.itemID, "ShoppingList")
+            WSGS.ItemData:RequestItemData(entry.itemID, "ShoppingList")
         end
     end
     for index = #entries + 1, #frame.rows do

@@ -34,12 +34,15 @@ Builds\Import.lua
 Builds\Specialization.lua
 Builds\ActiveBuild.lua
 Enhancements\Catalog\Lookup.lua
+Character\Professions.lua
+Character\ItemData.lua
 Character\Enchantment.lua
 Character\ProfessionEffects.lua
 Character\EquippedItems.lua
 Equipment\Comparison.lua
 Character\CarriedItems.lua
 Character\Capture.lua
+Equipment\State.lua
 Shopping\Controller.lua
 Diagnostics\EquipmentProbe.lua
 Equipment\Planning\Plan.lua

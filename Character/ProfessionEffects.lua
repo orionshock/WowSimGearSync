@@ -54,7 +54,7 @@ function Inspector:Inspect(slotId, link)
             if itemID and not self.requestedTinkerItems[itemID] then
                 self.requestedTinkerItems[itemID] = true
                 requestedItemData = true
-                WSGS:GetModule("Equipment"):RequestItemData(itemID, "EquipmentInspector:tinker")
+                WSGS.ItemData:RequestItemData(itemID, "EquipmentInspector:tinker")
             end
         end
         local rawLink = type(link) == "string" and (link:match("|H(item:[^|]+)|h") or link) or tostring(link)

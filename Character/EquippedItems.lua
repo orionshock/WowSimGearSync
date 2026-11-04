@@ -13,7 +13,7 @@ function Scanner:Scan(onlyPosition)
     local snapshot = {
         capturedAt = time(),
         slots = {},
-        context = WSGS.ModificationMaterials:CharacterContext()
+        context = WSGS.Professions:CharacterContext()
     }
     for position = onlyPosition or 1, onlyPosition or #WSGS.equipmentSlots do
         local slot = WSGS.equipmentSlots[position]
@@ -75,6 +75,12 @@ function Scanner:Scan(onlyPosition)
                 observations[field] = observed
             end
         end
+    end
+    snapshot.context.titansGrip = C_SpellBook.IsSpellKnown(46917)
+    for position, current in ipairs(snapshot.slots) do
+        current.guid = current.observations.instance.status == "KNOWN" and current.observations.instance.value or nil
+        current.equipLoc = current.id and select(4, C_Item.GetItemInfoInstant(current.link or current.id))
+        current.locked = IsInventoryItemLocked(WSGS.equipmentSlots[position].id)
     end
     return snapshot
 end
