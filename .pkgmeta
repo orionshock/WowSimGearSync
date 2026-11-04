@@ -1,5 +1,45 @@
 package-as: WowSimGearSync
 
+# Destinations match the TOC directly; only required Ace3 modules are fetched.
+externals:
+  Libs/LibStub:
+    url: https://repos.wowace.com/wow/libstub/trunk
+    type: svn
+  Libs/CallbackHandler-1.0:
+    url: https://repos.wowace.com/wow/callbackhandler/trunk/CallbackHandler-1.0
+    type: svn
+  Libs/AceAddon-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceAddon-3.0
+    type: svn
+  Libs/AceEvent-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceEvent-3.0
+    type: svn
+  Libs/AceConsole-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceConsole-3.0
+    type: svn
+  Libs/AceDB-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceDB-3.0
+    type: svn
+  Libs/AceLocale-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceLocale-3.0
+    type: svn
+  Libs/AceConfig-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceConfig-3.0
+    type: svn
+  Libs/AceGUI-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceGUI-3.0
+    type: svn
+  Libs/AceTab-3.0:
+    url: https://repos.wowace.com/wow/ace3/trunk/AceTab-3.0
+    type: svn
+  Libs/LibDBIcon-1.0:
+    url: https://repos.wowace.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0
+    type: svn
+
+# LibDataBroker stays hard-embedded, following its maintainer's guidance.
+tools-used:
+  - libdatabroker-1-1
+
 ignore:
   - .github
   - .gitignore
@@ -8,4 +48,5 @@ ignore:
   - AGENTS.md
   - README.md
 
+# Release archives always include the libraries required by the TOC.
 enable-nolib-creation: no

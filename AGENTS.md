@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository is a WoW Forever Lua addon using the retail client APIs with production modules grouped by ownership under `Addon/`, `Builds/`, `Character/`, `Equipment/`, `Enhancements/`, `EquipmentSets/`, `Shopping/`, `Interaction/`, `Views/`, and `Diagnostics/`, and bundled libraries under `Libs/`. Organize new code around stable domain, capability, runtime, or ownership boundaries. Create folders when they improve discovery or isolate meaningful dependencies, not merely to reduce file counts.
+This repository is a WoW Forever Lua addon using the retail client APIs with production modules grouped by ownership under `Addon/`, `Builds/`, `Character/`, `Equipment/`, `Enhancements/`, `EquipmentSets/`, `Shopping/`, `Interaction/`, `Views/`, and `Diagnostics/`, and libraries under `Libs/`. Organize new code around stable domain, capability, runtime, or ownership boundaries. Create folders when they improve discovery or isolate meaningful dependencies, not merely to reduce file counts.
 
 `Bootstrap.lua` establishes public feature tables and the temporary implementation registry. `Addon/Composition.lua` loads last, wires runtime collaborators, and removes the registry from the addon namespace.
 
@@ -13,6 +13,8 @@ Keep related behavior together and dependency direction clear. Avoid cross-impor
 ## Build, Test, and Development Commands
 
 Release packaging runs through `.github/workflows/release.yml` on version tags such as `v0.3.0` and `v0.3.0-alpha1`, using BigWigsMods/packager@v2. Use annotated tags. The workflow fetches full history and uses GitHub's built-in token for Releases; no external upload credentials are needed. For local staging without publishing, run the upstream `release.sh -d -z -n "{package-name}-{project-version}"` under Bash with Git and the standard Unix tools available. This command skips ZIP creation; the hosted workflow creates the ZIP. Unpackaged checkouts use the TOC version placeholder and report Development in addon diagnostics; packaged versions come from the tag. No automated tests or local WoW runner are configured. Use `Get-ChildItem -Force` to inspect the repository, including hidden configuration files.
+
+External library destinations in `.pkgmeta` must match the TOC directly; do not use `move-folders` for libraries. External sources are ignored by Git and remain locally populated for development; a fresh checkout must fetch them before loading in the client. LibDataBroker is hard-embedded, and library license/attribution files remain tracked. Packaged releases include all dependencies; no no-lib archive is produced.
 
 ## Coding Style & Naming Conventions
 

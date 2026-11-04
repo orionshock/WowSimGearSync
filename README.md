@@ -35,3 +35,5 @@ Open `/wsgs options` or right-click the launcher. You can toggle debug logging a
 ## Development layout
 
 Production code is grouped by feature ownership. `Bootstrap.lua` loads first; `Addon/Composition.lua` wires the modules last.
+
+Release packaging fetches the external libraries listed in `.pkgmeta` into their TOC paths. A fresh Git checkout needs those libraries populated locally before use in the client. LibDataBroker remains bundled in the repository.
