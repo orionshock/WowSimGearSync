@@ -47,6 +47,7 @@ Equipment\Comparison.lua
 Character\CarriedItems.lua
 Character\Capture.lua
 Equipment\State.lua
+Interaction\Availability.lua
 Shopping\Controller.lua
 Diagnostics\EquipmentProbe.lua
 Equipment\Planning\Plan.lua
@@ -62,9 +63,13 @@ Enhancements\Verification.lua
 Enhancements\PendingApplication.lua
 Enhancements\Planning.lua
 Enhancements\Execution\ProfessionCraft.lua
+Enhancements\Execution\SecureItemUse.lua
+Enhancements\Events.lua
 Enhancements\Controller.lua
 Views\Controller.lua
 Views\Equipment\Presentation.lua
 Views\Tooltips\Enhancement.lua
 Views\Import\Dialog.lua
 Views\Equipment\Window.lua
+
+Addon\Composition.lua

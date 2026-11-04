@@ -6,21 +6,8 @@ local Equipment = Modules.Equipment.Runtime
 -- Selected clicks use the ordinary planner and executor. Weapons remain a pair
 -- because clearing/replacing the other hand can be required for a safe layout.
 function Equipment:GetSlotEquipPlan(position, state)
-    if self:PendingCount() > 0 then
-        return nil, L["Waiting for equipment to update"], "PENDING"
-    end
-    if Modules.Enhancements.Runtime.IsModificationPending() then
-        return nil, "Finish the active modification first", "BLOCKED"
-    end
-    if InCombatLockdown() or UnitAffectingCombat("player") then
-        return nil, "Cannot equip in combat", "BLOCKED"
-    end
-    if GetCursorInfo() then
-        return nil, "Place the held cursor item first", "BLOCKED"
-    end
-    if SpellIsTargeting() then
-        return nil, "Finish or cancel the active item targeting first", "BLOCKED"
-    end
+    local reason, status = Modules.Availability:Reason()
+    if reason then return nil, reason, status end
     local slot = state and state.slots[position]
     local item = slot and slot.comparison and slot.comparison.fields.item
     if not item or item.state == "UNKNOWN" then

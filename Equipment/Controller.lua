@@ -386,8 +386,9 @@ function Actions:LogPlan(profile, plan)
 end
 
 function Actions:Click(position)
-    -- A terminal batch may be retried; an overlapping pending batch may not.
-    if self:PendingCount() > 0 then
+    local reason = Modules.Availability:Reason()
+    if reason then
+        WSGS:Print("[EQUIP] " .. WSGS:FormatPlayerReason(reason))
         return
     end
     self.fault, self.batch = nil, nil

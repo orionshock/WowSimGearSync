@@ -23,23 +23,7 @@ local function selectedOperation(controller)
 end
 
 local function configureButton(position)
-    local button = buttons[position]
-    if not button or InCombatLockdown() then
-        return
-    end
-    local controller = controllers[position]
-    local operation = controller and controller.state == "READY" and controller.prepared
-    local actionType = operation and
-        not operation.nativeProfession and "item" or nil
-    button:SetAttribute("wsgs-type1", actionType)
-    button:SetAttribute("type1", actionType)
-    button:SetAttribute("item1",
-        actionType == "item" and operation.material and
-            string.format("%d %d", operation.material.bag, operation.material.bagSlot) or nil)
-    button:SetAttribute("spell1", nil)
-    button:SetAttribute("macrotext1", nil)
-    button:SetAttribute("action1", nil)
-    button:SetAttribute("target-slot1", actionType and controller.inventorySlot or nil)
+    Internal.SecureItemUse:Configure(buttons[position], controllers[position])
 end
 
 local function synchronizeBuild()
@@ -176,12 +160,12 @@ local function submitProfession(self, controller, request, button)
     local result = Internal.ProfessionExecution:Submit(request)
     if result and result.status == "UNRESOLVED" then
         button.wsgsSubmission = nil
-        Pending:MarkUnknown( controller, operation, result.reason)
+        Pending:MarkUnknown(controller, operation, result.reason)
         return false
     end
     if not result or result.status ~= "SUBMITTED" then
         button.wsgsSubmission = nil
-        Pending:Fail( controller, operation, result and result.reason or "Profession execution returned no result",
+        Pending:Fail(controller, operation, result and result.reason or "Profession execution returned no result",
             "OPERATION")
         return false
     end
@@ -193,37 +177,13 @@ local function submitProfession(self, controller, request, button)
 end
 
 local function submitItem(self, controller, request, button)
-    local operation = request.operation
-    local material = operation.material
-    if not material then
-        Pending:Fail( controller, operation, "Prepared material location is unavailable", "OPERATION")
+    local ok, reason = Internal.SecureItemUse:Prepare(controller, request.operation, button)
+    if not ok then
+        Pending:Fail(controller, request.operation, reason, "OPERATION")
         return false
     end
-    local current = C_Container.GetContainerItemInfo(material.bag, material.bagSlot)
-    if not current or current.itemID ~= material.itemID or current.isLocked then
-        Pending:Fail( controller, operation, "Prepared material moved or became locked", "OPERATION")
-        return false
-    end
-    local guidOK, currentGuid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(material.bag,
-        material.bagSlot))
-    if material.guid and (not guidOK or currentGuid ~= material.guid) then
-        Pending:Fail( controller, operation, "Prepared material instance moved; rescan before retrying", "OPERATION")
-        return false
-    end
-    configureButton(controller.position)
-    local expectedItem = string.format("%d %d", material.bag, material.bagSlot)
-    if button:GetAttribute("type1") ~= "item" or button:GetAttribute("target-slot1") ~= controller.inventorySlot or
-        button:GetAttribute("item1") ~= expectedItem then
-        Pending:Fail( controller, operation, "Secure action could not be prepared", "OPERATION")
-        return false
-    end
-    controller.submitting = operation
-    button.wsgsSubmission = {
-        position = controller.position,
-        operation = operation
-    }
-    debug("EXEC", string.format("slot=%d handler=%s api=SecureActionButton:item action=%s target-slot=%d",
-        controller.inventorySlot, operation.handlerName, expectedItem, controller.inventorySlot))
+    controller.submitting = request.operation
+    button.wsgsSubmission = {position = controller.position, operation = request.operation}
     return true
 end
 
@@ -234,20 +194,13 @@ local function submitRequest(self, controller, request, button)
     if request.method == "ITEM" then
         return submitItem(self, controller, request, button)
     end
-    Pending:Fail( controller, request.operation, "Prepared action has no supported execution method")
+    Pending:Fail(controller, request.operation, "Prepared action has no supported execution method")
     return false
 end
 
 local function validateClick(controller, operation, position)
-    if InCombatLockdown() then
-        return "Action unavailable during combat lockdown"
-    end
-    if CursorHasItem() then
-        return "Place the held cursor item first"
-    end
-    if SpellIsTargeting() then
-        return "Finish or cancel the active item-targeting cursor first"
-    end
+    local reason = Modules.Availability:Reason()
+    if reason then return reason end
     local id = GetInventoryItemID("player", controller.inventorySlot)
     local ok, guid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromEquipmentSlot(controller.inventorySlot))
     if id ~= controller.target.id or not ok or guid ~= controller.targetGuid then
@@ -299,7 +252,7 @@ function Actions:ActivateSlot(position, button)
     local operation = controller.prepared
     local problem = validateClick(controller, operation, position)
     if problem then
-        Pending:Fail( controller, operation, problem)
+        Pending:Fail(controller, operation, problem)
         return
     end
     debug("EXEC", string.format(
@@ -334,10 +287,10 @@ local function finishActivation(self, position, button)
         return
     end
     if controller.failure then
-        Pending:Fail( controller, operation, controller.failure)
+        Pending:Fail(controller, operation, controller.failure)
         return
     end
-    Pending:MarkPending( controller, operation)
+    Pending:MarkPending(controller, operation)
     configureButton(position)
     self:SendMessage("WSGS_ACTIONS_CHANGED", "PENDING")
 end
@@ -353,210 +306,15 @@ function Actions:RegisterSlotButton(position, button)
     configureButton(position)
 end
 
-local function activeState()
-    synchronizeBuild()
-    local active, submitting
-    for _, controller in pairs(controllers) do
-        if controller.state == "PENDING" or controller.submitting then
-            active = true
-        end
-        if controller.submitting then
-            submitting = true
-        end
-    end
-    return active, submitting
-end
-
-local function logEvent(event, ...)
-    local args = {}
-    for index = 1, select("#", ...) do
-        args[index] = valueText(select(index, ...))
-    end
-    debug("EVENT", string.format("event=%s args=%s", event, table.concat(args, ",")))
-end
-
-local function finishEvent(self, event, submitting, ...)
-    logEvent(event, ...)
-    if submitting then
-        return
-    end
-    refreshFromClient(self, event)
-end
-
-local function handleActiveEvent(self, event, ...)
-    local active, submitting = activeState()
-    if not active then
-        return
-    end
-    finishEvent(self, event, submitting, ...)
-end
-
-function Actions:PLAYER_EQUIPMENT_CHANGED(event, inventorySlot, ...)
-    local active, submitting = activeState()
-    if not active then
-        return
-    end
-    local relevant
-    for _, controller in pairs(controllers) do
-        if (controller.pending or controller.submitting) and controller.inventorySlot == inventorySlot then
-            relevant = true
-            break
-        end
-    end
-    if not relevant then
-        return
-    end
-    finishEvent(self, event, submitting, inventorySlot, ...)
-end
-
-function Actions:BAG_UPDATE_DELAYED(event, ...)
-    handleActiveEvent(self, event, ...)
-end
-
-function Actions:ITEM_LOCK_CHANGED(event, ...)
-    handleActiveEvent(self, event, ...)
-end
-
-function Actions:TRADE_SKILL_SHOW(event, ...)
-    handleActiveEvent(self, event, ...)
-end
-
-function Actions:TRADE_SKILL_LIST_UPDATE(event, ...)
-    handleActiveEvent(self, event, ...)
-end
-
-function Actions:PLAYER_REGEN_ENABLED(event, ...)
-    handleActiveEvent(self, event, ...)
-end
-
-function Actions:UNIT_SPELLCAST_SENT(event, unit, target, castGUID, spellID)
-    if unit ~= "player" then
-        return
-    end
-    synchronizeBuild()
-    for _, controller in pairs(controllers) do
-        local operation = controller.submitting
-        if operation then
-            local matches = operation.spellID == spellID
-            if matches then
-                operation.castGUID = castGUID
-            end
-        end
-    end
-end
-
-local function handleSpellcastResult(self, event, failed, unit, castGUID, spellID, ...)
-    local active, submitting = activeState()
-    if not active or unit ~= "player" then
-        return
-    end
-    local relevant, tradeSkillClosed
-    for _, controller in pairs(controllers) do
-        local operation = controller.pending or controller.submitting
-        if operation and operation.castGUID and operation.spellID == spellID and operation.castGUID == castGUID then
-            relevant = true
-            if failed then
-                controller.failure = "Client spell cast failed or was interrupted"
-            elseif not tradeSkillClosed and operation.nativeProfession and TradeSkillFrame and
-                TradeSkillFrame:IsShown() then
-                HideUIPanel(TradeSkillFrame)
-                tradeSkillClosed = true
-                debug("EVENT", string.format("event=%s slot=%d type=%s profession=%s tradeskill=closed", event,
-                    controller.inventorySlot, operation.type, operation.professionName))
-            end
-        end
-    end
-    if not relevant then
-        return
-    end
-    finishEvent(self, event, submitting, unit, castGUID, spellID, ...)
-end
-
-function Actions:UNIT_SPELLCAST_SUCCEEDED(event, unit, castGUID, spellID, ...)
-    handleSpellcastResult(self, event, false, unit, castGUID, spellID, ...)
-end
-
-function Actions:UNIT_SPELLCAST_FAILED(event, unit, castGUID, spellID, ...)
-    handleSpellcastResult(self, event, true, unit, castGUID, spellID, ...)
-end
-
-function Actions:UNIT_SPELLCAST_INTERRUPTED(event, unit, castGUID, spellID, ...)
-    handleSpellcastResult(self, event, true, unit, castGUID, spellID, ...)
-end
-
-local function confirmApplication(self, event, api, ...)
-    local active = activeState()
-    if not active then
-        return
-    end
-    local controller, operation
-    for _, candidate in pairs(controllers) do
-        local candidateOperation = candidate.submitting
-        if candidateOperation then
-            controller, operation = candidate, candidateOperation
-            break
-        end
-    end
-    if not operation then
-        return
-    end
-    logEvent(event, ...)
-    local ok, problem = pcall(api)
-    if ok then
-        StaticPopup_Hide(event)
-    end
-    debug("EVENT", string.format("event=%s slot=%d type=%s confirm=%s", event, controller.inventorySlot,
-        operation.type, ok and "accepted" or "failed"))
-    if not ok then
-        controller.failure = event .. " confirmation failed: " .. tostring(problem)
-    end
-end
-
-function Actions:REPLACE_ENCHANT(event, ...)
-    confirmApplication(self, event, C_Item.ReplaceEnchant, ...)
-end
-
-function Actions:BIND_ENCHANT(event, ...)
-    confirmApplication(self, event, C_Item.BindEnchant, ...)
-end
-
-function Actions:ACTION_WILL_BIND_ITEM(event, ...)
-    confirmApplication(self, event, C_Item.ActionBindsItem, ...)
-end
-
-function Actions:WSGS_EQUIPMENT_STATE_INVALIDATED(_, event, ...)
-    if event == "PLAYER_EQUIPMENT_CHANGED" then
-        self:PLAYER_EQUIPMENT_CHANGED(event, ...)
-    elseif event == "BAG_UPDATE_DELAYED" then
-        self:BAG_UPDATE_DELAYED(event, ...)
-    elseif event == "ITEM_LOCK_CHANGED" then
-        self:ITEM_LOCK_CHANGED(event, ...)
-    end
-end
-
-function Actions:WSGS_BUILD_IMPORTED()
-    synchronizeBuild()
-end
-
-function Actions:OnEnable()
-    planSignatures = {}
-    self:RegisterMessage("WSGS_EQUIPMENT_STATE_INVALIDATED")
-    self:RegisterMessage("WSGS_BUILD_IMPORTED")
-    self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-    self:RegisterEvent("UNIT_SPELLCAST_SENT")
-    self:RegisterEvent("UNIT_SPELLCAST_FAILED")
-    self:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    self:RegisterEvent("TRADE_SKILL_SHOW")
-    self:RegisterEvent("TRADE_SKILL_LIST_UPDATE")
-    self:RegisterEvent("REPLACE_ENCHANT")
-    self:RegisterEvent("BIND_ENCHANT")
-    self:RegisterEvent("ACTION_WILL_BIND_ITEM")
-    self:RegisterEvent("PLAYER_REGEN_ENABLED")
-end
-
 Pending = Internal.CreatePendingApplication({
     synchronizeBuild = synchronizeBuild,
     controllerAt = function(position) return controllers[position] end,
     refresh = function(reason) refreshFromClient(Actions, reason) end,
     changed = function(reason) Actions:SendMessage("WSGS_ACTIONS_CHANGED", reason) end
+})
+
+Internal.Events:Configure({
+    synchronizeBuild = synchronizeBuild,
+    controllers = function() return controllers end,
+    refresh = function(reason) refreshFromClient(Actions, reason) end
 })

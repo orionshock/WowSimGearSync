@@ -24,7 +24,7 @@ function ItemEnhancement:Prepare(context, operation)
         return nil, operation.reason or "Enhancement state is unknown", true
     end
     local material, fixedItemID, spellID = MaterialCatalog:ForInventoryEnhancement(context.bags, operation.expected)
-    operation.material, operation.materialItemID = material, fixedItemID or material and material.itemID
+    operation.material, operation.materialItemID = material, fixedItemID or material and material.id
     operation.spellID, operation.method = spellID or material and material.spellID, "ITEM"
     if not MaterialCatalog.inventory[operation.expected] then
         return nil, "Required enchantment material is not yet known"
