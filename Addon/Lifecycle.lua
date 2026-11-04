@@ -1,6 +1,6 @@
 local addonName, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
-LibStub("AceAddon-3.0"):NewAddon(WSGS, addonName, "AceConsole-3.0", "AceEvent-3.0")
 local LibDataBroker = LibStub("LibDataBroker-1.1")
 local LibDBIcon = LibStub("LibDBIcon-1.0")
 
@@ -29,7 +29,7 @@ local commandOptions = {
             desc = "Toggle the WoW Sims import screen.",
             order = 0,
             func = function()
-                WSGS.UI:ToggleImportDialog()
+                Modules.Views.Runtime:ToggleImportDialog()
             end
         },
         debug = {
@@ -64,7 +64,7 @@ local commandOptions = {
             end,
             validate = function(_, value)
                 local position = tonumber(value)
-                if not position or position ~= math.floor(position) or position < 1 or position > #WSGS.equipmentSlots then
+                if not position or position ~= math.floor(position) or position < 1 or position > #Modules.Equipment.Slots then
                     return "Usage: /wsgs probe <export position 1-17>"
                 end
                 return true
@@ -91,7 +91,7 @@ local ldbObjectDefinition = {
     icon = "Interface\\Icons\\INV_Chest_Plate04",
     OnClick = function(_, button)
         if button == "LeftButton" then
-            WSGS.UI:TogglePaperDoll()
+            Modules.Views.Runtime:TogglePaperDoll()
         elseif button == "RightButton" then
             Settings.OpenToCategory(WSGS.optionsCategory)
         end

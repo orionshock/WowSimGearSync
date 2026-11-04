@@ -1,5 +1,6 @@
 local _, WSGS = ...
-local Import = WSGS.Import
+local Modules = WSGS.Private
+local Import = Modules.Builds.Runtime
 
 function Import:SaveBuild(character, build)
     local specialization = build.specialization
@@ -27,6 +28,6 @@ function Import:RenameBuild(character, expectedBuild, name)
         return nil, "Equipment set names must be at most 16 characters."
     end
     build.name = name
-    WSGS:GetModule("Equipment"):InvalidateState("BUILD_RENAMED")
+    Modules.Equipment.Runtime:InvalidateState("BUILD_RENAMED")
     return build
 end

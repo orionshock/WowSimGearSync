@@ -1,8 +1,10 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local Shopping = WSGS:NewModule("ShoppingList", "AceEvent-3.0")
-local Equipment = WSGS:GetModule("Equipment")
-local Materials = WSGS.ModificationMaterials
+Modules.Shopping.Runtime = Shopping
+local Equipment = Modules.Equipment.Runtime
+local Materials = Modules.Enhancements.Catalog
 
 local PANEL_WIDTH, MAX_PANEL_HEIGHT = 260, 320
 local ROW_HEIGHT = 38
@@ -50,18 +52,18 @@ local function collectSlotRequirements(requirements, state, slot)
     local fields = difference.fields
     local enchant = fields.enchant
     if enchant and enchant.state == "MISMATCH" then
-        local inventory = Materials.actions.inventory[enchant.expected]
+        local inventory = Materials.inventory[enchant.expected]
         if inventory and inventory.purchasable ~= false then
             addRequirement(requirements, inventory.itemID or inventory.purchasableItemID, 1)
         else
-            addProfessionReagents(requirements, state, Materials.actions.profession[enchant.expected],
+            addProfessionReagents(requirements, state, Materials.profession[enchant.expected],
                 difference.currentSlotId)
         end
     end
 
     local tinker = fields.tinker
     if tinker and tinker.state == "MISMATCH" then
-        addProfessionReagents(requirements, state, Materials.actions.profession[tinker.expected],
+        addProfessionReagents(requirements, state, Materials.profession[tinker.expected],
             difference.currentSlotId)
     end
 end
@@ -71,7 +73,7 @@ function Shopping:BuildRequirements(state)
     if not state or not state.build or not state.comparison then
         return {}
     end
-    for position = 1, #WSGS.equipmentSlots do
+    for position = 1, #Modules.Equipment.Slots do
         collectSlotRequirements(requirements, state, state.slots[position])
     end
 
@@ -228,7 +230,7 @@ function Shopping:Render(entries)
         end
         if (not name or not icon) and not self.requestedItems[entry.itemID] then
             self.requestedItems[entry.itemID] = true
-            WSGS.ItemData:RequestItemData(entry.itemID, "ShoppingList")
+            Modules.Character.ItemData:RequestItemData(entry.itemID, "ShoppingList")
         end
     end
     for index = #entries + 1, #frame.rows do

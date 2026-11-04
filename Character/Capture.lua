@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Character = WSGS:NewModule("Character", "AceEvent-3.0")
-WSGS.Character = Character
+Modules.Character.Runtime = Character
 local observationEvents = {
     "PLAYER_EQUIPMENT_CHANGED", "BAG_UPDATE_DELAYED", "ITEM_LOCK_CHANGED",
     "SPELLS_CHANGED", "SKILL_LINES_CHANGED", "TRADE_SKILL_LIST_UPDATE",
@@ -11,8 +12,8 @@ local observationEvents = {
 -- Captures facts only. Imported targets and operation lifecycles belong to
 -- their consumers. Every consumer shares the same capture until invalidated.
 function Character:Refresh(reason)
-    local snapshot = WSGS.EquipmentScanner:Scan()
-    snapshot.bags = WSGS.EquipmentInventory:Scan()
+    local snapshot = Modules.Character.EquippedItems:Scan()
+    snapshot.bags = Modules.Character.CarriedItems:Scan()
     snapshot.materials = snapshot.bags.materials
     self.snapshot = snapshot
     self.invalid = false

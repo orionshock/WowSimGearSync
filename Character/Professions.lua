@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Professions = {}
-WSGS.Professions = Professions
+Modules.Character.Professions = Professions
 
 function Professions:ScanProfessions()
     local first, second = GetProfessions()

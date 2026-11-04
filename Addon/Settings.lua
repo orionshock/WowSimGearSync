@@ -1,4 +1,5 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 
 function WSGS:RegisterOptionsPanel()
@@ -10,8 +11,8 @@ function WSGS:RegisterOptionsPanel()
         end,
         set = function(info, enabled)
             WSGS.db.profile[info[#info]] = enabled
-            WSGS:GetModule("Equipment"):InvalidateState("OPTIONS_CHANGED")
-            WSGS.UI:RefreshPaperDoll()
+            Modules.Equipment.Runtime:InvalidateState("OPTIONS_CHANGED")
+            Modules.Views.Runtime:RefreshPaperDoll()
         end,
         args = {
             debug = {

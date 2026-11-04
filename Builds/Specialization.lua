@@ -1,5 +1,6 @@
 local _, WSGS = ...
-local Import = WSGS.Import
+local Modules = WSGS.Private
+local Import = Modules.Builds.Runtime
 
 -- Player oneof fields from the WoW Sims API v2 export. Numeric IDs are
 -- Blizzard specialization IDs, not simulation enum values.

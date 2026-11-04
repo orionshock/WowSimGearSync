@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
-local Equipment = WSGS:GetModule("Equipment")
+local Equipment = Modules.Equipment.Runtime
 
 -- Selected clicks use the ordinary planner and executor. Weapons remain a pair
 -- because clearing/replacing the other hand can be required for a safe layout.
@@ -8,7 +9,7 @@ function Equipment:GetSlotEquipPlan(position, state)
     if self:PendingCount() > 0 then
         return nil, L["Waiting for equipment to update"], "PENDING"
     end
-    if WSGS.Actions.IsModificationPending() then
+    if Modules.Enhancements.Runtime.IsModificationPending() then
         return nil, "Finish the active modification first", "BLOCKED"
     end
     if InCombatLockdown() or UnitAffectingCombat("player") then
@@ -31,7 +32,7 @@ function Equipment:GetSlotEquipPlan(position, state)
     if slot.current.locked then
         return nil, "Equipped item is locked", "BLOCKED"
     end
-    local plan = WSGS.EquipmentPlanner:Plan(state, position)
+    local plan = Modules.Equipment.Planning:Plan(state, position)
     local selected
     for _, operation in ipairs(plan.operations) do
         if operation.targetPosition == position then

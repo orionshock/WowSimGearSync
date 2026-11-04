@@ -26,6 +26,7 @@ Libs\AceTab-3.0\AceTab-3.0.lua
 Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
+Bootstrap.lua
 Localization\enUS.lua
 Addon\Lifecycle.lua
 Addon\Settings.lua
@@ -34,6 +35,9 @@ Builds\Import.lua
 Builds\Specialization.lua
 Builds\ActiveBuild.lua
 Enhancements\Catalog\Lookup.lua
+Enhancements\Catalog\InventoryEnhancements.lua
+Enhancements\Catalog\ProfessionEnhancements.lua
+Enhancements\Catalog\EquippedEffects.lua
 Character\Professions.lua
 Character\ItemData.lua
 Character\Enchantment.lua
@@ -52,6 +56,10 @@ Equipment\Controller.lua
 Equipment\SlotIntent.lua
 Views\Equipment\EnhancementPresentation.lua
 Enhancements\Rules\Registry.lua
+Enhancements\Rules\ItemEnhancement.lua
+Enhancements\Rules\ProfessionEnhancement.lua
+Enhancements\Verification.lua
+Enhancements\PendingApplication.lua
 Enhancements\Planning.lua
 Enhancements\Execution\ProfessionCraft.lua
 Enhancements\Controller.lua

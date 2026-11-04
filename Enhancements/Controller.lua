@@ -1,13 +1,13 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Actions = WSGS:NewModule("Actions", "AceEvent-3.0")
-local Equipment = WSGS:GetModule("Equipment")
-WSGS.Actions = Actions
+local Equipment = Modules.Equipment.Runtime
+Modules.Enhancements.Runtime = Actions
 
-local Internal = WSGS.ActionsInternal
-WSGS.ActionsInternal = nil
+local Internal = Modules.Enhancements
 local controllers, buttons, planSignatures = {}, {}, {}
-local serial = 0
 local controllerBuild
+local Pending
 
 local function debug(category, text)
     WSGS:Debug("[ACTION][" .. category .. "] " .. text)
@@ -20,19 +20,6 @@ end
 local function selectedOperation(controller)
     return controller and (controller.prepared or controller.pending or controller.lastFailed or controller.unknown[1] or
                controller.blocked[1])
-end
-
-local function operationSatisfied(operation, difference, targetInstanceMatches)
-    return operation.handler.Verify({
-        operation = operation,
-        difference = difference,
-        targetInstanceMatches = targetInstanceMatches
-    })
-end
-
-local function sameOperation(left, right)
-    return left and right and left.handlerName == right.handlerName and left.type == right.type and
-               left.field == right.field and left.expected == right.expected
 end
 
 local function configureButton(position)
@@ -85,55 +72,6 @@ local function synchronizeBuild()
     return true
 end
 
-local function carryPending(previous, built, difference)
-    if not previous then
-        return built
-    end
-    if previous.pending then
-        local sameInstance = previous.targetGuid == built.targetGuid
-        local satisfied, detail, actual = operationSatisfied(previous.pending, difference, sameInstance)
-        if sameInstance and satisfied then
-            debug("VERIFY", string.format(
-                "slot=%d serial=%d handler=%s type=%s expected=%s actual=%s guid=%s result=VERIFIED",
-                previous.inventorySlot, previous.serial, previous.pending.handlerName, previous.pending.type,
-                valueText(previous.pending.expected), valueText(actual), valueText(previous.targetGuid)))
-            debug("DONE", string.format("slot=%d serial=%d type=%s next=%s", previous.inventorySlot,
-                previous.serial, previous.pending.type, built.prepared and built.prepared.type or "none"))
-        elseif previous.failure or not sameInstance then
-            built.state = "BLOCKED"
-            built.reason = previous.failure or "Target item instance changed before verification"
-            built.lastFailed = previous.pending
-            debug("VERIFY", string.format("slot=%d handler=%s type=%s expected=%s result=FAILED reason=%s",
-                previous.inventorySlot, previous.pending.handlerName, previous.pending.type,
-                valueText(previous.pending.expected), built.reason))
-        else
-            built.state = "PENDING"
-            built.pending = previous.pending
-            built.startedAt = previous.startedAt
-            built.serial = previous.serial
-            built.timeoutScheduled = previous.timeoutScheduled
-            built.lastVerificationDetail = detail
-            built.reason = "Awaiting client verification: " .. detail
-            if previous.lastVerificationDetail ~= detail then
-                debug("VERIFY", string.format(
-                    "slot=%d serial=%d handler=%s type=%s expected=%s actual=%s guid=%s result=STILL_PENDING reason=%s",
-                    previous.inventorySlot, previous.serial, previous.pending.handlerName, previous.pending.type,
-                    valueText(previous.pending.expected), valueText(actual), valueText(previous.targetGuid), detail))
-            end
-        end
-    elseif previous.lastFailed and built.prepared and
-        (previous.failureScope ~= "OPERATION" or sameOperation(previous.lastFailed, built.prepared)) then
-        built.state = "BLOCKED"
-        built.lastFailed = previous.lastFailed
-        built.failureScope = previous.failureScope
-        built.reason = previous.reason
-    elseif previous.lastFailed and built.prepared then
-        debug("PLAN", string.format("slot=%d failed=%s fallback=%s decision=use-next-ready", built.inventorySlot,
-            previous.lastFailed.type, built.prepared.type))
-    end
-    return built
-end
-
 local function controllerSignature(controller)
     local operation = selectedOperation(controller)
     return table.concat({valueText(controller.inventorySlot), controller.state, operation and operation.type or "none",
@@ -151,7 +89,7 @@ local function logPlan(position, controller)
         return
     end
     debug("PLAN", string.format("slot=%d actualSlot=%d state=%s handler=%s next=%s expected=%s guid=%s reason=%s",
-        WSGS.equipmentSlots[position].id, controller.inventorySlot, controller.state,
+        Modules.Equipment.Slots[position].id, controller.inventorySlot, controller.state,
         operation and operation.handlerName or "none", operation and operation.type or "none",
         operation and valueText(operation.expected) or "nil", valueText(controller.targetGuid),
         controller.reason or operation and operation.reason or "none"))
@@ -187,7 +125,7 @@ end
 local function rebuildController(position, state)
     local previous = controllers[position]
     local built = Internal.Planner:Build(position, state)
-    built = carryPending(previous, built, state.comparison.slots[position])
+    built = Pending:Carry(previous, built, state.comparison.slots[position])
     controllers[position] = built
     logPlan(position, built)
     configureButton(position)
@@ -203,7 +141,7 @@ function Actions:Refresh(state)
         end
         return
     end
-    for position = 1, #WSGS.equipmentSlots do
+    for position = 1, #Modules.Equipment.Slots do
         rebuildController(position, state)
     end
 end
@@ -225,75 +163,6 @@ local function refreshFromClient(self, reason)
     self:SendMessage("WSGS_ACTIONS_CHANGED", reason)
 end
 
-local fail
-
-local function scheduleTimeout(self, controller)
-    if controller.timeoutScheduled then
-        return
-    end
-    controller.timeoutScheduled = true
-    local pendingSerial = controller.serial
-    C_Timer.After(8, function()
-        synchronizeBuild()
-        local current = controllers[controller.position]
-        if not current or current.state ~= "PENDING" or current.serial ~= pendingSerial then
-            return
-        end
-        debug("EVENT", string.format("slot=%d event=VERIFICATION_TIMEOUT serial=%d phase=rescan",
-            current.inventorySlot, pendingSerial))
-        refreshFromClient(self, "VERIFICATION_TIMEOUT_RESCAN")
-        C_Timer.After(0, function()
-            synchronizeBuild()
-            current = controllers[controller.position]
-            if not current or current.state ~= "PENDING" or current.serial ~= pendingSerial then
-                return
-            end
-            refreshFromClient(self, "VERIFICATION_TIMEOUT_FINAL_RESCAN")
-            current = controllers[controller.position]
-            if current and current.state == "PENDING" and current.serial == pendingSerial then
-                fail(self, current, current.pending, "Timed out without a verified item-state change")
-            end
-        end)
-    end)
-end
-
-local function markPending(self, controller, operation)
-    serial = serial + 1
-    controller.state = "PENDING"
-    controller.pending = operation
-    controller.submitting = nil
-    controller.startedAt = GetTime()
-    controller.serial = serial
-    debug("EXEC", string.format("slot=%d type=%s submitted serial=%d; awaiting events", controller.inventorySlot,
-        operation.type, controller.serial))
-    scheduleTimeout(self, controller)
-end
-
-fail = function(self, controller, operation, reason, scope)
-    controller.state = "BLOCKED"
-    controller.reason = reason
-    controller.lastFailed = operation
-    controller.failureScope = scope or "SLOT"
-    controller.pending = nil
-    controller.submitting = nil
-    debug("BLOCK", string.format("slot=%d type=%s scope=%s reason=%s", controller.inventorySlot, operation.type,
-        controller.failureScope, reason))
-    self:SendMessage("WSGS_ACTIONS_CHANGED", "FAILED")
-end
-
-local function markUnknown(self, controller, operation, reason)
-    operation.reason = reason
-    controller.state = "UNKNOWN"
-    controller.reason = reason
-    controller.prepared = nil
-    controller.pending = nil
-    controller.submitting = nil
-    controller.lastFailed = nil
-    controller.unknown = {operation}
-    debug("PLAN", string.format("slot=%d handler=%s result=UNKNOWN reason=%s", controller.inventorySlot,
-        operation.handlerName, reason))
-    self:SendMessage("WSGS_ACTIONS_CHANGED", "UNRESOLVED")
-end
 local function submitProfession(self, controller, request, button)
     local operation = request.operation
     controller.submitting = operation
@@ -307,12 +176,12 @@ local function submitProfession(self, controller, request, button)
     local result = Internal.ProfessionExecution:Submit(request)
     if result and result.status == "UNRESOLVED" then
         button.wsgsSubmission = nil
-        markUnknown(self, controller, operation, result.reason)
+        Pending:MarkUnknown( controller, operation, result.reason)
         return false
     end
     if not result or result.status ~= "SUBMITTED" then
         button.wsgsSubmission = nil
-        fail(self, controller, operation, result and result.reason or "Profession execution returned no result",
+        Pending:Fail( controller, operation, result and result.reason or "Profession execution returned no result",
             "OPERATION")
         return false
     end
@@ -327,25 +196,25 @@ local function submitItem(self, controller, request, button)
     local operation = request.operation
     local material = operation.material
     if not material then
-        fail(self, controller, operation, "Prepared material location is unavailable", "OPERATION")
+        Pending:Fail( controller, operation, "Prepared material location is unavailable", "OPERATION")
         return false
     end
     local current = C_Container.GetContainerItemInfo(material.bag, material.bagSlot)
     if not current or current.itemID ~= material.itemID or current.isLocked then
-        fail(self, controller, operation, "Prepared material moved or became locked", "OPERATION")
+        Pending:Fail( controller, operation, "Prepared material moved or became locked", "OPERATION")
         return false
     end
     local guidOK, currentGuid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(material.bag,
         material.bagSlot))
     if material.guid and (not guidOK or currentGuid ~= material.guid) then
-        fail(self, controller, operation, "Prepared material instance moved; rescan before retrying", "OPERATION")
+        Pending:Fail( controller, operation, "Prepared material instance moved; rescan before retrying", "OPERATION")
         return false
     end
     configureButton(controller.position)
     local expectedItem = string.format("%d %d", material.bag, material.bagSlot)
     if button:GetAttribute("type1") ~= "item" or button:GetAttribute("target-slot1") ~= controller.inventorySlot or
         button:GetAttribute("item1") ~= expectedItem then
-        fail(self, controller, operation, "Secure action could not be prepared", "OPERATION")
+        Pending:Fail( controller, operation, "Secure action could not be prepared", "OPERATION")
         return false
     end
     controller.submitting = operation
@@ -365,7 +234,7 @@ local function submitRequest(self, controller, request, button)
     if request.method == "ITEM" then
         return submitItem(self, controller, request, button)
     end
-    fail(self, controller, request.operation, "Prepared action has no supported execution method")
+    Pending:Fail( controller, request.operation, "Prepared action has no supported execution method")
     return false
 end
 
@@ -430,7 +299,7 @@ function Actions:ActivateSlot(position, button)
     local operation = controller.prepared
     local problem = validateClick(controller, operation, position)
     if problem then
-        fail(self, controller, operation, problem)
+        Pending:Fail( controller, operation, problem)
         return
     end
     debug("EXEC", string.format(
@@ -465,10 +334,10 @@ local function finishActivation(self, position, button)
         return
     end
     if controller.failure then
-        fail(self, controller, operation, controller.failure)
+        Pending:Fail( controller, operation, controller.failure)
         return
     end
-    markPending(self, controller, operation)
+    Pending:MarkPending( controller, operation)
     configureButton(position)
     self:SendMessage("WSGS_ACTIONS_CHANGED", "PENDING")
 end
@@ -684,3 +553,10 @@ function Actions:OnEnable()
     self:RegisterEvent("ACTION_WILL_BIND_ITEM")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
 end
+
+Pending = Internal.CreatePendingApplication({
+    synchronizeBuild = synchronizeBuild,
+    controllerAt = function(position) return controllers[position] end,
+    refresh = function(reason) refreshFromClient(Actions, reason) end,
+    changed = function(reason) Actions:SendMessage("WSGS_ACTIONS_CHANGED", reason) end
+})

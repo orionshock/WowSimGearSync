@@ -1,7 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
-local Internal = WSGS.ActionsInternal or {}
-WSGS.ActionsInternal = Internal
+local Internal = Modules.Enhancements
 
 local Presentation = {}
 Internal.Presentation = Presentation

@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Comparator = {}
-WSGS.EquipmentComparator = Comparator
+Modules.Equipment.Comparison = Comparator
 local fields = {"enchant", "tinker"}
 
 local function scalar(expected, observed)
@@ -35,13 +36,13 @@ local function scalar(expected, observed)
 end
 
 function Comparator:CompareSlot(target, current, position, currentPosition, context)
-    local slot = WSGS.equipmentSlots[position]
+    local slot = Modules.Equipment.Slots[position]
     local result = {
         position = position,
         slotName = slot.name,
         targetSlotId = slot.id,
         currentPosition = currentPosition,
-        currentSlotId = WSGS.equipmentSlots[currentPosition].id,
+        currentSlotId = Modules.Equipment.Slots[currentPosition].id,
         fields = {}
     }
     local observations = current and current.observations or {}
@@ -127,7 +128,7 @@ function Comparator:Compare(profile, snapshot)
             unknown = 0
         }
     }
-    for position = 1, #WSGS.equipmentSlots do
+    for position = 1, #Modules.Equipment.Slots do
         local target = profile.equipment[position]
         if not target then
             return nil, "Imported build is missing equipment position " .. position .. "."

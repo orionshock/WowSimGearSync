@@ -1,6 +1,6 @@
 local _, WSGS = ...
-local Internal = WSGS.ActionsInternal or {}
-WSGS.ActionsInternal = Internal
+local Modules = WSGS.Private
+local Internal = Modules.Enhancements
 local Execution = {}
 Internal.ProfessionExecution = Execution
 
@@ -13,7 +13,7 @@ end
 function Execution:Submit(request)
     local operation = request.operation
     local skillLine = operation.professionSkillLine
-    local profession = WSGS.Professions:GetProfession(skillLine)
+    local profession = Modules.Character.Professions:GetProfession(skillLine)
     if not profession then
         return result("FAILED", "Required profession is unavailable")
     end

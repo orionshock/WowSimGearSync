@@ -1,5 +1,6 @@
 local _, WSGS = ...
-local Equipment = WSGS:GetModule("Equipment")
+local Modules = WSGS.Private
+local Equipment = Modules.Equipment.Runtime
 local labels = {
     item = "Item",
     enchant = "Enchant",
@@ -20,7 +21,7 @@ function WSGS:CompareLatestEquipment()
     end
     local summary = result.summary
     self:Print("[COMPARE] Profile: " .. profile.name)
-    self:Print("[COMPARE] Equipment matched: " .. summary.matched .. "/" .. #WSGS.equipmentSlots)
+    self:Print("[COMPARE] Equipment matched: " .. summary.matched .. "/" .. #Modules.Equipment.Slots)
     self:Print("[COMPARE] Item mismatches: " .. summary.itemMismatches)
     self:Print("[COMPARE] Configuration mismatches: " .. summary.configurationMismatches)
     self:Print("[COMPARE] Unknown observations: " .. summary.unknown .. " (required fields)")

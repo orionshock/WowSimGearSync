@@ -1,5 +1,6 @@
 local _, WSGS = ...
-local Actions = WSGS:GetModule("Equipment")
+local Modules = WSGS.Private
+local Actions = Modules.Equipment.Runtime
 local verificationEvents = {
     PLAYER_EQUIPMENT_CHANGED = true,
     BAG_UPDATE_DELAYED = true,
@@ -149,7 +150,7 @@ function Actions:Reconcile(state, snapshot, bags, combat, now, event)
             end
         end
     end
-    self.plan = WSGS.EquipmentPlanner:Plan(state)
+    self.plan = Modules.Equipment.Planning:Plan(state)
     if self.batch and self:PendingCount() == 0 then
         local counts = self:OutcomeCounts()
         if counts.FAILED > 0 or counts.BLOCKED > 0 then
@@ -183,7 +184,7 @@ function Actions:UnresolvedSlots(state)
     end
     for position, result in ipairs(comparison.slots) do
         if result.fields.item.state ~= "MATCH" then
-            unresolved[#unresolved + 1] = WSGS.equipmentSlots[position].id .. ":" .. result.fields.item.state
+            unresolved[#unresolved + 1] = Modules.Equipment.Slots[position].id .. ":" .. result.fields.item.state
         end
     end
     return unresolved
@@ -217,7 +218,7 @@ function Actions:LogDone(state)
         #unresolved > 0 and table.concat(unresolved, ",") or "none"))
     if not self.batch.setSyncAttempted and (not self.batch.selectedPosition or self.plan.unresolvedCount == 0) then
         self.batch.setSyncAttempted = true
-        WSGS.EquipmentSetSync:Synchronize(self.stateBuild, state, self.batch)
+        Modules.EquipmentSets.Runtime:Synchronize(self.stateBuild, state, self.batch)
     end
 end
 
@@ -251,7 +252,7 @@ function Actions:RefreshCurrentBuild()
     local profile = WSGS:GetActiveSimulationProfile()
     local state = self:GetState(profile)
     self:Refresh(state)
-    WSGS.Actions:Refresh(state)
+    Modules.Enhancements.Runtime:Refresh(state)
     return state
 end
 
@@ -300,7 +301,7 @@ function Actions:SubmitBatch(batch)
     for index, record in ipairs(batch.records) do
         record.attempted = true
         self.executingRecord = record
-        local ok, submitted, reason = pcall(WSGS.EquipmentExecution.Perform, WSGS.EquipmentExecution, record.operation,
+        local ok, submitted, reason = pcall(Modules.Equipment.InventoryActions.Perform, Modules.Equipment.InventoryActions, record.operation,
             index, batch.total)
         self.executingRecord = nil
         if not ok then
@@ -351,7 +352,7 @@ function Actions:LogPlan(profile, plan)
                            "no safely executable source; see excluded reasons"
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] pos=%d inv=%d name=%s physical=%d current=%s currentGUID=%s target=%s state=%s decision=%s reason=%s",
-            position, WSGS.equipmentSlots[position].id, WSGS.equipmentSlots[position].name, physical,
+            position, Modules.Equipment.Slots[position].id, Modules.Equipment.Slots[position].name, physical,
             shown(current and current.id), shown(current and current.guid), shown(target and target.id), state,
             decision, reason))
     end
@@ -367,7 +368,7 @@ function Actions:LogPlan(profile, plan)
     for _, item in ipairs(plan.missing) do
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] excluded pos=%d inv=%d item=%s reason=not found in equipped gear or carried bags",
-            item.position, WSGS.equipmentSlots[item.position].id, shown(item.id)))
+            item.position, Modules.Equipment.Slots[item.position].id, shown(item.id)))
     end
     for _, reason in ipairs(plan.blocked) do
         WSGS:Debug("[EQUIP][PLAN] excluded reason=" .. reason)
@@ -379,7 +380,7 @@ function Actions:LogPlan(profile, plan)
         local targetLoc = target and target.id and target.id > 0 and select(4, C_Item.GetItemInfoInstant(target.id))
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] weapon=%s inv=%d current=%s currentType=%s target=%s targetType=%s titansGrip=%s operation=%s",
-            position == 15 and "MH" or "OH", WSGS.equipmentSlots[position].id, shown(current.id),
+            position == 15 and "MH" or "OH", Modules.Equipment.Slots[position].id, shown(current.id),
             shown(current.equipLoc), shown(target and target.id), shown(targetLoc), grip, shown(byTarget[position])))
     end
 end
@@ -409,7 +410,7 @@ function Actions:Click(position)
         self:LogPlan(profile, selectedPlan)
     end
     if not position and self.state == "COMPLETE" then
-        WSGS.EquipmentSetSync:Synchronize(profile, state)
+        Modules.EquipmentSets.Runtime:Synchronize(profile, state)
         return
     end
     if not position and self.state ~= "READY" then

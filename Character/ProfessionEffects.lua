@@ -1,7 +1,8 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Inspector = {}
-WSGS.EquipmentInspector = Inspector
-local MaterialCatalog = WSGS.ModificationMaterials
+Modules.Character.ProfessionEffects = Inspector
+local MaterialCatalog = Modules.Enhancements.Catalog
 
 WSGS:RegisterMessage("WSGS_ITEM_DATA_RECEIVED", function(_, itemID, success, requester)
     if requester == "EquipmentInspector:tinker" and not success and Inspector.requestedTinkerItems then
@@ -54,7 +55,7 @@ function Inspector:Inspect(slotId, link)
             if itemID and not self.requestedTinkerItems[itemID] then
                 self.requestedTinkerItems[itemID] = true
                 requestedItemData = true
-                WSGS.ItemData:RequestItemData(itemID, "EquipmentInspector:tinker")
+                Modules.Character.ItemData:RequestItemData(itemID, "EquipmentInspector:tinker")
             end
         end
         local rawLink = type(link) == "string" and (link:match("|H(item:[^|]+)|h") or link) or tostring(link)

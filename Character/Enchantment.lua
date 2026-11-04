@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Enchantment = {}
-WSGS.ItemEnchantment = Enchantment
+Modules.Character.Enchantment = Enchantment
 
 -- Retail exposes item identity through C_Item, but no permanent-enchant getter.
 -- Only the enchantment field is read; the rest of the hyperlink is opaque.

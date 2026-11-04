@@ -1,5 +1,6 @@
 local _, WSGS = ...
-local UI = WSGS.UI
+local Modules = WSGS.Private
+local UI = Modules.Views.Runtime
 
 local Tooltip = {}
 UI.ModificationTooltip = Tooltip

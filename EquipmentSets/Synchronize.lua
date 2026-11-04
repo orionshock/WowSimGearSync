@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Sync = WSGS:NewModule("EquipmentSets", "AceEvent-3.0")
-WSGS.EquipmentSetSync = Sync
+Modules.EquipmentSets.Runtime = Sync
 local shirtSlot, tabardSlot = INVSLOT_BODY, INVSLOT_TABARD
 
 local function shown(value)
@@ -59,7 +60,7 @@ function Sync:Check(profile, state, batch)
         end
     end
     local failures = {}
-    for position = 1, #WSGS.equipmentSlots do
+    for position = 1, #Modules.Equipment.Slots do
         local target = profile.equipment[position]
         local result = comparison.slots[position]
         local physical = comparison.assignments[position]
@@ -70,13 +71,13 @@ function Sync:Check(profile, state, batch)
         local verified = itemMatch and instanceMatch
         WSGS:Debug(string.format(
             "[SET][CHECK] build=%s pos=%d inv=%d physical=%d target=%s observed=%s GUID=%s itemMatch=%s instanceMatch=%s result=%s",
-            shown(profile.name), position, WSGS.equipmentSlots[position].id, physical, shown(target.id),
+            shown(profile.name), position, Modules.Equipment.Slots[position].id, physical, shown(target.id),
             shown(current.id), shown(current.guid), itemMatch and "yes" or "no",
             instance and (instanceMatch and "yes" or "no") or "not-required", verified and "VERIFIED" or "BLOCKED"))
         if not verified then
             local reason = not itemMatch and ("item state " .. result.fields.item.state) or
                                "selected item instance is not equipped"
-            failures[#failures + 1] = WSGS.equipmentSlots[position].name .. " (" .. reason .. ")"
+            failures[#failures + 1] = Modules.Equipment.Slots[position].name .. " (" .. reason .. ")"
         end
     end
     if #failures > 0 then
@@ -177,7 +178,7 @@ function Sync:SetMatchesState(setID, state)
         return nil, "Saved item IDs are unavailable."
     end
     local mismatches = {}
-    for position, slot in ipairs(WSGS.equipmentSlots) do
+    for position, slot in ipairs(Modules.Equipment.Slots) do
         local expected = state.equipped[position].id or EQUIPMENT_SET_EMPTY_SLOT
         local actual = itemIDs[slot.id]
         if actual == nil then

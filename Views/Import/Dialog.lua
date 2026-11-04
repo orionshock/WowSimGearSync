@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
-local UI = WSGS.UI
+local UI = Modules.Views.Runtime
 
 function UI:ShowImportDialog()
     local frame = self:CreateImportDialog()
@@ -21,7 +22,7 @@ end
 
 function UI:SubmitImport(frame)
     frame.importInput:ClearFocus()
-    local profile, reason = WSGS.Import:ImportEquipment(frame.importInput:GetText())
+    local profile, reason = Modules.Builds.Runtime:ImportEquipment(frame.importInput:GetText())
     if not profile then
         frame.importStatus:SetText("Import failed: " .. WSGS:FormatPlayerReason(reason))
         return nil, reason

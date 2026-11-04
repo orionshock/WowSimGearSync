@@ -1,8 +1,9 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 -- Owns player-facing translation only. Scanner/comparator remain authoritative.
 local Presentation = {}
-WSGS.UI.SlotPresentation = Presentation
+Modules.Views.Runtime.SlotPresentation = Presentation
 
 Presentation.fields = {"item", "enchant", "tinker"}
 Presentation.modifications = {{
@@ -69,7 +70,7 @@ local function effectValue(fieldName, effectID, difference)
     if fieldName == "tinker" and difference and difference.actualSpellID == effectID then
         return spellValue(effectID, difference.actualSpellName)
     end
-    local catalog = WSGS.ModificationMaterials.actions
+    local catalog = Modules.Enhancements.Catalog
     local profession = catalog.profession[effectID]
     if profession then
         return spellValue(profession.spellID,
@@ -107,7 +108,7 @@ local function fieldFor(definition, fields)
     for _, name in ipairs(definition.fields) do
         local field = fields[name]
         local professionEnhancement = name == "enchant" and field and field.expected and
-                                            WSGS.ModificationMaterials.actions.profession[field.expected] ~= nil or false
+                                            Modules.Enhancements.Catalog.profession[field.expected] ~= nil or false
         local selected = name ~= "enchant" or definition.professionOnly == nil or
                              definition.professionOnly == professionEnhancement
         if selected and field and field.state ~= "NOT_APPLICABLE" then

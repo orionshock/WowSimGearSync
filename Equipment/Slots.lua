@@ -1,7 +1,8 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 
 -- WoW Sims index -> retail inventory slot ID. Shirt and tabard are excluded.
-WSGS.equipmentSlots = {{
+Modules.Equipment.Slots = {{
     name = "Head",
     token = "HeadSlot",
     id = 1

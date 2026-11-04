@@ -1,5 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Equipment = WSGS:NewModule("Equipment", "AceEvent-3.0")
+Modules.Equipment.Runtime = Equipment
 
 local function shown(value)
     if value == nil or value == "" then
@@ -36,13 +38,13 @@ end
 
 local function normalizedSlots(build, snapshot, comparison)
     local slots = {}
-    for position = 1, #WSGS.equipmentSlots do
+    for position = 1, #Modules.Equipment.Slots do
         local physical = comparison and comparison.assignments[position] or position
         slots[position] = {
             position = position,
-            inventorySlot = WSGS.equipmentSlots[position].id,
+            inventorySlot = Modules.Equipment.Slots[position].id,
             physicalPosition = physical,
-            physicalInventorySlot = WSGS.equipmentSlots[physical].id,
+            physicalInventorySlot = Modules.Equipment.Slots[physical].id,
             target = build and build.equipment and build.equipment[position] or nil,
             current = snapshot.slots[physical],
             comparison = comparison and comparison.slots[position] or nil
@@ -64,10 +66,10 @@ end
 -- resolved physical assignments, per-slot comparisons, and summary results.
 -- Equipment owns capture and invalidation; consumers must not mutate the value.
 local function capture(build, consumer)
-    local snapshot = WSGS.Character:GetSnapshot()
+    local snapshot = Modules.Character.Runtime:GetSnapshot()
     local inventory = snapshot.bags
     local materials = snapshot.materials
-    local comparison, reason = WSGS.EquipmentComparator:Compare(build, snapshot)
+    local comparison, reason = Modules.Equipment.Comparison:Compare(build, snapshot)
     local byItem, counts = indexBagItems(inventory)
     local state = {
         capturedAt = snapshot.capturedAt,
@@ -115,7 +117,7 @@ function Equipment:InvalidateState(reason, ...)
 end
 
 function Equipment:RefreshState(build, consumer)
-    WSGS.Character:Refresh(consumer)
+    Modules.Character.Runtime:Refresh(consumer)
     local state = capture(build, consumer)
     self.equipmentState = state
     self.stateInvalid = false

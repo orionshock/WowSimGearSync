@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Scanner = {}
-WSGS.EquipmentScanner = Scanner
+Modules.Character.EquippedItems = Scanner
 
 local function unknown(reason)
     return {
@@ -13,10 +14,10 @@ function Scanner:Scan(onlyPosition)
     local snapshot = {
         capturedAt = time(),
         slots = {},
-        context = WSGS.Professions:CharacterContext()
+        context = Modules.Character.Professions:CharacterContext()
     }
-    for position = onlyPosition or 1, onlyPosition or #WSGS.equipmentSlots do
-        local slot = WSGS.equipmentSlots[position]
+    for position = onlyPosition or 1, onlyPosition or #Modules.Equipment.Slots do
+        local slot = Modules.Equipment.Slots[position]
         local current = {
             position = position,
             slotId = slot.id,
@@ -70,8 +71,8 @@ function Scanner:Scan(onlyPosition)
                     source = "C_Item.GetItemGUID"
                 }
             end
-            observations.enchant = WSGS.ItemEnchantment:Observe(current.link)
-            for field, observed in pairs(WSGS.EquipmentInspector:Inspect(slot.id, current.link)) do
+            observations.enchant = Modules.Character.Enchantment:Observe(current.link)
+            for field, observed in pairs(Modules.Character.ProfessionEffects:Inspect(slot.id, current.link)) do
                 observations[field] = observed
             end
         end
@@ -80,7 +81,7 @@ function Scanner:Scan(onlyPosition)
     for position, current in ipairs(snapshot.slots) do
         current.guid = current.observations.instance.status == "KNOWN" and current.observations.instance.value or nil
         current.equipLoc = current.id and select(4, C_Item.GetItemInfoInstant(current.link or current.id))
-        current.locked = IsInventoryItemLocked(WSGS.equipmentSlots[position].id)
+        current.locked = IsInventoryItemLocked(Modules.Equipment.Slots[position].id)
     end
     return snapshot
 end

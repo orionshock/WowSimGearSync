@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Planner = {}
-WSGS.EquipmentPlanner = Planner
+Modules.Equipment.Planning = Planner
 local locations = {
     [1] = {
         INVTYPE_HEAD = true
@@ -70,7 +71,7 @@ end
 
 -- Ranking reuses actual comparator results, not a second modification comparator.
 local function cost(target, candidate, position)
-    local fields = WSGS.EquipmentComparator:CompareSlot(target, candidate, position, position).fields
+    local fields = Modules.Equipment.Comparison:CompareSlot(target, candidate, position, position).fields
     local field = fields.enchant
     return field.state == "MISMATCH" and 100 or field.state == "UNKNOWN" and 1 or 0
 end
@@ -138,7 +139,7 @@ local function reserveResolvedAssignments(context)
                 end
             elseif selected(context, position) then
                 if itemState == "UNKNOWN" or current.locked then
-                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                    context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
                         ": equipped identity unavailable or locked."
                 else
                     context.targetGroups[target.id] = context.targetGroups[target.id] or {}
@@ -214,7 +215,7 @@ local function matchTargetGroup(context, id, targets)
                 source = item,
                 position = target.physical,
                 targetPosition = target.position,
-                slotId = WSGS.equipmentSlots[target.physical].id,
+                slotId = Modules.Equipment.Slots[target.physical].id,
                 id = id
             }
         elseif shortage > 0 then
@@ -224,7 +225,7 @@ local function matchTargetGroup(context, id, targets)
                 id = id
             }
         else
-            context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[target.position].name ..
+            context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[target.position].name ..
                                                                      ": item " .. id ..
                                                                      " is locked, unreadable, incompatible, or has ambiguous duplicate instances."
         end
@@ -243,15 +244,15 @@ local function allocateBagDestinations(context)
         if selected(context, position) and not present(target) then
             local current = context.snapshot.slots[position]
             if current.observations.item.status ~= "KNOWN" then
-                context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
                                                                          ": equipped identity is unavailable."
             elseif current.id then
                 local destination = context.inventory.free[freeIndex]
                 if current.locked or not current.guid then
-                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                    context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
                                                                              ": equipped item is locked or unreadable."
                 elseif not destination then
-                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.equipmentSlots[position].name ..
+                    context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
                                                                              ": no empty general bag slot is available."
                 else
                     freeIndex = freeIndex + 1
@@ -261,7 +262,7 @@ local function allocateBagDestinations(context)
                         destination = destination,
                         position = position,
                         targetPosition = position,
-                        slotId = WSGS.equipmentSlots[position].id,
+                        slotId = Modules.Equipment.Slots[position].id,
                         id = current.id
                     }
                 end

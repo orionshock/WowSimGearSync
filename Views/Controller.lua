@@ -1,7 +1,8 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local UI = WSGS:NewModule("UI", "AceEvent-3.0")
-local Equipment = WSGS:GetModule("Equipment")
-WSGS.UI = UI
+local Equipment = Modules.Equipment.Runtime
+Modules.Views.Runtime = UI
 
 local refreshEvents = {
     PLAYER_EQUIPMENT_CHANGED = true,
@@ -29,7 +30,7 @@ end
 
 function UI:CommitBuildName()
     local input = self.paperDoll.buildName
-    local build, reason = WSGS.Import:RenameBuild(WSGS.db.char, input.build, input:GetText())
+    local build, reason = Modules.Builds.Runtime:RenameBuild(WSGS.db.char, input.build, input:GetText())
     if build then
         self.profile = build
         input:SetText(build.name)

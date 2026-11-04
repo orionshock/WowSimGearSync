@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Inventory = {}
-WSGS.EquipmentInventory = Inventory
+Modules.Character.CarriedItems = Inventory
 
 function Inventory:Scan()
     local result = {
@@ -31,7 +32,7 @@ function Inventory:Scan()
                 item.equipLoc = (item.link or item.id) and select(4, C_Item.GetItemInfoInstant(item.link or item.id))
                 item.observations = {
                     item = {status = "KNOWN", value = item.id, present = true},
-                    enchant = WSGS.ItemEnchantment:Observe(item.link)
+                    enchant = Modules.Character.Enchantment:Observe(item.link)
                 }
                 if not item.guid then
                     result.unreadable = result.unreadable + 1

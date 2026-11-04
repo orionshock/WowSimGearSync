@@ -1,7 +1,8 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
-local UI = WSGS.UI
-local Equipment = WSGS:GetModule("Equipment")
+local UI = Modules.Views.Runtime
+local Equipment = Modules.Equipment.Runtime
 
 local Presentation = UI.SlotPresentation
 local FRAME_WIDTH, FRAME_HEIGHT = 350, 600
@@ -32,7 +33,7 @@ function UI:ShowSlotTooltip(button)
         GameTooltip:Show()
         return
     end
-    local actionState = button.actionState or WSGS.Actions:GetSlotState(button.position)
+    local actionState = button.actionState or Modules.Enhancements.Runtime:GetSlotState(button.position)
     local item = button.difference and button.difference.fields.item
     if item and item.state ~= "MATCH" then
         local state = Equipment:GetState(WSGS:GetActiveSimulationProfile())
@@ -78,7 +79,7 @@ local function registerTooltipItems(self, frame, status)
                 self.relevantItems[itemID] = true
                 if frame:IsShown() and not C_Item.GetItemInfo(itemID) and not self.requestedItems[itemID] then
                     self.requestedItems[itemID] = true
-                    WSGS.ItemData:RequestItemData(itemID, "PaperDoll:modification-tooltip")
+                    Modules.Character.ItemData:RequestItemData(itemID, "PaperDoll:modification-tooltip")
                 end
             end
         end
@@ -106,7 +107,7 @@ function UI:RenderPaperDoll(state)
         local s = comparison.summary
         frame.summary:SetText(string.format(
             "Equipped: %d/%d  |  To equip: %d\nEnhancements needed: %d  |  Unknown: %d",
-            s.matched, #WSGS.equipmentSlots, s.itemMismatches, s.configurationMismatches, s.unknown))
+            s.matched, #Modules.Equipment.Slots, s.itemMismatches, s.configurationMismatches, s.unknown))
     else
         frame.summary:SetText(reason or "Comparison unavailable")
     end
@@ -125,7 +126,7 @@ function UI:RenderPaperDoll(state)
     end
     for _, button in ipairs(frame.slots) do
         local target = button.target
-        local texture = select(2, GetInventorySlotInfo(WSGS.equipmentSlots[button.position].token))
+        local texture = select(2, GetInventorySlotInfo(Modules.Equipment.Slots[button.position].token))
         local quality
         if target and target.id and target.id > 0 then
             local name, _, rarity, _, _, _, _, _, _, cachedIcon = C_Item.GetItemInfo(target.id)
@@ -134,7 +135,7 @@ function UI:RenderPaperDoll(state)
                           "Interface\\Icons\\INV_Misc_QuestionMark"
             if not name and frame:IsShown() and not self.requestedItems[target.id] then
                 self.requestedItems[target.id] = true
-                WSGS.ItemData:RequestItemData(target.id, "PaperDoll:target")
+                Modules.Character.ItemData:RequestItemData(target.id, "PaperDoll:target")
             end
         end
         button.icon:SetTexture(texture)
@@ -145,7 +146,7 @@ function UI:RenderPaperDoll(state)
         else
             button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
         end
-        local actionState = WSGS.Actions:GetSlotState(button.position)
+        local actionState = Modules.Enhancements.Runtime:GetSlotState(button.position)
         for _, record in ipairs(Equipment.batch and Equipment.batch.records or {}) do
             if record.operation.targetPosition == button.position and record.status == "STILL_PENDING" then
                 actionState.pending = true
@@ -278,7 +279,7 @@ function UI:CreatePaperDoll()
     note:SetJustifyH("RIGHT")
     frame.equipNote = note
     frame.slots = {}
-    for position in ipairs(WSGS.equipmentSlots) do
+    for position in ipairs(Modules.Equipment.Slots) do
         local button = CreateFrame("Button", nil, frame, "SecureActionButtonTemplate,SecureHandlerStateTemplate")
         frame.slots[position] = button
         button.position = position
@@ -353,7 +354,7 @@ function UI:CreatePaperDoll()
             end
         ]])
         RegisterStateDriver(button, "combat", "[combat] combat; nocombat")
-        WSGS.Actions:RegisterSlotButton(position, button)
+        Modules.Enhancements.Runtime:RegisterSlotButton(position, button)
     end
     frame.summary = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     frame.summary:SetPoint("BOTTOM", 0, 20)

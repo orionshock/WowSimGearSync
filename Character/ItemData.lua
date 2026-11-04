@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local ItemData = WSGS:NewModule("ItemData", "AceEvent-3.0")
-WSGS.ItemData = ItemData
+Modules.Character.ItemData = ItemData
 
 function ItemData:RequestItemData(itemID, requester)
     if type(itemID) ~= "number" or itemID <= 0 then

@@ -1,12 +1,13 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Execution = {}
-WSGS.EquipmentExecution = Execution
+Modules.Equipment.InventoryActions = Execution
 
 local function pickup(source)
     if source.bag ~= nil then
         C_Container.PickupContainerItem(source.bag, source.bagSlot)
     else
-        PickupInventoryItem(WSGS.equipmentSlots[source.position].id)
+        PickupInventoryItem(Modules.Equipment.Slots[source.position].id)
     end
 end
 
@@ -52,7 +53,7 @@ function Execution:Perform(operation, index, total)
     local source, before = operation.source, GetInventoryItemID("player", operation.slotId)
     local sourceInfo = source.bag ~= nil and C_Container.GetContainerItemInfo(source.bag, source.bagSlot)
     local sourceLocked = source.bag ~= nil and (not sourceInfo or sourceInfo.isLocked) or source.bag == nil and
-                             IsInventoryItemLocked(WSGS.equipmentSlots[source.position].id)
+                             IsInventoryItemLocked(Modules.Equipment.Slots[source.position].id)
     local destinationLocked = IsInventoryItemLocked(operation.slotId)
     WSGS:Debug(string.format(
         "[EQUIP][EXEC] op=%s/%s kind=%s source=%s item=%s GUID=%s destInv=%d API=%s cursorBefore=%s itemBefore=%s sourceLocked=%s destLocked=%s",
@@ -81,14 +82,14 @@ function Execution:Perform(operation, index, total)
             logResult(operation, index, false, reason)
             return false, reason
         end
-    elseif IsInventoryItemLocked(WSGS.equipmentSlots[source.position].id) then
+    elseif IsInventoryItemLocked(Modules.Equipment.Slots[source.position].id) then
         local reason = "Source equipment is locked."
         logResult(operation, index, false, reason)
         return false, reason
     end
 
     local location = source.bag ~= nil and ItemLocation:CreateFromBagAndSlot(source.bag, source.bagSlot) or
-                         ItemLocation:CreateFromEquipmentSlot(WSGS.equipmentSlots[source.position].id)
+                         ItemLocation:CreateFromEquipmentSlot(Modules.Equipment.Slots[source.position].id)
     local guidOK, guid = pcall(C_Item.GetItemGUID, location)
     if not source.guid or not guidOK or guid ~= source.guid then
         local reason = "Source instance changed; rescan required."
@@ -109,7 +110,7 @@ function Execution:Perform(operation, index, total)
             return false, reason
         end
         WSGS:Debug(string.format("[EQUIP][EXEC] op=%s call=PickupInventoryItem sourceInv=%d", shown(index),
-            WSGS.equipmentSlots[source.position].id))
+            Modules.Equipment.Slots[source.position].id))
         pickup(source)
         if not CursorHasItem() then
             local reason = "Client did not pick up the off-hand item."

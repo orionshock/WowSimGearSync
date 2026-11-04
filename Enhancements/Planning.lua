@@ -1,6 +1,6 @@
 local _, WSGS = ...
-local Internal = WSGS.ActionsInternal or {}
-WSGS.ActionsInternal = Internal
+local Modules = WSGS.Private
+local Internal = Modules.Enhancements
 local Planner = {}
 Internal.Planner = Planner
 

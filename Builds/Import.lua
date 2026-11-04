@@ -1,6 +1,7 @@
 local _, WSGS = ...
+local Modules = WSGS.Private
 local Import = WSGS:NewModule("Import", "AceEvent-3.0")
-WSGS.Import = Import
+Modules.Builds.Runtime = Import
 
 local supportedFields = {
     id = true,
@@ -53,14 +54,14 @@ function Import:ValidateEquipment(document)
     if not entryCount then
         return nil, "player.equipment.items must be an array."
     end
-    if entryCount > #WSGS.equipmentSlots then
+    if entryCount > #Modules.Equipment.Slots then
         return nil, "Equipment contains more than 17 entries."
     end
 
     local equipment, warnings, equipped = {}, {}, 0
-    for index = 1, #WSGS.equipmentSlots do
+    for index = 1, #Modules.Equipment.Slots do
         local item = items[index]
-        local slot = WSGS.equipmentSlots[index]
+        local slot = Modules.Equipment.Slots[index]
         local normalized = {
             slotId = slot.id,
             slotName = slot.name,
@@ -102,7 +103,7 @@ function Import:ValidateEquipment(document)
             end
         end
     end
-    if entryCount < #WSGS.equipmentSlots then
+    if entryCount < #Modules.Equipment.Slots then
         warnings[#warnings + 1] = "Missing trailing positions were padded as empty."
     end
     return {
