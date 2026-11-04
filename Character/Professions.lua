@@ -3,7 +3,7 @@ local Modules = WSGS.Private
 local Professions = {}
 Modules.Character.Professions = Professions
 
-function Professions:ScanProfessions()
+local function scanProfessions()
     local first, second = GetProfessions()
     local professions = {}
     for _, professionIndex in pairs({first, second}) do
@@ -21,12 +21,8 @@ function Professions:ScanProfessions()
     return professions
 end
 
-function Professions:GetProfession(skillLineID)
-    return self:ScanProfessions()[skillLineID]
-end
-
-function Professions:CharacterContext()
-    local professions = self:ScanProfessions()
+function Professions:Capture()
+    local professions = scanProfessions()
     local details = {}
     for skillLine, profession in pairs(professions) do
         details[#details + 1] = string.format("%s(%d)=%s/%s", profession.name or "unknown", skillLine,

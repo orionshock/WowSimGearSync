@@ -1,6 +1,5 @@
 local addonName, WSGS = ...
 local Modules = WSGS.Private
-local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 
 local version = C_AddOns.GetAddOnMetadata(addonName, "Version")
 WSGS.version = version and not version:find("@", 1, true) and version or "Development"

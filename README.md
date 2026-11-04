@@ -31,3 +31,7 @@ Using different names lets you keep separate Blizzard equipment sets while WSGS 
 ## Options
 
 Open `/wsgs options` or right-click the launcher. You can toggle debug logging and Equipment Manager integration. Profession enhancements must be explicitly included in the import.
+
+## Development layout
+
+Production code is grouped by feature ownership. See [module ownership and runtime contracts](docs/architecture.md) for the folder map, public interfaces, capture flow, and in-client validation scenarios. `Bootstrap.lua` loads first; `Addon/Composition.lua` wires the modules last.

@@ -1,6 +1,5 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local L = LibStub("AceLocale-3.0"):GetLocale("WowSimGearSync")
 local Shopping = WSGS:NewModule("ShoppingList", "AceEvent-3.0")
 Modules.Shopping.Runtime = Shopping
 local Equipment = WSGS.Equipment

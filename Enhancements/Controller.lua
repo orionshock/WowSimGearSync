@@ -227,6 +227,7 @@ function Actions:ActivateSlot(position, button)
     end
     local controller = controllers[position]
     if not controller then
+        if not InCombatLockdown() then button:SetAttribute("type1", nil) end
         return
     end
     if controller.difference.fields.item.state ~= "MATCH" then
@@ -316,5 +317,5 @@ Pending = Internal.CreatePendingApplication({
 Internal.Events:Configure({
     synchronizeBuild = synchronizeBuild,
     controllers = function() return controllers end,
-    refresh = function(reason) refreshFromClient(Actions, reason) end
+    refresh = function(reason) Modules.ScheduleReconcile(reason) end
 })

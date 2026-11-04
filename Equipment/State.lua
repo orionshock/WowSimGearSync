@@ -10,18 +10,6 @@ local function shown(value)
     return tostring(value)
 end
 
-local function indexBagItems(inventory)
-    local byItem, counts = {}, {}
-    for _, item in ipairs(inventory.items) do
-        if item.id then
-            byItem[item.id] = byItem[item.id] or {}
-            byItem[item.id][#byItem[item.id] + 1] = item
-            counts[item.id] = (counts[item.id] or 0) + (item.count or 1)
-        end
-    end
-    return byItem, counts
-end
-
 local function buildIdentity(build)
     if not build then
         return nil
@@ -66,11 +54,11 @@ end
 -- resolved physical assignments, per-slot comparisons, and summary results.
 -- Equipment owns capture and invalidation; consumers must not mutate the value.
 local function capture(build, consumer)
-    local snapshot = Modules.Character.Runtime:GetSnapshot()
+    local snapshot = WSGS.Character:GetSnapshot()
     local inventory = snapshot.bags
     local materials = snapshot.materials
     local comparison, reason = Modules.Equipment.Comparison:Compare(build, snapshot)
-    local byItem, counts = indexBagItems(inventory)
+    local byItem, counts = inventory.itemsById, materials.counts
     local state = {
         capturedAt = snapshot.capturedAt,
         build = buildIdentity(build),
@@ -117,7 +105,7 @@ function Equipment:InvalidateState(reason, ...)
 end
 
 function Equipment:RefreshState(build, consumer)
-    Modules.Character.Runtime:Refresh(consumer)
+    WSGS.Character:Refresh(consumer)
     local state = capture(build, consumer)
     self.equipmentState = state
     self.stateInvalid = false

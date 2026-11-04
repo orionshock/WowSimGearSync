@@ -6,6 +6,7 @@ Modules.Character.CarriedItems = Inventory
 function Inventory:Scan()
     local result = {
         items = {},
+        itemsById = {},
         free = {},
         unreadable = 0,
         materials = {byItem = {}, bySpell = {}, counts = {}}
@@ -38,6 +39,8 @@ function Inventory:Scan()
                     result.unreadable = result.unreadable + 1
                 end
                 result.items[#result.items + 1] = item
+                result.itemsById[item.id] = result.itemsById[item.id] or {}
+                table.insert(result.itemsById[item.id], item)
                 local materials = result.materials
                 materials.counts[item.id] = (materials.counts[item.id] or 0) + item.count
                 if not materials.byItem[item.id] or materials.byItem[item.id].locked and not item.locked then

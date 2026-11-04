@@ -14,7 +14,7 @@ function Scanner:Scan(onlyPosition)
     local snapshot = {
         capturedAt = time(),
         slots = {},
-        context = Modules.Character.Professions:CharacterContext()
+        context = Modules.Character.Professions:Capture()
     }
     for position = onlyPosition or 1, onlyPosition or #WSGS.Equipment.Slots do
         local slot = WSGS.Equipment.Slots[position]

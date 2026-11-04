@@ -11,6 +11,7 @@ function WSGS.Builds:Import(text) return Modules.Builds.Runtime:ImportEquipment(
 function WSGS.Builds:Rename(expectedBuild, name)
     return Builds:RenameBuild(expectedBuild, name)
 end
+function WSGS.Character:Refresh(reason) return Character:Refresh(reason) end
 function WSGS.Character:GetSnapshot() return Character:GetSnapshot() end
 function WSGS.Character:Invalidate(reason) Character:Invalidate(reason) end
 function WSGS.Character:RequestItemData(itemID, requester)
@@ -45,6 +46,10 @@ end
 function WSGS.Views:ToggleEquipment() Views:TogglePaperDoll() end
 function WSGS.Views:ToggleImport() Views:ToggleImportDialog() end
 function WSGS.Views:RefreshEquipment() Views:RefreshPaperDoll() end
+
+function Modules.ScheduleReconcile(reason)
+    Equipment:QueueRefresh(reason)
+end
 
 function Modules.Reconcile()
     local state = Equipment:GetState(Builds:Get())

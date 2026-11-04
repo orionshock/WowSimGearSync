@@ -2,7 +2,11 @@
 
 ## Project Structure & Module Organization
 
-This repository is a WoW Forever Lua addon using the retail client APIs with production modules grouped by ownership under `Addon/`, `Builds/`, `Character/`, `Equipment/`, `Enhancements/`, `EquipmentSets/`, `Shopping/`, `Views/`, and `Diagnostics/`, bundled libraries under `Libs/`, and implementation notes under `docs/`. Organize new code around stable domain, capability, runtime, or ownership boundaries. Create folders when they improve discovery or isolate meaningful dependencies, not merely to reduce file counts.
+This repository is a WoW Forever Lua addon using the retail client APIs with production modules grouped by ownership under `Addon/`, `Builds/`, `Character/`, `Equipment/`, `Enhancements/`, `EquipmentSets/`, `Shopping/`, `Interaction/`, `Views/`, and `Diagnostics/`, bundled libraries under `Libs/`, and implementation notes under `docs/`. Organize new code around stable domain, capability, runtime, or ownership boundaries. Create folders when they improve discovery or isolate meaningful dependencies, not merely to reduce file counts.
+
+`Bootstrap.lua` establishes public feature tables and the temporary implementation registry. `Addon/Composition.lua` loads last, wires feature interfaces, and removes the registry from the addon namespace. Follow the ownership and runtime contracts in `docs/architecture.md`.
+
+Other features use the public interfaces on `WSGS`; they must not access a sibling's implementation registry. Files inside one feature may share that feature's private modules. The composition root is the only place that wires implementations across features. `WSGS.Equipment.Slots` is shared read-only domain metadata.
 
 Keep related behavior together and dependency direction clear. Avoid cross-imports into unrelated sibling internals and bidirectional dependencies. Use names that describe the owned concept or responsibility; avoid dumping grounds such as `utils`, `helpers`, `common`, and `misc`.
 

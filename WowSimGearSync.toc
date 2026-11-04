@@ -57,6 +57,7 @@ Shopping\Requirements.lua
 Shopping\AuctionNavigation.lua
 Shopping\Controller.lua
 Diagnostics\EquipmentProbe.lua
+Diagnostics\ComparisonReport.lua
 Equipment\Planning\InstanceAssignment.lua
 Equipment\Planning\BagDestinations.lua
 Equipment\Planning\WeaponLayout.lua
