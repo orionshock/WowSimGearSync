@@ -11,39 +11,39 @@ local observationEvents = {
 
 -- Captures facts only. Imported targets and operation lifecycles belong to
 -- their consumers. Every consumer shares the same capture until invalidated.
-function Character:Refresh(reason)
+function WSGS.Character:Refresh(reason)
     local snapshot = Modules.Character.EquippedItems:Scan()
     snapshot.bags = Modules.Character.CarriedItems:Scan()
     snapshot.materials = snapshot.bags.materials
-    self.snapshot = snapshot
-    self.invalid = false
+    Character.snapshot = snapshot
+    Character.invalid = false
     WSGS:Debug(string.format("[CHARACTER][CAPTURE] reason=%s bags=%d unreadable=%d",
         tostring(reason), #snapshot.bags.items, snapshot.bags.unreadable))
     return snapshot
 end
 
-function Character:GetSnapshot()
-    if self.invalid or not self.snapshot then
-        return self:Refresh("INVALIDATED")
+function WSGS.Character:GetSnapshot()
+    if Character.invalid or not Character.snapshot then
+        return WSGS.Character:Refresh("INVALIDATED")
     end
-    return self.snapshot
+    return Character.snapshot
 end
 
-function Character:Invalidate(event, ...)
-    self.invalid = true
-    self:SendMessage("WSGS_CHARACTER_INVALIDATED", event, ...)
+function WSGS.Character:Invalidate(event, ...)
+    Character.invalid = true
+    Character:SendMessage("WSGS_CHARACTER_INVALIDATED", event, ...)
 end
 
 function Character:WSGS_ITEM_DATA_RECEIVED(_, itemID, success)
     if success then
-        self:Invalidate("ITEM_DATA_LOAD_RESULT", itemID, success)
+        WSGS.Character:Invalidate("ITEM_DATA_LOAD_RESULT", itemID, success)
     end
 end
 
 function Character:OnEnable()
     self.invalid = true
     for _, event in ipairs(observationEvents) do
-        self:RegisterEvent(event, "Invalidate")
+        self:RegisterEvent(event, WSGS.Character.Invalidate, WSGS.Character)
     end
     self:RegisterMessage("WSGS_ITEM_DATA_RECEIVED")
 end

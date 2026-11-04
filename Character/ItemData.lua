@@ -3,21 +3,21 @@ local Modules = WSGS.Private
 local ItemData = WSGS:NewModule("ItemData", "AceEvent-3.0")
 Modules.Character.ItemData = ItemData
 
-function ItemData:RequestItemData(itemID, requester)
+function WSGS.Character:RequestItemData(itemID, requester)
     if type(itemID) ~= "number" or itemID <= 0 then
         return nil, "Item ID must be a positive number"
     end
-    self.pendingItemData = self.pendingItemData or {}
+    ItemData.pendingItemData = ItemData.pendingItemData or {}
     requester = requester or true
-    local subscribers = self.pendingItemData[itemID]
+    local subscribers = ItemData.pendingItemData[itemID]
     if subscribers then
         subscribers[requester] = true
         return true
     end
-    self.pendingItemData[itemID] = {[requester] = true}
+    ItemData.pendingItemData[itemID] = {[requester] = true}
     local ok, problem = pcall(C_Item.RequestLoadItemDataByID, itemID)
     if not ok then
-        self:OnItemDataEvent("REQUEST_FAILED", itemID, false)
+        ItemData:OnItemDataEvent("REQUEST_FAILED", itemID, false)
         return nil, tostring(problem)
     end
     return true

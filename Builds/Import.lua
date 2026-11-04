@@ -17,7 +17,7 @@ local function importBuild(text)
     return Modules.Builds.ActiveBuild:SaveBuild(profile)
 end
 
-function Import:ImportEquipment(text)
+function WSGS.Builds:Import(text)
     WSGS:Debug("[IMPORT] Starting import")
     local profile, reason = importBuild(text)
     if not profile then
@@ -27,6 +27,6 @@ function Import:ImportEquipment(text)
     WSGS:Debug("[IMPORT] API version: " .. profile.apiVersion)
     WSGS:Debug("[IMPORT] Equipment entries: " .. profile.metadata.entryCount)
     WSGS:Debug("[IMPORT] Profile saved: " .. profile.name)
-    self:SendMessage("WSGS_BUILD_IMPORTED", profile)
+    Import:SendMessage("WSGS_BUILD_IMPORTED", profile)
     return profile
 end

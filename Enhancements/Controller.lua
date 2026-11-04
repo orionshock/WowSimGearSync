@@ -130,7 +130,7 @@ function Controller:Refresh(state)
     end
 end
 
-function Controller:GetSlotState(position)
+function WSGS.Enhancements:GetSlotState(position)
     local controller = controllers[position]
     return Internal.Presentation:Build(controller, selectedOperation(controller))
 end
@@ -234,7 +234,7 @@ function Controller:ActivateSlot(position, button)
         if not InCombatLockdown() then
             button:SetAttribute("type1", nil)
         end
-        Equipment:EquipSlot(position)
+        Equipment:Equip(position)
         -- Equipment events can prepare a modification synchronously. This
         -- hardware click belongs only to equipment, even if the new item matches.
         if not InCombatLockdown() then
@@ -296,13 +296,13 @@ local function finishActivation(self, position, button)
     self:SendMessage("WSGS_ACTIONS_CHANGED", "PENDING")
 end
 
-function Controller:RegisterSlotButton(position, button)
+function WSGS.Enhancements:BindSlot(position, button)
     buttons[position] = button
     button:SetScript("PreClick", function(clicked)
-        self:ActivateSlot(position, clicked)
+        Controller:ActivateSlot(position, clicked)
     end)
     button:SetScript("PostClick", function(clicked)
-        finishActivation(self, position, clicked)
+        finishActivation(Controller, position, clicked)
     end)
     configureButton(position)
 end
@@ -317,5 +317,5 @@ Pending = Internal.CreatePendingApplication({
 Internal.Events:Configure({
     synchronizeBuild = synchronizeBuild,
     controllers = function() return controllers end,
-    refresh = function(reason) Modules.ScheduleReconcile(reason) end
+    refresh = Modules.RequestReconcile
 })

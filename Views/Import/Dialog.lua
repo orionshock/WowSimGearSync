@@ -9,14 +9,14 @@ function UI:ShowImportDialog()
     frame:Raise()
 end
 
-function UI:ToggleImportDialog()
-    if not self.importDialog then
-        self:CreateImportDialog()
+function WSGS.Views:ToggleImport()
+    if not UI.importDialog then
+        UI:CreateImportDialog()
     end
-    if self.importDialog:IsShown() then
-        self.importDialog:Hide()
+    if UI.importDialog:IsShown() then
+        UI.importDialog:Hide()
     else
-        self.importDialog:Show()
+        UI.importDialog:Show()
     end
 end
 

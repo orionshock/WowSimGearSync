@@ -107,7 +107,7 @@ end
 
 function Controller:Refresh(state)
     if not state then
-        state = self:GetState(nil)
+        state = WSGS.Equipment:GetState()
     end
     local snapshot = {
         slots = state.equipped,
@@ -131,16 +131,16 @@ function Controller:Refresh(state)
     return self.plan
 end
 
-function Controller:QueueRefresh(event, ...)
+function Modules.RequestReconcile(event, ...)
     if verificationEvents[event] then
-        self.verificationEvent = event
+        Controller.verificationEvent = event
     end
-    if self.refreshQueued then
+    if Controller.refreshQueued then
         return
     end
-    self.refreshQueued = true
+    Controller.refreshQueued = true
     C_Timer.After(0, function()
-        self.refreshQueued = false
+        Controller.refreshQueued = false
         Modules.Reconcile()
     end)
 end
@@ -153,7 +153,7 @@ function Controller:UI_ERROR_MESSAGE(event, ...)
     local _, message = ...
     if active then
         self.batch:OnError(type(message) == "string" and message or "Client rejected the operation.")
-        self:QueueRefresh(event)
+        Modules.RequestReconcile(event)
     end
 end
 
@@ -223,7 +223,7 @@ function Controller:Click(position)
     end
     self.fault, self.batch = nil, nil
     local profile = WSGS.Builds:GetActive()
-    local state = self:RefreshState(profile, position and "SlotEquipClick" or "GlobalEquipClick")
+    local state = WSGS.Equipment:GetState(position and "SlotEquipClick" or "GlobalEquipClick")
     self:Refresh(state)
     local operations, selectedPlan = self.plan.operations
     if position then
@@ -267,7 +267,7 @@ function Controller:Click(position)
     end
     -- This immediate rescan only observes. Every protected action above ran in
     -- the original button callback.
-    state = self:RefreshState(WSGS.Builds:GetActive(), "GlobalEquipImmediateVerify")
+    state = WSGS.Equipment:GetState("GlobalEquipImmediateVerify")
     self:Refresh(state)
     if position then
         self:SendMessage("WSGS_ACTIONS_CHANGED", "SLOT_EQUIP_SUBMITTED")
@@ -276,24 +276,29 @@ function Controller:Click(position)
         if self.batch == batch and self:PendingCount() > 0 then
             WSGS:Debug(string.format("[EQUIP][EVENT] name=VERIFY_TIMEOUT pending=%d", self:PendingCount()))
             self.verificationEvent = "FINAL"
-            local finalState = self:RefreshState(WSGS.Builds:GetActive(), "GlobalEquipFinalVerify")
+            local finalState = WSGS.Equipment:GetState("GlobalEquipFinalVerify")
             self:Refresh(finalState)
         end
     end)
 end
 
-function Controller:GetStatus()
-    local plan, batch = self.plan, self.batch
+function WSGS.Equipment:GetStatus()
+    local plan, batch = Controller.plan, Controller.batch
     local pendingSlots = {}
     for _, record in ipairs(batch and batch.records or {}) do
         if record.status == "STILL_PENDING" then pendingSlots[record.operation.targetPosition] = true end
     end
     return {
-        state = self.state, fault = self.fault,
+        state = Controller.state, fault = Controller.fault,
         counts = batch and batch:Counts() or nil,
         total = batch and batch.total or 0,
         unresolvedCount = plan and plan.unresolvedCount or 0,
         missingCount = plan and #plan.missing or 0,
         blocker = plan and plan.blocked[1], pendingSlots = pendingSlots
     }
+end
+
+function WSGS.Equipment:Equip(position)
+    Controller:Click(position)
+    Modules.Reconcile()
 end

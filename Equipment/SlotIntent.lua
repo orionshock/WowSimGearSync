@@ -57,3 +57,8 @@ function Equipment:GetSlotEquipPlan(position, state)
     reason = reason:gsub("[Ii]tem %d+", "Target item")
     return nil, reason, "BLOCKED"
 end
+
+function WSGS.Equipment:GetSlotState(position)
+    local _, reason, status = Equipment:GetSlotEquipPlan(position, WSGS.Equipment:GetState())
+    return {state = status, clickText = reason}
+end

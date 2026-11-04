@@ -6,7 +6,7 @@ function Effects:Inspect(slotId, link)
     local location = ItemLocation:CreateFromEquipmentSlot(slotId)
     if not C_Item.IsItemDataCached(location) then
         local itemID = C_Item.GetItemID(location)
-        if itemID then Modules.Character.ItemData:RequestItemData(itemID, "Character:use-spell") end
+        if itemID then WSGS.Character:RequestItemData(itemID, "Character:use-spell") end
         return {useSpell = {status = "UNKNOWN", reason = "Item use spell data is loading"}}
     end
     local ok, name, spellID = pcall(C_Item.GetItemSpell, link)

@@ -8,8 +8,7 @@ implementation files capture their own feature tables during loading.
 
 `Bootstrap.lua` creates the Ace addon, public feature tables, and a temporary
 `WSGS.Private` registry. The TOC loads implementations in dependency order.
-`Addon/Composition.lua` runs last. It binds the public interfaces, connects
-runtime reconciliation and interaction policy, constructs the shopping view,
+`Addon/Composition.lua` runs last. It connects runtime reconciliation and interaction policy, constructs the shopping view,
 and removes `WSGS.Private` from the addon namespace.
 
 This is explicit Lua composition. There is no dynamic loader, dependency
@@ -19,6 +18,13 @@ Files within one feature may use that feature's private implementation tables.
 Other features use the public interfaces. Composition may access all private
 implementations because wiring them is its responsibility. The shared
 `WSGS.Equipment.Slots` table is read-only domain metadata, not runtime state.
+
+Public methods are implemented directly by their owning features and close over
+private state where needed. Composition contains runtime coordination and bound
+callbacks, rather than public methods forwarding to another receiver.
+`Equipment:Equip()` handles all positions; supplying a position selects one slot.
+The equip operation always reconciles state after processing the click, including
+when execution returns early.
 
 ## Owners
 
@@ -43,7 +49,7 @@ implementations because wiring them is its responsibility. The shared
 | --- | --- |
 | Builds | `GetActive()`, `Import(text)`, `Rename(expectedBuild, name)` |
 | Character | `GetSnapshot()`, `Refresh(reason)`, `Invalidate(reason)`, `RequestItemData(id, requester)` |
-| Equipment | `GetState(refreshReason)`, `GetStatus()`, `GetSlotState(position)`, `EquipAll()`, `EquipSlot(position)` |
+| Equipment | `GetState(refreshReason)`, `GetStatus()`, `GetSlotState(position)`, `Equip(position)` |
 | Enhancements | `GetSlotState(position)`, `BindSlot(position, button)`, `Resolve(effectID)`, `ObserveEffect(slot, observation)` |
 | EquipmentSets | `SaveVerified(state, executionReport)` |
 | Views | `ToggleEquipment()`, `ToggleImport()`, `RefreshEquipment()` |

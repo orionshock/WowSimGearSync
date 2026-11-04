@@ -194,10 +194,11 @@ function Sync:Run(profile, state, batch)
     return true
 end
 
-function Sync:Synchronize(profile, state, batch)
-    local ok, result, reason = pcall(self.Run, self, profile, state, batch)
+function WSGS.EquipmentSets:SaveVerified(state, batch)
+    local profile = WSGS.Builds:GetActive()
+    local ok, result, reason = pcall(Sync.Run, Sync, profile, state, batch)
     if not ok then
-        return self:Block(profile, "Equipment Manager API error: " .. tostring(result))
+        return Sync:Block(profile, "Equipment Manager API error: " .. tostring(result))
     end
     return result, reason
 end

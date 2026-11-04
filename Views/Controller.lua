@@ -27,12 +27,12 @@ function UI:CommitBuildName()
     return build, reason
 end
 
-function UI:RefreshPaperDoll()
-    if not self.paperDoll or not self.paperDoll:IsShown() then
+function WSGS.Views:RefreshEquipment()
+    if not UI.paperDoll or not UI.paperDoll:IsShown() then
         return
     end
     local state = Equipment:GetState()
-    self:RenderPaperDoll(state)
+    UI:RenderPaperDoll(state)
 end
 
 function UI:QueuePaperDollRefresh()
@@ -45,7 +45,7 @@ function UI:QueuePaperDollRefresh()
     self.refreshQueued = true
     C_Timer.After(0, function()
         self.refreshQueued = false
-        self:RefreshPaperDoll()
+        WSGS.Views:RefreshEquipment()
     end)
 end
 
@@ -73,12 +73,12 @@ function UI:OnEnable()
     self:RegisterMessage("WSGS_ITEM_DATA_RECEIVED")
 end
 
-function UI:TogglePaperDoll()
-    if not self.paperDoll and InCombatLockdown() then
+function WSGS.Views:ToggleEquipment()
+    if not UI.paperDoll and InCombatLockdown() then
         WSGS:Print("Open the equipment view after combat.")
         return
     end
-    local frame = self:CreatePaperDoll()
+    local frame = UI:CreatePaperDoll()
     if frame:IsShown() then
         frame:Hide()
     else

@@ -17,7 +17,7 @@ function Store:SaveBuild(build)
     return build
 end
 
-function Store:RenameBuild(expectedBuild, name)
+function WSGS.Builds:Rename(expectedBuild, name)
     local character = WSGS.db.char
     local build = character.activeImport
     if not build or build ~= expectedBuild then
@@ -35,6 +35,6 @@ function Store:RenameBuild(expectedBuild, name)
     return build
 end
 
-function Store:Get()
+function WSGS.Builds:GetActive()
     return WSGS.db.char.activeImport
 end

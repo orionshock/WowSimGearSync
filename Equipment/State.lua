@@ -104,32 +104,28 @@ function Equipment:InvalidateState(reason, ...)
     self:SendMessage("WSGS_EQUIPMENT_STATE_INVALIDATED", reason, ...)
 end
 
-function Equipment:RefreshState(build, consumer)
-    WSGS.Character:Refresh(consumer)
-    local state = capture(build, consumer)
-    self.equipmentState = state
-    self.stateInvalid = false
-    self.stateBuild = build
-    return state
-end
-
-function Equipment:GetState(build)
-    if self.stateInvalid or not self.equipmentState or self.stateBuild ~= build then
-        self.equipmentState = capture(build, "GetState")
-        self.stateInvalid = false
-        self.stateBuild = build
+function WSGS.Equipment:GetState(refreshReason)
+    local build = WSGS.Builds:GetActive()
+    if refreshReason then
+        WSGS.Character:Refresh(refreshReason)
+        Equipment.stateInvalid = true
     end
-    return self.equipmentState
+    if Equipment.stateInvalid or not Equipment.equipmentState or Equipment.stateBuild ~= build then
+        Equipment.equipmentState = capture(build, refreshReason or "GetState")
+        Equipment.stateInvalid = false
+        Equipment.stateBuild = build
+    end
+    return Equipment.equipmentState
 end
 
 function Equipment:WSGS_CHARACTER_INVALIDATED(_, reason, ...)
     self:InvalidateState(reason, ...)
-    self:QueueRefresh(reason, ...)
+    Modules.RequestReconcile(reason, ...)
 end
 
 function Equipment:WSGS_BUILD_IMPORTED(event)
     self:InvalidateState(event)
-    self:QueueRefresh(event)
+    Modules.RequestReconcile(event)
 end
 
 function Equipment:OnEnable()
@@ -138,5 +134,5 @@ function Equipment:OnEnable()
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
     self:RegisterMessage("WSGS_BUILD_RENAMED", "WSGS_BUILD_IMPORTED")
     self:RegisterEvent("UI_ERROR_MESSAGE")
-    self:QueueRefresh("INITIALIZE")
+    Modules.RequestReconcile("INITIALIZE")
 end
