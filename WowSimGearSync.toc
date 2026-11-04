@@ -50,8 +50,15 @@ Equipment\State.lua
 Interaction\Availability.lua
 Shopping\Controller.lua
 Diagnostics\EquipmentProbe.lua
+Equipment\Planning\InstanceAssignment.lua
+Equipment\Planning\BagDestinations.lua
+Equipment\Planning\WeaponLayout.lua
 Equipment\Planning\Plan.lua
 Equipment\Execution\InventoryActions.lua
+Equipment\Execution\Verification.lua
+Equipment\Execution\Batch.lua
+EquipmentSets\SaveSelection.lua
+EquipmentSets\Verification.lua
 EquipmentSets\Synchronize.lua
 Equipment\Controller.lua
 Equipment\SlotIntent.lua

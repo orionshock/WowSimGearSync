@@ -147,12 +147,7 @@ function UI:RenderPaperDoll(state)
             button.quality:SetVertexColor(color and color.r or 0.5, color and color.g or 0.5, color and color.b or 0.5)
         end
         local actionState = Modules.Enhancements.Runtime:GetSlotState(button.position)
-        for _, record in ipairs(Equipment.batch and Equipment.batch.records or {}) do
-            if record.operation.targetPosition == button.position and record.status == "STILL_PENDING" then
-                actionState.pending = true
-                break
-            end
-        end
+        actionState.pending = actionState.pending or Equipment:GetStatus().pendingSlots[button.position] or false
         button.actionState = actionState
         local statuses = Presentation:ModificationIcons(button.difference, actionState)
         for index, icon in ipairs(button.statusIcons) do
@@ -188,18 +183,17 @@ function UI:UpdateEquipButton()
     if not self.paperDoll then
         return
     end
-    local actions = Equipment
+    local actions = Equipment:GetStatus()
     self.paperDoll.equipButton:SetText(equipButtonLabels[actions.state] or "Blocked")
     self.paperDoll.equipButton:SetEnabled(actions.state == "READY" or actions.state == "FAULT" or actions.state ==
                                               "COMPLETE")
-    local plan = actions.plan
-    local counts = actions.batch and actions:OutcomeCounts()
+    local counts = actions.counts
     local note = actions.state == "CURSOR" and "Place the held cursor item first." or actions.state == "COMBAT" and
                      "Cannot equip in combat." or actions.fault or counts and counts.STILL_PENDING > 0 and
                      string.format("Equipping: %d/%d verified; %d target slot(s) unresolved.", counts.VERIFIED,
-            actions.batch.total, plan and plan.unresolvedCount or counts.STILL_PENDING) or plan and
-                     (#plan.missing > 0 and ("Missing target items: " .. #plan.missing) or plan.blocked[1] or
-                         plan.unresolvedCount > 0 and (plan.unresolvedCount .. " target slot(s) unresolved.")) or ""
+            actions.total, actions.unresolvedCount) or
+                     (actions.missingCount > 0 and ("Missing target items: " .. actions.missingCount) or actions.blocker or
+                         actions.unresolvedCount > 0 and (actions.unresolvedCount .. " target slot(s) unresolved.")) or ""
     self.paperDoll.equipNote:SetText(WSGS:FormatPlayerReason(note))
 end
 

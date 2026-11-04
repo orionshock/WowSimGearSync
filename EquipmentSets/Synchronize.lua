@@ -1,6 +1,6 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local Sync = WSGS:NewModule("EquipmentSets", "AceEvent-3.0")
+local Sync = {}
 Modules.EquipmentSets.Runtime = Sync
 local shirtSlot, tabardSlot = INVSLOT_BODY, INVSLOT_TABARD
 
@@ -9,21 +9,6 @@ local function shown(value)
         return "nil"
     end
     return tostring(value)
-end
-
-local function setInfo(setID)
-    if type(setID) ~= "number" then
-        return nil
-    end
-    local ok, name, icon, returnedID = pcall(C_EquipmentSet.GetEquipmentSetInfo, setID)
-    if not ok or type(name) ~= "string" or returnedID ~= setID then
-        return nil
-    end
-    return {
-        id = setID,
-        name = name,
-        icon = icon
-    }
 end
 
 local function specializationIcon(profile)
@@ -88,7 +73,7 @@ end
 
 function Sync:Resolve(profile)
     local setID = C_EquipmentSet.GetEquipmentSetID(profile.name)
-    local set = setInfo(setID)
+    local set = Modules.EquipmentSets.Store:ReadInfo(setID)
     if setID and (not set or set.name ~= profile.name) then
         return nil, "The equipment set name could not be verified."
     end
@@ -101,128 +86,6 @@ local function ignoredState(ignored)
     end
     return string.format("shirt=%s tabard=%s", ignored[shirtSlot] and "ignored" or "included",
         ignored[tabardSlot] and "ignored" or "included")
-end
-
-local function readSetIgnoredSlots(setID)
-    local ok, ignored = pcall(C_EquipmentSet.GetIgnoredSlots, setID)
-    if not ok or type(ignored) ~= "table" then
-        return nil, "saved ignored-slot state is unavailable"
-    end
-    if type(ignored[shirtSlot]) ~= "boolean" or type(ignored[tabardSlot]) ~= "boolean" then
-        return nil, "saved Shirt or Tabard ignored state is incomplete"
-    end
-    return {
-        [shirtSlot] = ignored[shirtSlot],
-        [tabardSlot] = ignored[tabardSlot]
-    }
-end
-
-local function captureSaveSelection()
-    local ignored = {}
-    for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
-        ignored[slot] = C_EquipmentSet.IsSlotIgnoredForSave(slot)
-    end
-    return ignored
-end
-
-local function configureManagedSlots(ignored)
-    C_EquipmentSet.ClearIgnoredSlotsForSave()
-    if ignored[shirtSlot] then
-        C_EquipmentSet.IgnoreSlotForSave(shirtSlot)
-    end
-    if ignored[tabardSlot] then
-        C_EquipmentSet.IgnoreSlotForSave(tabardSlot)
-    end
-end
-
-local function restoreSaveSelection(ignored)
-    C_EquipmentSet.ClearIgnoredSlotsForSave()
-    for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
-        if ignored[slot] then
-            C_EquipmentSet.IgnoreSlotForSave(slot)
-        end
-    end
-end
-
-function Sync:CallSave(action, setID, name, icon, managedIgnored)
-    local saveSelection = captureSaveSelection()
-    self.active = {
-        eventSeen = false,
-        action = action,
-        setID = setID,
-        name = name
-    }
-    local ok, problem = pcall(function()
-        configureManagedSlots(managedIgnored)
-        if action == "CREATE" then
-            C_EquipmentSet.CreateEquipmentSet(name, icon)
-        else
-            C_EquipmentSet.SaveEquipmentSet(setID, icon)
-        end
-    end)
-    local restoreOK, restoreProblem = pcall(restoreSaveSelection, saveSelection)
-    local eventSeen = self.active.eventSeen
-    self.active = nil
-    if not ok then
-        return nil, tostring(problem), eventSeen
-    end
-    if not restoreOK then
-        return nil, "Could not restore Equipment Manager ignored slots: " .. tostring(restoreProblem), eventSeen
-    end
-    return true, nil, eventSeen
-end
-
-function Sync:SetMatchesState(setID, state)
-    local ok, itemIDs = pcall(C_EquipmentSet.GetItemIDs, setID)
-    if not ok or type(itemIDs) ~= "table" then
-        return nil, "Saved item IDs are unavailable."
-    end
-    local mismatches = {}
-    for position, slot in ipairs(Modules.Equipment.Slots) do
-        local expected = state.equipped[position].id or EQUIPMENT_SET_EMPTY_SLOT
-        local actual = itemIDs[slot.id]
-        if actual == nil then
-            actual = EQUIPMENT_SET_EMPTY_SLOT
-        end
-        if actual ~= expected then
-            mismatches[#mismatches + 1] = slot.id .. ":" .. shown(expected) .. "/" .. shown(actual)
-        end
-    end
-    return #mismatches == 0, #mismatches > 0 and table.concat(mismatches, ",") or nil
-end
-
-function Sync:VerifySaved(profile, setID, state, eventSeen, desiredIcon, expectedIgnored, operation)
-    local info = setInfo(setID)
-    if not info then
-        return nil, "The saved set could not be found after synchronization."
-    end
-    if info.name ~= profile.name then
-        return nil, "The client saved the set as '" .. info.name .. "' instead of '" .. profile.name .. "'."
-    end
-    local matches, difference = self:SetMatchesState(setID, state)
-    local iconMatch = not desiredIcon or info.icon == desiredIcon
-    local resultingIgnored, ignoredProblem = readSetIgnoredSlots(setID)
-    WSGS:Debug(string.format(
-        "[SET][VERIFY] build=%s setID=%d nameMatch=yes itemsMatch=%s desiredIcon=%s savedIcon=%s iconMatch=%s eventSeen=%s differences=%s",
-        shown(profile.name), setID, matches and "yes" or "no", shown(desiredIcon), shown(info.icon),
-        desiredIcon and (iconMatch and "yes" or "no") or "not-required", eventSeen and "yes" or "no", shown(difference)))
-    WSGS:Debug(string.format(
-        "[SET][VERIFY] build=%s setID=%d operation=%s expectedIgnored=%s resultingIgnored=%s",
-        shown(profile.name), setID, shown(operation), ignoredState(expectedIgnored), ignoredState(resultingIgnored)))
-    if not matches then
-        return nil, "Saved set contents did not match equipped items: " .. (difference or "unknown")
-    end
-    if not iconMatch then
-        return nil, "The client did not preserve the requested equipment set icon."
-    end
-    if expectedIgnored and not resultingIgnored then
-        return nil, "Saved Shirt and Tabard ignored state could not be verified: " .. ignoredProblem
-    end
-    if expectedIgnored and (resultingIgnored[shirtSlot] ~= expectedIgnored[shirtSlot] or
-        resultingIgnored[tabardSlot] ~= expectedIgnored[tabardSlot]) then
-        return nil, "The client did not preserve the managed Shirt and Tabard ignored state."
-    end
-    return true
 end
 
 function Sync:Run(profile, state, batch)
@@ -269,7 +132,7 @@ function Sync:Run(profile, state, batch)
         WSGS:Debug(string.format(
             "[SET][CREATE] build=%s setID=nil specID=%s icon=%s action=C_EquipmentSet.CreateEquipmentSet existingIgnored=%s resultingIgnored=%s",
             shown(profile.name), shown(specID), shown(icon), ignoredState(nil), ignoredState(createIgnored)))
-        local ok, callProblem, eventSeen = self:CallSave("CREATE", nil, profile.name, icon, createIgnored)
+        local ok, callProblem, eventSeen = Modules.EquipmentSets.Store:Save("CREATE", nil, profile.name, icon, createIgnored)
         if not ok then
             return self:Block(profile, "CreateEquipmentSet failed: " .. callProblem)
         end
@@ -281,13 +144,13 @@ function Sync:Run(profile, state, batch)
             "[SET][CREATE] build=%s setID=%d action=C_EquipmentSet.SaveEquipmentSet reason=apply-ignored-slots resultingIgnored=%s",
             shown(profile.name), setID, ignoredState(createIgnored)))
         local saved, saveProblem, saveEvent =
-            self:CallSave("CREATE_SAVE", setID, profile.name, icon, createIgnored)
+            Modules.EquipmentSets.Store:Save("CREATE_SAVE", setID, profile.name, icon, createIgnored)
         eventSeen = eventSeen or saveEvent
         if not saved then
             return self:Block(profile, "SaveEquipmentSet after creation failed: " .. saveProblem)
         end
         local verified, verifyProblem =
-            self:VerifySaved(profile, setID, state, eventSeen, icon, createIgnored, "CREATE")
+            Modules.EquipmentSets.Verification:CheckSaved(profile, setID, state, eventSeen, icon, createIgnored, "CREATE")
         if not verified then
             return self:Block(profile, verifyProblem)
         end
@@ -295,11 +158,11 @@ function Sync:Run(profile, state, batch)
         return true
     end
 
-    local existingIgnored, ignoredProblem = readSetIgnoredSlots(set.id)
+    local existingIgnored, ignoredProblem = Modules.EquipmentSets.Store:ReadIgnoredSlots(set.id)
     WSGS:Debug(string.format(
         "[SET][CHECK] build=%s setID=%d operation=UPDATE existingIgnored=%s resultingIgnored=%s",
         shown(profile.name), set.id, ignoredState(existingIgnored), ignoredState(existingIgnored)))
-    local contentsMatch, difference = self:SetMatchesState(set.id, state)
+    local contentsMatch, difference = Modules.EquipmentSets.Verification:MatchesState(set.id, state)
     if contentsMatch == nil then
         return self:Block(profile, difference)
     end
@@ -314,7 +177,7 @@ function Sync:Run(profile, state, batch)
             "[SET][UPDATE] build=%s setID=%d action=C_EquipmentSet.SaveEquipmentSet differences=%s existingIgnored=%s resultingIgnored=%s",
             shown(profile.name), set.id, shown(difference), ignoredState(existingIgnored), ignoredState(existingIgnored)))
         local ok, callProblem, saveEvent =
-            self:CallSave("UPDATE", set.id, profile.name, set.icon, existingIgnored)
+            Modules.EquipmentSets.Store:Save("UPDATE", set.id, profile.name, set.icon, existingIgnored)
         eventSeen = eventSeen or saveEvent
         if not ok then
             return self:Block(profile, "SaveEquipmentSet failed: " .. callProblem)
@@ -322,7 +185,7 @@ function Sync:Run(profile, state, batch)
         changed, operation = true, "UPDATE"
     end
     local verified, verifyProblem =
-        self:VerifySaved(profile, set.id, state, eventSeen, set.icon, existingIgnored, operation)
+        Modules.EquipmentSets.Verification:CheckSaved(profile, set.id, state, eventSeen, set.icon, existingIgnored, operation)
     if not verified then
         return self:Block(profile, verifyProblem)
     end
@@ -337,16 +200,4 @@ function Sync:Synchronize(profile, state, batch)
         return self:Block(profile, "Equipment Manager API error: " .. tostring(result))
     end
     return result, reason
-end
-
-function Sync:EQUIPMENT_SETS_CHANGED()
-    if self.active then
-        self.active.eventSeen = true
-        WSGS:Debug(string.format("[SET][VERIFY] build=%s setID=%s event=EQUIPMENT_SETS_CHANGED action=%s",
-            shown(self.active.name), shown(self.active.setID), shown(self.active.action)))
-    end
-end
-
-function Sync:OnEnable()
-    self:RegisterEvent("EQUIPMENT_SETS_CHANGED")
 end
