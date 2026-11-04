@@ -42,4 +42,3 @@ function Professions:CharacterContext()
         professions = professions
     }
 end
-

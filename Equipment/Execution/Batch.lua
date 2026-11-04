@@ -131,3 +131,16 @@ function Batch:OnError(message)
     local record = self.executingRecord or self.lastSubmittedRecord
     if record and record.status == "STILL_PENDING" then record.error = message end
 end
+
+function Batch:Report()
+    local result = {records = {}}
+    for _, record in ipairs(self.records) do
+        local operation = record.operation
+        result.records[#result.records + 1] = {
+            status = record.status,
+            operation = {kind = operation.kind, position = operation.position,
+                targetPosition = operation.targetPosition, source = {guid = operation.source.guid}}
+        }
+    end
+    return result
+end

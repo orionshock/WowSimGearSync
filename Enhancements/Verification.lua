@@ -22,4 +22,3 @@ function Verification:Check(operation, difference, targetInstanceMatches)
     return field.state == "MATCH", field.state .. (field.reason and ": " .. field.reason or ""),
         field.actual
 end
-

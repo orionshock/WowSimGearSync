@@ -108,7 +108,7 @@ local function reserveResolvedAssignments(context)
                 end
             elseif selected(context, position) then
                 if itemState == "UNKNOWN" or current.locked then
-                    context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
+                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.Equipment.Slots[position].name ..
                         ": equipped identity unavailable or locked."
                 else
                     context.targetGroups[target.id] = context.targetGroups[target.id] or {}
@@ -184,7 +184,7 @@ local function matchTargetGroup(context, id, targets)
                 source = item,
                 position = target.physical,
                 targetPosition = target.position,
-                slotId = Modules.Equipment.Slots[target.physical].id,
+                slotId = WSGS.Equipment.Slots[target.physical].id,
                 id = id
             }
         elseif shortage > 0 then
@@ -194,7 +194,7 @@ local function matchTargetGroup(context, id, targets)
                 id = id
             }
         else
-            context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[target.position].name ..
+            context.plan.blocked[#context.plan.blocked + 1] = WSGS.Equipment.Slots[target.position].name ..
                                                                      ": item " .. id ..
                                                                      " is locked, unreadable, incompatible, or has ambiguous duplicate instances."
         end

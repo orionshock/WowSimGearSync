@@ -62,3 +62,24 @@ function Materials:ProfessionEnhancementAvailability(bags, enchantID, inventoryS
     end
     return professionAvailability(bags, recipe, inventorySlot, professions)
 end
+
+function Materials:Resolve(effectID)
+    if self.profession[effectID] then return self.profession[effectID], "PROFESSION" end
+    if self.inventory[effectID] then return self.inventory[effectID], "ITEM" end
+end
+
+function Materials:ObserveEffect(inventorySlot, observed)
+    if not observed or observed.status ~= "KNOWN" then
+        return {status = "UNKNOWN", reason = observed and observed.reason or "Item use spell unavailable"}
+    end
+    local effect, _, supported = self:ProfessionEffect(inventorySlot, observed.spellId)
+    if not supported then return {status = "NOT_APPLICABLE", reason = "Not a supported profession-effect slot"} end
+    if effect and effect.effectID then
+        return {status = "KNOWN", value = effect.effectID, source = "Equipped use spell mapping"}
+    end
+    if effect and effect.different then
+        return {status = "KNOWN", different = true, spellId = observed.spellId,
+            spellName = observed.spellName, source = "Known alternate equipped use spell"}
+    end
+    return {status = "UNKNOWN", reason = "Equipped item use spell is not mapped for this profession slot"}
+end

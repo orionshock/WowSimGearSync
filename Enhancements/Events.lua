@@ -206,4 +206,3 @@ function Events:OnEnable()
     self:RegisterEvent("ACTION_WILL_BIND_ITEM")
     self:RegisterEvent("PLAYER_REGEN_ENABLED")
 end
-

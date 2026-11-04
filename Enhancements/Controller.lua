@@ -1,7 +1,7 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
 local Actions = WSGS:NewModule("Actions", "AceEvent-3.0")
-local Equipment = Modules.Equipment.Runtime
+local Equipment = WSGS.Equipment
 Modules.Enhancements.Runtime = Actions
 
 local Internal = Modules.Enhancements
@@ -27,7 +27,7 @@ local function configureButton(position)
 end
 
 local function synchronizeBuild()
-    local build = WSGS:GetActiveSimulationProfile()
+    local build = WSGS.Builds:GetActive()
     if controllerBuild == build then
         return false
     end
@@ -73,7 +73,7 @@ local function logPlan(position, controller)
         return
     end
     debug("PLAN", string.format("slot=%d actualSlot=%d state=%s handler=%s next=%s expected=%s guid=%s reason=%s",
-        Modules.Equipment.Slots[position].id, controller.inventorySlot, controller.state,
+        WSGS.Equipment.Slots[position].id, controller.inventorySlot, controller.state,
         operation and operation.handlerName or "none", operation and operation.type or "none",
         operation and valueText(operation.expected) or "nil", valueText(controller.targetGuid),
         controller.reason or operation and operation.reason or "none"))
@@ -125,7 +125,7 @@ function Actions:Refresh(state)
         end
         return
     end
-    for position = 1, #Modules.Equipment.Slots do
+    for position = 1, #WSGS.Equipment.Slots do
         rebuildController(position, state)
     end
 end
@@ -136,11 +136,11 @@ function Actions:GetSlotState(position)
 end
 
 local function refreshFromClient(self, reason)
-    local profile = WSGS:GetActiveSimulationProfile()
+    local profile = WSGS.Builds:GetActive()
     if not profile then
         return
     end
-    local state = Equipment:RefreshState(profile, "SlotActions:" .. tostring(reason))
+    local state = Equipment:GetState("SlotActions:" .. tostring(reason))
     if state.comparison then
         self:Refresh(state)
     end
@@ -233,7 +233,7 @@ function Actions:ActivateSlot(position, button)
         if not InCombatLockdown() then
             button:SetAttribute("type1", nil)
         end
-        Equipment:Click(position)
+        Equipment:EquipSlot(position)
         -- Equipment events can prepare a modification synchronously. This
         -- hardware click belongs only to equipment, even if the new item matches.
         if not InCombatLockdown() then

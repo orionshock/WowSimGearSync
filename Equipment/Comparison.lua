@@ -36,16 +36,17 @@ local function scalar(expected, observed)
 end
 
 function Comparator:CompareSlot(target, current, position, currentPosition, context)
-    local slot = Modules.Equipment.Slots[position]
+    local slot = WSGS.Equipment.Slots[position]
     local result = {
         position = position,
         slotName = slot.name,
         targetSlotId = slot.id,
         currentPosition = currentPosition,
-        currentSlotId = Modules.Equipment.Slots[currentPosition].id,
+        currentSlotId = WSGS.Equipment.Slots[currentPosition].id,
         fields = {}
     }
     local observations = current and current.observations or {}
+    local tinker = WSGS.Enhancements:ObserveEffect(slot.id, observations.useSpell)
     local item = observations.item
     local emptyTarget = target.empty or not target.id or target.id == 0
     if not item or item.status ~= "KNOWN" then
@@ -68,13 +69,13 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
         local expected = target[field]
         local difference
         if field == "tinker" and not emptyTarget and expected ~= nil and result.fields.item.state == "MATCH" and
-            observations.tinker and observations.tinker.status == "KNOWN" and observations.tinker.different then
+            tinker and tinker.status == "KNOWN" and tinker.different then
             difference = {
                 state = "MISMATCH",
                 expected = expected,
-                actualSpellID = observations.tinker.spellId,
-                actualSpellName = observations.tinker.spellName,
-                source = observations.tinker.source
+                actualSpellID = tinker.spellId,
+                actualSpellName = tinker.spellName,
+                source = tinker.source
             }
         elseif emptyTarget or expected == nil then
             difference = {
@@ -88,7 +89,7 @@ function Comparator:CompareSlot(target, current, position, currentPosition, cont
                 reason = "Target item is not confirmed in this slot"
             }
         else
-            difference = scalar(expected, observations[field])
+            difference = scalar(expected, field == "tinker" and tinker or observations[field])
         end
         result.fields[field] = difference
     end
@@ -128,7 +129,7 @@ function Comparator:Compare(profile, snapshot)
             unknown = 0
         }
     }
-    for position = 1, #Modules.Equipment.Slots do
+    for position = 1, #WSGS.Equipment.Slots do
         local target = profile.equipment[position]
         if not target then
             return nil, "Imported build is missing equipment position " .. position .. "."

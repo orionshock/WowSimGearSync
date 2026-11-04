@@ -45,7 +45,7 @@ function Sync:Check(profile, state, batch)
         end
     end
     local failures = {}
-    for position = 1, #Modules.Equipment.Slots do
+    for position = 1, #WSGS.Equipment.Slots do
         local target = profile.equipment[position]
         local result = comparison.slots[position]
         local physical = comparison.assignments[position]
@@ -56,13 +56,13 @@ function Sync:Check(profile, state, batch)
         local verified = itemMatch and instanceMatch
         WSGS:Debug(string.format(
             "[SET][CHECK] build=%s pos=%d inv=%d physical=%d target=%s observed=%s GUID=%s itemMatch=%s instanceMatch=%s result=%s",
-            shown(profile.name), position, Modules.Equipment.Slots[position].id, physical, shown(target.id),
+            shown(profile.name), position, WSGS.Equipment.Slots[position].id, physical, shown(target.id),
             shown(current.id), shown(current.guid), itemMatch and "yes" or "no",
             instance and (instanceMatch and "yes" or "no") or "not-required", verified and "VERIFIED" or "BLOCKED"))
         if not verified then
             local reason = not itemMatch and ("item state " .. result.fields.item.state) or
                                "selected item instance is not equipped"
-            failures[#failures + 1] = Modules.Equipment.Slots[position].name .. " (" .. reason .. ")"
+            failures[#failures + 1] = WSGS.Equipment.Slots[position].name .. " (" .. reason .. ")"
         end
     end
     if #failures > 0 then
@@ -103,7 +103,7 @@ function Sync:Run(profile, state, batch)
     if not C_EquipmentSet.CanUseEquipmentSets() then
         return self:Block(profile, "Equipment Manager is unavailable for this character.")
     end
-    if profile ~= WSGS:GetActiveSimulationProfile() or not state or state.target ~= profile.equipment then
+    if profile ~= WSGS.Builds:GetActive() or not state or state.target ~= profile.equipment then
         return self:Block(profile, "The active import changed; verify its equipment again.")
     end
     for _, record in ipairs(batch and batch.records or {}) do

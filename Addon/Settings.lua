@@ -11,8 +11,8 @@ function WSGS:RegisterOptionsPanel()
         end,
         set = function(info, enabled)
             WSGS.db.profile[info[#info]] = enabled
-            Modules.Equipment.Runtime:InvalidateState("OPTIONS_CHANGED")
-            Modules.Views.Runtime:RefreshPaperDoll()
+            WSGS.Character:Invalidate("OPTIONS_CHANGED")
+            WSGS.Views:RefreshEquipment()
         end,
         args = {
             debug = {

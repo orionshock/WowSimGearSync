@@ -22,7 +22,7 @@ end
 
 function UI:SubmitImport(frame)
     frame.importInput:ClearFocus()
-    local profile, reason = Modules.Builds.Runtime:ImportEquipment(frame.importInput:GetText())
+    local profile, reason = WSGS.Builds:Import(frame.importInput:GetText())
     if not profile then
         frame.importStatus:SetText("Import failed: " .. WSGS:FormatPlayerReason(reason))
         return nil, reason

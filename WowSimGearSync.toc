@@ -29,8 +29,13 @@ Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 Bootstrap.lua
 Localization\enUS.lua
 Addon\Lifecycle.lua
+Diagnostics\Output.lua
+Views\PlayerReasons.lua
+Addon\Commands.lua
+Addon\Launcher.lua
 Addon\Settings.lua
 Equipment\Slots.lua
+Builds\ExportV2.lua
 Builds\Import.lua
 Builds\Specialization.lua
 Builds\ActiveBuild.lua
@@ -48,6 +53,8 @@ Character\CarriedItems.lua
 Character\Capture.lua
 Equipment\State.lua
 Interaction\Availability.lua
+Shopping\Requirements.lua
+Shopping\AuctionNavigation.lua
 Shopping\Controller.lua
 Diagnostics\EquipmentProbe.lua
 Equipment\Planning\InstanceAssignment.lua
@@ -77,6 +84,9 @@ Views\Controller.lua
 Views\Equipment\Presentation.lua
 Views\Tooltips\Enhancement.lua
 Views\Import\Dialog.lua
+Views\Equipment\SlotButton.lua
+Views\Equipment\Render.lua
 Views\Equipment\Window.lua
+Views\Shopping\Panel.lua
 
 Addon\Composition.lua

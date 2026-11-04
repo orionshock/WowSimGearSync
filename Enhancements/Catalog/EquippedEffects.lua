@@ -20,4 +20,3 @@ Catalog.equippedProfessionEffects = {
         }
     }
 }
-

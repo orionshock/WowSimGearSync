@@ -1,6 +1,7 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local Import = Modules.Builds.Runtime
+local Specialization = {}
+Modules.Builds.Specialization = Specialization
 
 -- Player oneof fields from the WoW Sims API v2 export. Numeric IDs are
 -- Blizzard specialization IDs, not simulation enum values.
@@ -18,7 +19,7 @@ local classes = {
     {"Druid", 11,{{"balanceDruid", "Balance", 102}, {"feralDruid", "Feral", 103}, {"guardianDruid", "Guardian", 104},{"restorationDruid", "Restoration", 105}}}
 }
 
-function Import:DetectSpecialization(player)
+function Specialization:Detect(player)
     local className, match, count, invalid = "Unknown", nil, 0, false
     for _, class in ipairs(classes) do
         local enumName = "Class" .. class[1]:gsub(" ", "")

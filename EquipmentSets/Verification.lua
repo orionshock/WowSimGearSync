@@ -19,7 +19,7 @@ function Verification:MatchesState(setID, state)
         return nil, "Saved item IDs are unavailable."
     end
     local mismatches = {}
-    for position, slot in ipairs(Modules.Equipment.Slots) do
+    for position, slot in ipairs(WSGS.Equipment.Slots) do
         local expected = state.equipped[position].id or EQUIPMENT_SET_EMPTY_SLOT
         local actual = itemIDs[slot.id]
         if actual == nil then
@@ -65,4 +65,3 @@ function Verification:CheckSaved(profile, setID, state, eventSeen, desiredIcon, 
     end
     return true
 end
-

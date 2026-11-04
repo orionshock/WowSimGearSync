@@ -67,7 +67,7 @@ function Actions:UnresolvedSlots(state)
     end
     for position, result in ipairs(comparison.slots) do
         if result.fields.item.state ~= "MATCH" then
-            unresolved[#unresolved + 1] = Modules.Equipment.Slots[position].id .. ":" .. result.fields.item.state
+            unresolved[#unresolved + 1] = WSGS.Equipment.Slots[position].id .. ":" .. result.fields.item.state
         end
     end
     return unresolved
@@ -101,7 +101,7 @@ function Actions:LogDone(state)
         #unresolved > 0 and table.concat(unresolved, ",") or "none"))
     if not self.batch.setSyncAttempted and (not self.batch.selectedPosition or self.plan.unresolvedCount == 0) then
         self.batch.setSyncAttempted = true
-        Modules.EquipmentSets.Runtime:Synchronize(self.stateBuild, state, self.batch)
+        WSGS.EquipmentSets:SaveVerified(state, self.batch:Report())
     end
 end
 
@@ -131,14 +131,6 @@ function Actions:Refresh(state)
     return self.plan
 end
 
-function Actions:RefreshCurrentBuild()
-    local profile = WSGS:GetActiveSimulationProfile()
-    local state = self:GetState(profile)
-    self:Refresh(state)
-    Modules.Enhancements.Runtime:Refresh(state)
-    return state
-end
-
 function Actions:QueueRefresh(event, ...)
     if verificationEvents[event] then
         self.verificationEvent = event
@@ -149,8 +141,7 @@ function Actions:QueueRefresh(event, ...)
     self.refreshQueued = true
     C_Timer.After(0, function()
         self.refreshQueued = false
-        local state = self:RefreshCurrentBuild()
-        self:SendMessage("WSGS_STATE_CHANGED", state)
+        Modules.Reconcile()
     end)
 end
 
@@ -191,7 +182,7 @@ function Actions:LogPlan(profile, plan)
                            "no safely executable source; see excluded reasons"
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] pos=%d inv=%d name=%s physical=%d current=%s currentGUID=%s target=%s state=%s decision=%s reason=%s",
-            position, Modules.Equipment.Slots[position].id, Modules.Equipment.Slots[position].name, physical,
+            position, WSGS.Equipment.Slots[position].id, WSGS.Equipment.Slots[position].name, physical,
             shown(current and current.id), shown(current and current.guid), shown(target and target.id), state,
             decision, reason))
     end
@@ -207,7 +198,7 @@ function Actions:LogPlan(profile, plan)
     for _, item in ipairs(plan.missing) do
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] excluded pos=%d inv=%d item=%s reason=not found in equipped gear or carried bags",
-            item.position, Modules.Equipment.Slots[item.position].id, shown(item.id)))
+            item.position, WSGS.Equipment.Slots[item.position].id, shown(item.id)))
     end
     for _, reason in ipairs(plan.blocked) do
         WSGS:Debug("[EQUIP][PLAN] excluded reason=" .. reason)
@@ -219,7 +210,7 @@ function Actions:LogPlan(profile, plan)
         local targetLoc = target and target.id and target.id > 0 and select(4, C_Item.GetItemInfoInstant(target.id))
         WSGS:Debug(string.format(
             "[EQUIP][PLAN] weapon=%s inv=%d current=%s currentType=%s target=%s targetType=%s titansGrip=%s operation=%s",
-            position == 15 and "MH" or "OH", Modules.Equipment.Slots[position].id, shown(current.id),
+            position == 15 and "MH" or "OH", WSGS.Equipment.Slots[position].id, shown(current.id),
             shown(current.equipLoc), shown(target and target.id), shown(targetLoc), grip, shown(byTarget[position])))
     end
 end
@@ -231,7 +222,7 @@ function Actions:Click(position)
         return
     end
     self.fault, self.batch = nil, nil
-    local profile = WSGS:GetActiveSimulationProfile()
+    local profile = WSGS.Builds:GetActive()
     local state = self:RefreshState(profile, position and "SlotEquipClick" or "GlobalEquipClick")
     self:Refresh(state)
     local operations, selectedPlan = self.plan.operations
@@ -250,7 +241,7 @@ function Actions:Click(position)
         self:LogPlan(profile, selectedPlan)
     end
     if not position and self.state == "COMPLETE" then
-        Modules.EquipmentSets.Runtime:Synchronize(profile, state)
+        WSGS.EquipmentSets:SaveVerified(state)
         return
     end
     if not position and self.state ~= "READY" then
@@ -276,7 +267,7 @@ function Actions:Click(position)
     end
     -- This immediate rescan only observes. Every protected action above ran in
     -- the original button callback.
-    state = self:RefreshState(WSGS:GetActiveSimulationProfile(), "GlobalEquipImmediateVerify")
+    state = self:RefreshState(WSGS.Builds:GetActive(), "GlobalEquipImmediateVerify")
     self:Refresh(state)
     if position then
         self:SendMessage("WSGS_ACTIONS_CHANGED", "SLOT_EQUIP_SUBMITTED")
@@ -285,7 +276,7 @@ function Actions:Click(position)
         if self.batch == batch and self:PendingCount() > 0 then
             WSGS:Debug(string.format("[EQUIP][EVENT] name=VERIFY_TIMEOUT pending=%d", self:PendingCount()))
             self.verificationEvent = "FINAL"
-            local finalState = self:RefreshState(WSGS:GetActiveSimulationProfile(), "GlobalEquipFinalVerify")
+            local finalState = self:RefreshState(WSGS.Builds:GetActive(), "GlobalEquipFinalVerify")
             self:Refresh(finalState)
         end
     end)

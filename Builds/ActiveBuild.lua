@@ -1,8 +1,9 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
-local Import = Modules.Builds.Runtime
+local Store = {}
+Modules.Builds.ActiveBuild = Store
 
-function Import:SaveBuild(character, build)
+function Store:SaveBuild(character, build)
     local specialization = build.specialization
     if not specialization or not specialization.id or specialization.class == "Unknown" then
         return nil, "Export must contain one recognizable specialization before importing."
@@ -15,7 +16,7 @@ function Import:SaveBuild(character, build)
     return build
 end
 
-function Import:RenameBuild(character, expectedBuild, name)
+function Store:RenameBuild(character, expectedBuild, name)
     local build = character.activeImport
     if not build or build ~= expectedBuild then
         return nil, "Select a build before renaming."
@@ -28,6 +29,10 @@ function Import:RenameBuild(character, expectedBuild, name)
         return nil, "Equipment set names must be at most 16 characters."
     end
     build.name = name
-    Modules.Equipment.Runtime:InvalidateState("BUILD_RENAMED")
+    WSGS:SendMessage("WSGS_BUILD_RENAMED", build)
     return build
+end
+
+function Store:Get()
+    return WSGS.db.char.activeImport
 end

@@ -41,4 +41,3 @@ function Verification:UnexpectedDestination(record, snapshot)
     return operation.source.guid and destination.id == operation.id and destination.guid and destination.guid ~=
                operation.source.guid and destination.guid ~= record.beforeGUID
 end
-

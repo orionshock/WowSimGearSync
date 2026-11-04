@@ -1,23 +1,8 @@
 local _, WSGS = ...
 local Modules = WSGS.Private
 local UI = WSGS:NewModule("UI", "AceEvent-3.0")
-local Equipment = Modules.Equipment.Runtime
+local Equipment = WSGS.Equipment
 Modules.Views.Runtime = UI
-
-local refreshEvents = {
-    PLAYER_EQUIPMENT_CHANGED = true,
-    BAG_UPDATE_DELAYED = true,
-    ITEM_LOCK_CHANGED = true,
-    SPELLS_CHANGED = true,
-    SKILL_LINES_CHANGED = true,
-    TRADE_SKILL_LIST_UPDATE = true,
-    TRADE_SKILL_DATA_SOURCE_CHANGED = true,
-    PLAYER_SPECIALIZATION_CHANGED = true,
-    PLAYER_REGEN_DISABLED = true,
-    PLAYER_REGEN_ENABLED = true,
-    CURSOR_CHANGED = true
-}
-local itemDataEvents = {GET_ITEM_INFO_RECEIVED = true, ITEM_DATA_LOAD_RESULT = true}
 
 function UI:RefreshEscapeWindow()
     if not self.escapeWindowRegistered then
@@ -30,7 +15,7 @@ end
 
 function UI:CommitBuildName()
     local input = self.paperDoll.buildName
-    local build, reason = Modules.Builds.Runtime:RenameBuild(WSGS.db.char, input.build, input:GetText())
+    local build, reason = WSGS.Builds:Rename(input.build, input:GetText())
     if build then
         self.profile = build
         input:SetText(build.name)
@@ -46,7 +31,7 @@ function UI:RefreshPaperDoll()
     if not self.paperDoll or not self.paperDoll:IsShown() then
         return
     end
-    local state = Equipment:GetState(WSGS:GetActiveSimulationProfile())
+    local state = Equipment:GetState()
     self:RenderPaperDoll(state)
 end
 
@@ -65,18 +50,11 @@ function UI:QueuePaperDollRefresh()
 end
 
 
-function UI:WSGS_EQUIPMENT_REFRESH_REQUESTED(_, event, itemID, success)
-    if refreshEvents[event] or
-        itemDataEvents[event] and success and self.relevantItems and self.relevantItems[itemID] then
-        self:QueuePaperDollRefresh()
-    end
-end
-
 function UI:WSGS_ITEM_DATA_RECEIVED(_, itemID, success, requester)
     if requester ~= "PaperDoll:target" and requester ~= "PaperDoll:modification-tooltip" then
         return
     end
-    self.requestedItems[itemID] = nil
+    if self.requestedItems then self.requestedItems[itemID] = nil end
     if success and self.relevantItems and self.relevantItems[itemID] then
         self:QueuePaperDollRefresh()
     end

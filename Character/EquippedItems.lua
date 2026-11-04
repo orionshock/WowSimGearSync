@@ -16,8 +16,8 @@ function Scanner:Scan(onlyPosition)
         slots = {},
         context = Modules.Character.Professions:CharacterContext()
     }
-    for position = onlyPosition or 1, onlyPosition or #Modules.Equipment.Slots do
-        local slot = Modules.Equipment.Slots[position]
+    for position = onlyPosition or 1, onlyPosition or #WSGS.Equipment.Slots do
+        local slot = WSGS.Equipment.Slots[position]
         local current = {
             position = position,
             slotId = slot.id,
@@ -54,7 +54,7 @@ function Scanner:Scan(onlyPosition)
             observations.item = unknown("Inventory identity unavailable or inconsistent")
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
-        for _, field in ipairs({"enchant", "tinker", "instance"}) do
+        for _, field in ipairs({"enchant", "useSpell", "instance"}) do
             observations[field] = empty and {
                 status = "NOT_APPLICABLE",
                 reason = "Empty inventory slot"
@@ -81,7 +81,7 @@ function Scanner:Scan(onlyPosition)
     for position, current in ipairs(snapshot.slots) do
         current.guid = current.observations.instance.status == "KNOWN" and current.observations.instance.value or nil
         current.equipLoc = current.id and select(4, C_Item.GetItemInfoInstant(current.link or current.id))
-        current.locked = IsInventoryItemLocked(Modules.Equipment.Slots[position].id)
+        current.locked = IsInventoryItemLocked(WSGS.Equipment.Slots[position].id)
     end
     return snapshot
 end

@@ -38,13 +38,13 @@ end
 
 local function normalizedSlots(build, snapshot, comparison)
     local slots = {}
-    for position = 1, #Modules.Equipment.Slots do
+    for position = 1, #WSGS.Equipment.Slots do
         local physical = comparison and comparison.assignments[position] or position
         slots[position] = {
             position = position,
-            inventorySlot = Modules.Equipment.Slots[position].id,
+            inventorySlot = WSGS.Equipment.Slots[position].id,
             physicalPosition = physical,
-            physicalInventorySlot = Modules.Equipment.Slots[physical].id,
+            physicalInventorySlot = WSGS.Equipment.Slots[physical].id,
             target = build and build.equipment and build.equipment[position] or nil,
             current = snapshot.slots[physical],
             comparison = comparison and comparison.slots[position] or nil
@@ -148,6 +148,7 @@ function Equipment:OnEnable()
     self.stateInvalid = true
     self:RegisterMessage("WSGS_CHARACTER_INVALIDATED")
     self:RegisterMessage("WSGS_BUILD_IMPORTED")
+    self:RegisterMessage("WSGS_BUILD_RENAMED", "WSGS_BUILD_IMPORTED")
     self:RegisterEvent("UI_ERROR_MESSAGE")
     self:QueueRefresh("INITIALIZE")
 end

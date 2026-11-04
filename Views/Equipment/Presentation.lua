@@ -70,19 +70,13 @@ local function effectValue(fieldName, effectID, difference)
     if fieldName == "tinker" and difference and difference.actualSpellID == effectID then
         return spellValue(effectID, difference.actualSpellName)
     end
-    local catalog = Modules.Enhancements.Catalog
-    local profession = catalog.profession[effectID]
-    if profession then
-        return spellValue(profession.spellID,
-            "Profession enhancement")
-    end
-    local inventory = fieldName == "enchant" and catalog.inventory[effectID]
-    if inventory then
-        local itemID = inventory.itemID or inventory.purchasableItemID
-        if itemID then
-            return itemValue(itemID)
-        end
-        return spellValue(inventory.spellID, "Enchantment")
+    local definition, method = WSGS.Enhancements:Resolve(effectID)
+    if definition and method == "PROFESSION" then
+        return spellValue(definition.spellID, "Profession enhancement")
+    elseif definition and fieldName == "enchant" then
+        local itemID = definition.itemID or definition.purchasableItemID
+        if itemID then return itemValue(itemID) end
+        return spellValue(definition.spellID, "Enchantment")
     end
     return {
         text = "Enhancement"
@@ -108,7 +102,7 @@ local function fieldFor(definition, fields)
     for _, name in ipairs(definition.fields) do
         local field = fields[name]
         local professionEnhancement = name == "enchant" and field and field.expected and
-                                            Modules.Enhancements.Catalog.profession[field.expected] ~= nil or false
+                                            select(2, WSGS.Enhancements:Resolve(field.expected)) == "PROFESSION" or false
         local selected = name ~= "enchant" or definition.professionOnly == nil or
                              definition.professionOnly == professionEnhancement
         if selected and field and field.state ~= "NOT_APPLICABLE" then

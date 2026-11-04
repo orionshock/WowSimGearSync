@@ -18,15 +18,15 @@ function Destinations:Apply(context)
         if selected(context, position) and not present(target) then
             local current = context.snapshot.slots[position]
             if current.observations.item.status ~= "KNOWN" then
-                context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
+                context.plan.blocked[#context.plan.blocked + 1] = WSGS.Equipment.Slots[position].name ..
                                                                          ": equipped identity is unavailable."
             elseif current.id then
                 local destination = context.inventory.free[freeIndex]
                 if current.locked or not current.guid then
-                    context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
+                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.Equipment.Slots[position].name ..
                                                                              ": equipped item is locked or unreadable."
                 elseif not destination then
-                    context.plan.blocked[#context.plan.blocked + 1] = Modules.Equipment.Slots[position].name ..
+                    context.plan.blocked[#context.plan.blocked + 1] = WSGS.Equipment.Slots[position].name ..
                                                                              ": no empty general bag slot is available."
                 else
                     freeIndex = freeIndex + 1
@@ -36,7 +36,7 @@ function Destinations:Apply(context)
                         destination = destination,
                         position = position,
                         targetPosition = position,
-                        slotId = Modules.Equipment.Slots[position].id,
+                        slotId = WSGS.Equipment.Slots[position].id,
                         id = current.id
                     }
                 end
@@ -44,4 +44,3 @@ function Destinations:Apply(context)
         end
     end
 end
-

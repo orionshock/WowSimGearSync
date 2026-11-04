@@ -4,3 +4,10 @@ WSGS.Private = {
     Character = {}, Equipment = {}, Enhancements = {}, EquipmentSets = {},
     Builds = {}, Shopping = {}, Views = {}, Diagnostics = {}
 }
+
+WSGS.Builds = {}
+WSGS.Character = {}
+WSGS.Equipment = {}
+WSGS.Enhancements = {}
+WSGS.EquipmentSets = {}
+WSGS.Views = {}

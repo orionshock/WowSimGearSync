@@ -5,7 +5,6 @@ local Registry = {
     handlers = {}
 }
 Internal.Handlers = Registry
-local MaterialCatalog = Modules.Enhancements.Catalog
 
 -- Inventory-slot capabilities in execution order. The imported target and the
 -- comparator decide whether work exists; this table only selects its handler.
