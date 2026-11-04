@@ -34,4 +34,4 @@ Open `/wsgs options` or right-click the launcher. You can toggle debug logging a
 
 ## Development layout
 
-Production code is grouped by feature ownership. See [module ownership and runtime contracts](docs/architecture.md) for the folder map, public interfaces, capture flow, and in-client validation scenarios. `Bootstrap.lua` loads first; `Addon/Composition.lua` wires the modules last.
+Production code is grouped by feature ownership. `Bootstrap.lua` loads first; `Addon/Composition.lua` wires the modules last.

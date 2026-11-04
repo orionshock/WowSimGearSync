@@ -7,6 +7,5 @@ ignore:
   - .release
   - AGENTS.md
   - README.md
-  - docs
 
 enable-nolib-creation: no
