@@ -20,7 +20,7 @@ function WSGS:CompareLatestEquipment()
     end
     local summary = result.summary
     self:Print("[COMPARE] Profile: " .. profile.name)
-    self:Print("[COMPARE] Equipment matched: " .. summary.matched .. "/16")
+    self:Print("[COMPARE] Equipment matched: " .. summary.matched .. "/" .. #WSGS.equipmentSlots)
     self:Print("[COMPARE] Item mismatches: " .. summary.itemMismatches)
     self:Print("[COMPARE] Configuration mismatches: " .. summary.configurationMismatches)
     self:Print("[COMPARE] Unknown observations: " .. summary.unknown .. " (required fields)")
@@ -54,7 +54,7 @@ end
 -- Read-only raw evidence; no assumptions about colon-delimited modification fields.
 function WSGS:ProbeEquipment(position)
     if not self.equipmentSlots[position] then
-        self:Print("[PROBE] Use an export position from 1 to 16.");
+        self:Print("[PROBE] Use an export position from 1 to 17.");
         return
     end
     local state = Equipment:RefreshState(self:GetActiveSimulationProfile(), "ProbeEquipment")

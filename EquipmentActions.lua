@@ -363,7 +363,7 @@ function Actions:LogPlan(profile, plan)
             byTarget[position] and ("operation:" .. byTarget[position]) or missing[position] and "missing" or state ==
                 "MATCH" and "satisfied" or "excluded"
         local reason = byTarget[position] and "source selected" or missing[position] and "target instance not found" or
-                           state == "MATCH" and "actual equipped item matches target" or position >= 15 and
+                           state == "MATCH" and "actual equipped item matches target" or (position == 15 or position == 16) and
                            "weapon operation excluded; see weapon decision and excluded reasons" or
                            "no safely executable source; see excluded reasons"
         WSGS:Debug(string.format(

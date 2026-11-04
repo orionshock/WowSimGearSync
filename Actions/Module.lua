@@ -203,7 +203,7 @@ function Actions:Refresh(state)
         end
         return
     end
-    for position = 1, 16 do
+    for position = 1, #WSGS.equipmentSlots do
         rebuildController(position, state)
     end
 end

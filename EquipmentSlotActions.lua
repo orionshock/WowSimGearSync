@@ -40,7 +40,7 @@ function Equipment:GetSlotEquipPlan(position, state)
         end
     end
     if selected then
-        return plan, position >= 15 and L["Click to equip target weapons"] or
+        return plan, (position == 15 or position == 16) and L["Click to equip target weapons"] or
             slot.target.empty and "Click to empty this slot" or "Click to equip the target item", "READY"
     end
     -- Classify the planner's rejected candidates using its existing capture.

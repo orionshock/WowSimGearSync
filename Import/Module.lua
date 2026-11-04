@@ -12,10 +12,6 @@ local function isIdentifier(value)
     return type(value) == "number" and value >= 0 and value <= 9007199254740991 and value == math.floor(value)
 end
 
-local function isModification(value)
-    return isIdentifier(value) or (type(value) == "string" and value ~= "")
-end
-
 local function arrayLength(value)
     if type(value) ~= "table" then
         return nil
@@ -34,14 +30,17 @@ function Import:ValidateEquipment(document)
     if type(document) ~= "table" then
         return nil, "Expected a top-level JSON object."
     end
-    if document.apiVersion ~= 3 then
-        return nil, "Only numeric apiVersion 3 is supported."
+    if document.apiVersion ~= 2 then
+        return nil, "Only numeric apiVersion 2 is supported."
     end
     if type(document.player) ~= "table" then
         return nil, "Missing player object."
     end
 
     local player = document.player
+    if player.apiVersion ~= 2 then
+        return nil, "Only numeric player.apiVersion 2 is supported."
+    end
     if not ((type(player.class) == "string" and player.class:match("%S")) or
         (isIdentifier(player.class) and player.class > 0)) then
         return nil, "player.class must be a class name or positive numeric identifier."
@@ -54,12 +53,12 @@ function Import:ValidateEquipment(document)
     if not entryCount then
         return nil, "player.equipment.items must be an array."
     end
-    if entryCount > 16 then
-        return nil, "Equipment contains more than 16 entries."
+    if entryCount > #WSGS.equipmentSlots then
+        return nil, "Equipment contains more than 17 entries."
     end
 
     local equipment, warnings, equipped = {}, {}, 0
-    for index = 1, 16 do
+    for index = 1, #WSGS.equipmentSlots do
         local item = items[index]
         local slot = WSGS.equipmentSlots[index]
         local normalized = {
@@ -81,8 +80,8 @@ function Import:ValidateEquipment(document)
                     if not isIdentifier(value) then
                         problem = "id must be a non-negative integer"
                     end
-                elseif supportedFields[key] and not isModification(value) then
-                    problem = key .. " must be a non-negative integer or non-empty string"
+                elseif supportedFields[key] and not isIdentifier(value) then
+                    problem = key .. " must be a non-negative integer"
                 end
                 if problem then
                     return nil, "Item " .. index .. ": " .. problem .. "."
@@ -103,7 +102,7 @@ function Import:ValidateEquipment(document)
             end
         end
     end
-    if entryCount < 16 then
+    if entryCount < #WSGS.equipmentSlots then
         warnings[#warnings + 1] = "Missing trailing positions were padded as empty."
     end
     return {

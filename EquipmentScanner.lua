@@ -15,7 +15,7 @@ function Scanner:Scan(onlyPosition)
         slots = {},
         context = WSGS.ModificationMaterials:CharacterContext()
     }
-    for position = onlyPosition or 1, onlyPosition or 16 do
+    for position = onlyPosition or 1, onlyPosition or #WSGS.equipmentSlots do
         local slot = WSGS.equipmentSlots[position]
         local current = {
             position = position,

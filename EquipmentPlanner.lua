@@ -56,6 +56,12 @@ local locations = {
         INVTYPE_SHIELD = true,
         INVTYPE_HOLDABLE = true,
         INVTYPE_2HWEAPON = true
+    },
+    [17] = {
+        INVTYPE_RANGED = true,
+        INVTYPE_RANGEDRIGHT = true,
+        INVTYPE_THROWN = true,
+        INVTYPE_RELIC = true
     }
 }
 local function present(target)
@@ -102,7 +108,8 @@ end
 
 local function selected(context, position)
     return not context.selectedPosition or position == context.selectedPosition or
-        context.selectedPosition >= 15 and position >= 15
+        (context.selectedPosition == 15 or context.selectedPosition == 16) and
+            (position == 15 or position == 16)
 end
 
 local function collectCandidates(context)
@@ -298,13 +305,13 @@ local function resolveWeaponDependencies(context)
 
     local weaponWork
     for _, operation in ipairs(plan.operations) do
-        if operation.position >= 15 then
+        if operation.position == 15 or operation.position == 16 then
             weaponWork = true
         end
     end
     if mainLoc == "INVTYPE_2HWEAPON" and not present(off) and currentOff.id and not offUnequip then
         for index = #plan.operations, 1, -1 do
-            if plan.operations[index].position >= 15 then
+            if plan.operations[index].position == 15 or plan.operations[index].position == 16 then
                 table.remove(plan.operations, index)
             end
         end
@@ -314,14 +321,14 @@ local function resolveWeaponDependencies(context)
             not mainOperation and
             (currentMain.observations.item.status ~= "KNOWN" or currentMain.id and not currentMain.equipLoc)) then
         for index = #plan.operations, 1, -1 do
-            if plan.operations[index].position >= 15 then
+            if plan.operations[index].position == 15 or plan.operations[index].position == 16 then
                 table.remove(plan.operations, index)
             end
         end
         plan.blocked[#plan.blocked + 1] = "Weapon layout information is unavailable; rescan after item data loads."
     elseif mainLoc == "INVTYPE_2HWEAPON" and present(off) and not grip then
         for index = #plan.operations, 1, -1 do
-            if plan.operations[index].position >= 15 then
+            if plan.operations[index].position == 15 or plan.operations[index].position == 16 then
                 table.remove(plan.operations, index)
             end
         end
@@ -353,7 +360,7 @@ local function orderOperations(context)
                             not (mainOperation and mainOperation.source.bag == nil and mainOperation.source.position ==
                                 16)
     local function order(operation)
-        if operation.position < 15 then
+        if operation.position < 15 or operation.position == 17 then
             return operation.position
         end
         if operation.kind == "UNEQUIP" and operation.position == 16 and context.mainLoc == "INVTYPE_2HWEAPON" then
@@ -383,7 +390,7 @@ function Planner:Plan(state, selectedPosition)
     reserveResolvedAssignments(context)
     matchTargetInstances(context)
     allocateBagDestinations(context)
-    if not selectedPosition or selectedPosition >= 15 then
+    if not selectedPosition or selectedPosition == 15 or selectedPosition == 16 then
         resolveWeaponDependencies(context)
     end
     orderOperations(context)

@@ -127,7 +127,7 @@ function Comparator:Compare(profile, snapshot)
             unknown = 0
         }
     }
-    for position = 1, 16 do
+    for position = 1, #WSGS.equipmentSlots do
         local target = profile.equipment[position]
         if not target then
             return nil, "Imported build is missing equipment position " .. position .. "."

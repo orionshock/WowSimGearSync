@@ -20,7 +20,7 @@ At the Auction House, the Shopping List shows missing materials and opens the co
 
 Profession recipes load asynchronously. If a click opens a profession before its data is ready, click the item again once loading finishes. Crafting is never deferred to a timer or event.
 
-The API v3 import schema is retained pending a Forever export sample. Enhancement mappings still need verification against Forever game data; recipe execution checks the client's learned recipes and target eligibility.
+Imports use the supplied WoW Sims API v2 format with 17 equipment positions, including ranged weapons and relics. Enhancement mappings still need verification against Forever game data; recipe execution checks the client's learned recipes and target eligibility.
 
 ## Equipment Manager
 

@@ -2,7 +2,7 @@
 
 Target: installed `wowf` 1.60.1.70755, interface 16001. API evidence comes from
 `_forever_/BlizzardInterfaceCode/Interface/AddOns`, including its Camelot variants.
-The export format remains WoW Sims API v3 by user instruction. There is no
+The export format is WoW Sims API v2, verified against the supplied Forever export. There is no
 Classic client fallback, saved-data migration, or cross-client API adapter.
 
 | File | Retail client decision |
@@ -10,7 +10,7 @@ Classic client fallback, saved-data migration, or cross-client API adapter.
 | `WowSimGearSync.toc` | Target interface 16001; load the enchantment reader instead of the general link decoder. |
 | `Core.lua` | Keep retail Settings and addon metadata APIs; log the actual client build; remove automatic cloak enhancement policy. |
 | `Options.lua` | Keep Settings registration through AceConfig; remove the automatic MoP cloak recommendation. |
-| `EquipmentSlots.lua` | Keep the 16 export positions mapped to retail inventory slots; shirt and tabard remain unmanaged. |
+| `EquipmentSlots.lua` | Map all 17 v2 export positions, including ranged/relic, to client inventory slots; shirt and tabard remain unmanaged. |
 | `ItemLinkDecoder.lua` | Remove; client item IDs and GUIDs replace its identity and fingerprint responsibilities. |
 | `ItemEnchantment.lua` | Read only the permanent-enchant field. The supplied C_Item API has no permanent-enchant getter. |
 | `EquipmentScanner.lua` | Observe inventory identity and GUIDs directly; enchantment parsing cannot invalidate item identity. |
@@ -21,7 +21,7 @@ Classic client fallback, saved-data migration, or cross-client API adapter.
 | `EquipmentExecution.lua` | Move the selected bag/equipment instance using cursor APIs after checking its GUID. |
 | `EquipmentActions.lua` | Verify equipped and stored instances by GUID only. |
 | `EquipmentSlotActions.lua` | Treat an unavailable GUID as unresolved item data. |
-| `EquipmentSetSync.lua` | Remove the ranged slot; use retail equipped-slot bounds and GetSpecializationInfoByID. |
+| `EquipmentSetSync.lua` | Save the ranged/relic slot; use client equipped-slot bounds and GetSpecializationInfoByID. |
 | `EquipmentState.lua` | Keep ITEM_DATA_LOAD_RESULT; invalidate on recipe-data and specialization changes. |
 | `EquipmentDiagnostics.lua` | Keep read-only observations; remove recommendation-source diagnostics. |
 | `ModificationMaterials.lua` | Scan the reagent bag; remove profession spellbook indexes and automatic cloak policy. |
@@ -31,8 +31,8 @@ Classic client fallback, saved-data migration, or cross-client API adapter.
 | `Actions/ProfessionExecution.lua` | Use C_TradeSkillUI.OpenTradeSkill, recipe-ID queries, target eligibility, and CraftEnchant with an ItemLocation. |
 | `Actions/Module.lua` | Use TRADE_SKILL_LIST_UPDATE; remove obsolete spellbook and recipe-alias state. |
 | `Actions/Presentation.lua` | Keep enhancement instructions; no client API adaptation needed. |
-| `Import/Module.lua` | Keep API v3 validation; unsupported fields are discarded, not stored for compatibility. |
-| `Import/Specialization.lua` | Keep the existing simulation oneof schema pending a Forever export sample; client API selection is separate. |
+| `Import/Module.lua` | Validate API v2 and 17 equipment positions; unsupported fields are discarded, not stored for compatibility. |
+| `Import/Specialization.lua` | Read simulation oneof fields from the supplied v2 format; client API selection is separate. |
 | `Import/ManagedBuilds.lua` | Keep per-character imports and Equipment Manager name validation. |
 | `UI/Module.lua` | Refresh on retail recipe and specialization events; prevent first-time protected frame creation in combat. |
 | `UI/PaperDoll.lua` | Keep retail portrait and secure action templates; target-slot item use is supported by SecureTemplates.lua. |
@@ -57,12 +57,14 @@ Classic client fallback, saved-data migration, or cross-client API adapter.
   requirements, material, and cooldown checks.
 - `Blizzard_FrameXML/SecureTemplates.lua`: secure item use and target-slot support.
 - `Blizzard_FrameXML/Mainline/EquipmentManager.lua`: all carried bag slots.
+- `Blizzard_UIPanels_Game/Camelot/PaperDollFrame.xml` and `PaperDollFrame.lua`:
+  ranged/relic slot support; the supplied v2 export includes position 17.
 - `Blizzard_SharedXML/UnitUtil.lua`: GetSpecializationInfoByID.
 - `Blizzard_AuctionHouseUI/Shared/Blizzard_AuctionHouseFrame.lua`: browse selection
   and search text handling.
 
 The UI source establishes client contracts, not Forever's available items,
-recipes, or simulation schema. Existing enhancement ID mappings require in-client
+recipes, or the full simulation schema. Existing enhancement ID mappings require in-client
 game-data verification. Direct crafting rejects unlearned recipes, invalid targets,
 and recipes requiring quality allocation; those use Blizzard's profession UI.
 

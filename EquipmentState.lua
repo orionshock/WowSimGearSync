@@ -47,7 +47,7 @@ end
 
 local function normalizedSlots(build, snapshot, comparison)
     local slots = {}
-    for position = 1, 16 do
+    for position = 1, #WSGS.equipmentSlots do
         local physical = comparison and comparison.assignments[position] or position
         slots[position] = {
             position = position,
@@ -148,7 +148,7 @@ local function itemIsRelevant(state, itemID)
     if not state or type(itemID) ~= "number" then
         return false
     end
-    for position = 1, 16 do
+    for position = 1, #WSGS.equipmentSlots do
         local target = state.target and state.target[position]
         local current = state.equipped[position]
         if (target and target.id == itemID) or (current and current.id == itemID) then

@@ -71,7 +71,7 @@ function Shopping:BuildRequirements(state)
     if not state or not state.build or not state.comparison then
         return {}
     end
-    for position = 1, 16 do
+    for position = 1, #WSGS.equipmentSlots do
         collectSlotRequirements(requirements, state, state.slots[position])
     end
 

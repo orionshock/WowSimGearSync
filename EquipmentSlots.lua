@@ -65,4 +65,8 @@ WSGS.equipmentSlots = {{
     name = "Off hand",
     token = "SecondaryHandSlot",
     id = 17
+}, {
+    name = "Ranged / Relic",
+    token = "RangedSlot",
+    id = 18
 }}

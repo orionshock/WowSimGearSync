@@ -1,7 +1,7 @@
 local _, WSGS = ...
 local Import = WSGS.Import
 
--- Player oneof fields from the WoW Sims MoP protobuf schema. Numeric IDs are
+-- Player oneof fields from the WoW Sims API v2 export. Numeric IDs are
 -- Blizzard specialization IDs, not simulation enum values.
 local classes = {
     {"Warrior", 1,{{"armsWarrior", "Arms", 71}, {"furyWarrior", "Fury", 72}, {"protectionWarrior", "Protection", 73}}},

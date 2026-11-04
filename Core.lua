@@ -57,15 +57,15 @@ local commandOptions = {
         probe = {
             type = "input",
             name = "Probe",
-            desc = "Inspect an export position (1-16).",
+            desc = "Inspect an export position (1-17).",
             order = 3,
             get = function()
                 return ""
             end,
             validate = function(_, value)
                 local position = tonumber(value)
-                if not position or position ~= math.floor(position) or position < 1 or position > 16 then
-                    return "Usage: /wsgs probe <export position 1-16>"
+                if not position or position ~= math.floor(position) or position < 1 or position > #WSGS.equipmentSlots then
+                    return "Usage: /wsgs probe <export position 1-17>"
                 end
                 return true
             end,
@@ -135,7 +135,8 @@ local playerReasons = {
     ["C_Item.GetItemSpell failed"] = "Profession enhancement information could not be read",
     ["Equipped item use spell is not mapped for this profession slot"] = "This profession enhancement could not be identified",
     ["Equipment snapshot is unavailable."] = "Equipment information is not available yet.",
-    ["Only numeric apiVersion 3 is supported."] = "Unsupported export format. Export your gear again from WoW Sims.",
+    ["Only numeric player.apiVersion 2 is supported."] = "Unsupported character export format. Export your gear again from WoW Sims.",
+    ["Only numeric apiVersion 2 is supported."] = "Unsupported export format. Export your gear again from WoW Sims.",
     ["Missing player object."] = "The export is missing character information.",
     ["Missing player.equipment object."] = "The export is missing gear. Include Gear when exporting from WoW Sims.",
     ["player.equipment.items must be an array."] = "The exported gear list is invalid. Export it again from WoW Sims.",

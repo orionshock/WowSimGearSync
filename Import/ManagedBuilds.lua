@@ -9,7 +9,7 @@ function Import:SaveBuild(character, build)
     build.name = specialization.name
     build.metadata.importedAt = time()
     build.metadata.addonVersion = WSGS.version
-    build.metadata.source = "WoW Sims API v3"
+    build.metadata.source = "WoW Sims API v2"
     character.activeImport = build
     return build
 end

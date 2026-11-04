@@ -4,7 +4,7 @@ local UI = WSGS.UI
 local Equipment = WSGS:GetModule("Equipment")
 
 local Presentation = UI.SlotPresentation
-local FRAME_WIDTH, FRAME_HEIGHT = 350, 550
+local FRAME_WIDTH, FRAME_HEIGHT = 350, 600
 local SLOT_SIDE_INSET, SLOT_TOP_OFFSET, SLOT_ROW_SPACING = 10, 104, 47
 local equipButtonLabels = {
     READY = "Equip",
@@ -105,8 +105,8 @@ function UI:RenderPaperDoll(state)
     elseif comparison then
         local s = comparison.summary
         frame.summary:SetText(string.format(
-            "Equipped: %d/16  |  To equip: %d\nEnhancements needed: %d  |  Unknown: %d",
-            s.matched, s.itemMismatches, s.configurationMismatches, s.unknown))
+            "Equipped: %d/%d  |  To equip: %d\nEnhancements needed: %d  |  Unknown: %d",
+            s.matched, #WSGS.equipmentSlots, s.itemMismatches, s.configurationMismatches, s.unknown))
     else
         frame.summary:SetText(reason or "Comparison unavailable")
     end

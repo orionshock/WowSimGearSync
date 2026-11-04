@@ -59,7 +59,7 @@ function Sync:Check(profile, state, batch)
         end
     end
     local failures = {}
-    for position = 1, 16 do
+    for position = 1, #WSGS.equipmentSlots do
         local target = profile.equipment[position]
         local result = comparison.slots[position]
         local physical = comparison.assignments[position]
