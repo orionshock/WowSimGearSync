@@ -20,7 +20,11 @@ Follow the language and formatter selected by the first implementation; indentat
 
 ## Abstraction and File-Shape Rules
 
-Apply the **delete test** before introducing or retaining an abstraction: mentally inline its behavior into callers. Keep it when it owns meaningful policy, translation, lifecycle, dependencies, or domain knowledge; protects a boundary; or keeps changes together. Avoid pass-through layers when inlining improves clarity. Judge semantic depth, not size or call-site count; repetition alone does not justify extraction.
+### The Delete Test
+
+Apply the delete test before introducing or retaining helpers, wrappers, adapters, abstractions, or extracted units: mentally remove the abstraction and inline its behavior into its callers without changing behavior. Keep it when inlining would duplicate domain knowledge, scatter behavior that must change together, expose implementation details across a boundary, erase a useful concept, or spread one future change across several owners. Delete or avoid it when inlining makes the code clearer with only trivial duplication or reveals a pass-through layer with no meaningful ownership, policy, translation, lifecycle, or dependency role. Judge semantic depth rather than helper size, call-site count, or lines changed: a single-use boundary may be valuable, while a widely used trivial wrapper may still be needless indirection. Repetition is evidence to evaluate, not an automatic extraction rule.
+
+### File Shape
 
 Treat roughly **300 lines of handwritten source** as a review trigger, not a limit. Before adding substantial behavior, explicitly decide whether to keep or split the file. Keep cohesive responsibilities together; require a concrete cohesion reason for substantially larger files. Split only along genuine responsibility or ownership seams, preserve dependency direction, expose minimal contracts, and choose discoverable names and locations. Do not create micro-files solely to meet a threshold.
 
