@@ -1,20 +1,18 @@
 # WowSimGearSync
 
-WowSimGearSync helps bring your gear in line with a WoW Sims configuration in Mists of Pandaria Classic. It compares your equipment and helps you equip items, socket gems, apply enhancements, and reforge.
+WowSimGearSync helps bring your gear in line with a WoW Sims configuration in WoW Forever. It compares your equipment and helps you equip items and apply enhancements.
 
 ## Getting started
 
 Export your WoW Sims configuration as JSON with Gear included, then paste it into `/wsgs import`. Open the equipment view with the WowSimGearSync launcher to see what needs changing.
 
-Use Equip for the outfit, or click an individual slot to equip its target item. Once the correct gear is equipped, the modification icons show the remaining work. Hover for details and click an item to apply available gems or enhancements from your bags. Gemming works on one selected item per click.
+Use Equip for the outfit, or click an individual slot to equip its target item. Once the correct gear is equipped, the modification icons show the remaining work. Hover for details and click an item to apply available enhancements from your bags.
 
 WSGS keeps your latest import for each character, including across reloads. Importing another configuration replaces it.
 
-## NPC assistants
+## Shopping list
 
-At a reforging NPC, WSGS lists the needed stat changes and can apply them through its own reforging workflow or delegate to ReforgeLite.
-
-At an Item Upgrade NPC, click an item in the companion panel to select it for upgrading. You still confirm the purchase in Blizzard's window.
+Gems, additional gem sockets, reforging, and item upgrades are not part of the Forever implementation.
 
 At the Auction House, the Shopping List shows missing materials and opens the corresponding listings when clicked. Purchases remain up to you.
 

@@ -53,8 +53,7 @@ function Scanner:Scan(onlyPosition)
             observations.item = unknown("Inventory identity unavailable or inconsistent")
         end
         local empty = observations.item.status == "KNOWN" and observations.item.present == false
-        for _, field in ipairs({"enchant", "gems", "reforging", "upgradeStep", "upgradeEligibility", "upgradeMaximum",
-                                "upgradeRemaining", "upgradeState", "tinker", "socketCount", "instance"}) do
+        for _, field in ipairs({"enchant", "tinker", "instance"}) do
             observations[field] = empty and {
                 status = "NOT_APPLICABLE",
                 reason = "Empty inventory slot"
@@ -74,39 +73,12 @@ function Scanner:Scan(onlyPosition)
             local decoded, reason = WSGS.ItemLinkDecoder:Decode(current.link)
             if decoded and observations.item.status == "KNOWN" and decoded.id == current.id then
                 observations.enchant = decoded.enchant
-                observations.gems = decoded.gems
-                observations.reforging = decoded.reforging
-                local socketOK, nativeSockets = pcall(C_Item.GetItemNumSockets, current.link)
-                local addedOK, addedSockets = pcall(C_Item.GetItemNumAddedSockets, current.link)
-                local populatedSocketCount = 0
-                for index, gem in ipairs(decoded.gems.values) do
-                    if gem.status == "KNOWN" and gem.value > 0 then
-                        populatedSocketCount = index
-                    end
-                end
-                local apiSocketCount
-                if socketOK and type(nativeSockets) == "number" and nativeSockets >= 0 and addedOK and
-                    type(addedSockets) == "number" and addedSockets >= 0 then
-                    apiSocketCount = nativeSockets + addedSockets
-                end
-                if apiSocketCount or populatedSocketCount > 0 then
-                    observations.socketCount = {
-                        status = "KNOWN",
-                        value = math.max(apiSocketCount or 0, populatedSocketCount),
-                        native = apiSocketCount and nativeSockets or nil,
-                        added = apiSocketCount and addedSockets or nil,
-                        populated = populatedSocketCount,
-                        source = "C_Item socket counts and populated item-link gem positions"
-                    }
-                else
-                    observations.socketCount = unknown("Equipped socket count unavailable")
-                end
                 for field, observed in pairs(WSGS.EquipmentInspector:Inspect(slot.id, current.link)) do
                     observations[field] = observed
                 end
             else
                 local problem = reason or "Item link and inventory item identity do not agree"
-                for _, field in ipairs({"enchant", "gems", "reforging"}) do
+                for _, field in ipairs({"enchant"}) do
                     observations[field] = unknown(problem)
                 end
             end

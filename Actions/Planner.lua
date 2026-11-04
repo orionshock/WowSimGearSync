@@ -44,7 +44,7 @@ function Planner:Build(position, state)
         return controller
     end
     local modificationsRemain = false
-    for _, field in ipairs({"professionSocket", "buckle", "gems", "enchant", "tinker"}) do
+    for _, field in ipairs({"enchant", "tinker"}) do
         local observed = difference.fields[field]
         if observed and (observed.state == "MISMATCH" or observed.state == "UNKNOWN") then
             modificationsRemain = true
@@ -67,11 +67,6 @@ function Planner:Build(position, state)
         bags = state.materials,
         professions = state.context.professions
     }
-    local professionSocket = difference.fields.professionSocket
-    local buckle = difference.fields.buckle
-    context.additionalSocketMissing = professionSocket and professionSocket.state == "MISMATCH" or
-                                          buckle and buckle.state == "MISMATCH"
-    context.availableSocketCount = professionSocket and professionSocket.actual or buckle and buckle.actual
     for _, handlerName in ipairs(Internal.Handlers:ForSlot(controller.inventorySlot)) do
         local handler = Internal.Handlers.handlers[handlerName]
         for _, operation in ipairs(handler:Check(context)) do

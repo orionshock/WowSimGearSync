@@ -48,13 +48,6 @@ local function collectSlotRequirements(requirements, state, slot)
         return
     end
     local fields = difference.fields
-    local gems = fields.gems
-    for _, socket in ipairs(gems and gems.sockets or {}) do
-        if socket.state == "MISMATCH" and type(socket.expected) == "number" and socket.expected > 0 then
-            addRequirement(requirements, socket.expected, 1)
-        end
-    end
-
     local enchant = fields.enchant
     if enchant and enchant.state == "MISMATCH" then
         local inventory = Materials.actions.inventory[enchant.expected]
@@ -70,17 +63,6 @@ local function collectSlotRequirements(requirements, state, slot)
     if tinker and tinker.state == "MISMATCH" then
         addProfessionReagents(requirements, state, Materials.actions.profession[tinker.expected],
             difference.currentSlotId)
-    end
-
-    local professionSocket = fields.professionSocket
-    if professionSocket and professionSocket.state == "MISMATCH" then
-        addProfessionReagents(requirements, state,
-            Materials.actions.prerequisites.professionSockets[difference.currentSlotId], difference.currentSlotId)
-    end
-
-    local buckle = fields.buckle
-    if buckle and buckle.state == "MISMATCH" then
-        addRequirement(requirements, Materials.actions.prerequisites.beltBuckle.itemID, 1)
     end
 end
 

@@ -5,9 +5,6 @@ WSGS.Import = Import
 local supportedFields = {
     id = true,
     enchant = true,
-    gems = true,
-    reforging = true,
-    upgradeStep = true,
     tinker = true
 }
 
@@ -31,17 +28,6 @@ local function arrayLength(value)
         length = math.max(length, key)
     end
     return length
-end
-
-local function copy(value)
-    if type(value) ~= "table" then
-        return value
-    end
-    local result = {}
-    for key, child in pairs(value) do
-        result[key] = copy(child)
-    end
-    return result
 end
 
 function Import:ValidateEquipment(document)
@@ -95,17 +81,6 @@ function Import:ValidateEquipment(document)
                     if not isIdentifier(value) then
                         problem = "id must be a non-negative integer"
                     end
-                elseif key == "gems" then
-                    local gemCount = arrayLength(value)
-                    if not gemCount then
-                        problem = "gems must be an array"
-                    else
-                        for gemIndex = 1, gemCount do
-                            if not isIdentifier(value[gemIndex]) then
-                                problem = "gem IDs must be non-negative integers"
-                            end
-                        end
-                    end
                 elseif supportedFields[key] and not isModification(value) then
                     problem = key .. " must be a non-negative integer or non-empty string"
                 end
@@ -113,18 +88,9 @@ function Import:ValidateEquipment(document)
                     return nil, "Item " .. index .. ": " .. problem .. "."
                 end
                 if supportedFields[key] then
-                    if key == "gems" then
-                        normalized.gems = {}
-                        for gemIndex, gem in ipairs(value) do
-                            normalized.gems[gemIndex] = gem
-                        end
-                    else
-                        normalized[key] = value
-                    end
+                    normalized[key] = value
                 else
-                    normalized.extraFields = normalized.extraFields or {}
-                    normalized.extraFields[key] = copy(value)
-                    warnings[#warnings + 1] = "Item " .. index .. ": retained unsupported field " .. key:sub(1, 80) ..
+                    warnings[#warnings + 1] = "Item " .. index .. ": ignored unsupported field " .. key:sub(1, 80) ..
                                                   "."
                 end
             end

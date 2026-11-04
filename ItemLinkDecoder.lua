@@ -2,8 +2,8 @@ local _, WSGS = ...
 local Decoder = {}
 WSGS.ItemLinkDecoder = Decoder
 
--- MoP 50504 fields verified in live client tests supplied with Task 005.
--- Field indices exclude the literal "item" prefix. Field 11 is unidentified.
+-- Only identity and enchantment are consumed on Forever.
+-- Field indices exclude the literal "item" prefix.
 function Decoder:Decode(link)
     if type(link) ~= "string" then
         return nil, "Item link unavailable"
@@ -22,7 +22,7 @@ function Decoder:Decode(link)
     if not fields[1] or not fields[1]:match("^%d+$") or not id or id <= 0 or id > 9007199254740991 then
         return nil, "Malformed item ID"
     end
-    if #fields < 10 then
+    if #fields < 2 then
         return nil, "Item link lacks the verified modification fields"
     end
     local function observed(index)
@@ -52,23 +52,10 @@ function Decoder:Decode(link)
     local result = {
         id = id,
         payload = payload,
-        playerLevel = observed(9),
-        enchant = observed(2),
-        reforging = observed(10),
-        gems = {
-            status = "KNOWN",
-            values = {}
-        }
+        enchant = observed(2)
     }
-    if not result.enchant or not result.reforging or not result.playerLevel then
-        return nil, "Malformed enchant or reforge field"
-    end
-    for index = 1, 4 do
-        local gem = observed(index + 2)
-        if not gem then
-            return nil, "Malformed gem field " .. index
-        end
-        result.gems.values[index] = gem
+    if not result.enchant then
+        return nil, "Malformed enchant field"
     end
     return result
 end

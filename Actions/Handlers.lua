@@ -10,22 +10,22 @@ local MaterialCatalog = WSGS.ModificationMaterials
 -- Inventory-slot capabilities in execution order. The imported target and the
 -- comparator decide whether work exists; this table only selects its handler.
 Registry.SlotHandlers = {
-    [1] = {"Gems", "ItemEnhancement"},
-    [2] = {"Gems", "ItemEnhancement"},
-    [3] = {"Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [5] = {"Gems", "ItemEnhancement"},
-    [6] = {"AdditionalSockets", "Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [7] = {"Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [8] = {"Gems", "ItemEnhancement"},
-    [9] = {"AdditionalSockets", "Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [10] = {"AdditionalSockets", "Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [11] = {"Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [12] = {"Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [13] = {"Gems", "ItemEnhancement"},
-    [14] = {"Gems", "ItemEnhancement"},
-    [15] = {"Gems", "ItemEnhancement", "ProfessionEnhancement"},
-    [16] = {"Gems", "ItemEnhancement"},
-    [17] = {"Gems", "ItemEnhancement"}
+    [1] = {"ItemEnhancement"},
+    [2] = {"ItemEnhancement"},
+    [3] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [5] = {"ItemEnhancement"},
+    [6] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [7] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [8] = {"ItemEnhancement"},
+    [9] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [10] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [11] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [12] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [13] = {"ItemEnhancement"},
+    [14] = {"ItemEnhancement"},
+    [15] = {"ItemEnhancement", "ProfessionEnhancement"},
+    [16] = {"ItemEnhancement"},
+    [17] = {"ItemEnhancement"}
 }
 
 local function verify(context)
@@ -38,136 +38,16 @@ local function verify(context)
         return false, "target item no longer equipped"
     end
     local field = difference.fields[operation.field]
-    if operation.type == "GEM" then
-        field = field and field.sockets and field.sockets[operation.socket]
-    end
     if not field then
         return false, "comparison field unavailable"
     end
-    local expected = operation.expectedCount or operation.expected
+    local expected = operation.expected
     if field.expected ~= expected then
         return false, "comparison no longer describes the submitted expectation", field.actual
     end
     return field.state == "MATCH", field.state .. (field.reason and ": " .. field.reason or ""),
-        field.actualCount or field.actual
+        field.actual
 end
-
-local AdditionalSockets = {}
-function AdditionalSockets:Check(context)
-    local results = {}
-    for _, definition in ipairs({{
-        field = "professionSocket",
-        type = "PROFESSION_SOCKET"
-    }, {
-        field = "buckle",
-        type = "BUCKLE"
-    }}) do
-        local difference = context.fields[definition.field]
-        if difference and (difference.state == "MISMATCH" or difference.state == "UNKNOWN") then
-            results[#results + 1] = {
-                handler = self,
-                handlerName = "AdditionalSockets",
-                type = definition.type,
-                field = definition.field,
-                expected = true,
-                expectedCount = difference.expected,
-                unresolved = difference.state == "UNKNOWN",
-                reason = difference.reason
-            }
-        end
-    end
-    return results
-end
-function AdditionalSockets:Prepare(context, operation)
-    if operation.unresolved then
-        return nil, operation.reason or "Additional socket state is unknown", true
-    end
-    if operation.type == "BUCKLE" then
-        local material, _, definition = MaterialCatalog:ForBuckle(context.bags)
-        operation.material = material
-        operation.materialItemID = definition.itemID
-        operation.spellID = material and material.spellID
-        operation.method = "ITEM"
-        if not material then
-            return nil, "Not in your bags"
-        end
-        if material.locked then
-            return nil, "Belt buckle is locked"
-        end
-        return operation
-    end
-    local mapping = MaterialCatalog.actions.prerequisites.professionSockets[context.inventorySlot]
-    local recipe, reason, recipeName, professionName, professionSpellIndex =
-        MaterialCatalog:SocketAvailability(context.bags, context.inventorySlot, context.professions)
-    operation.spellID = recipe and (recipe.spellID or recipe.spellIDs and recipe.spellIDs[1])
-    operation.recipeSpellIDs = recipe and recipe.spellIDs
-    operation.spellName, operation.professionName = recipeName, professionName
-    operation.professionSpellIndex = professionSpellIndex
-    operation.professionSkillLine = mapping and mapping.profession
-    operation.nativeProfession, operation.method = true, "PROFESSION"
-    if reason then
-        return nil, reason
-    end
-    return operation
-end
-AdditionalSockets.Verify = verify
-
-local Gems = {}
-function Gems:Check(context)
-    local results, field = {}, context.fields.gems
-    if not field then
-        return results
-    end
-    if field.sockets then
-        for socket, difference in ipairs(field.sockets) do
-            if difference.state == "MISMATCH" or difference.state == "UNKNOWN" then
-                results[#results + 1] = {
-                    handler = self,
-                    handlerName = "Gems",
-                    type = "GEM",
-                    field = "gems",
-                    socket = socket,
-                    expected = difference.expected,
-                    unresolved = difference.state == "UNKNOWN",
-                    reason = difference.reason
-                }
-            end
-        end
-    elseif field.state == "UNKNOWN" then
-        results[#results + 1] = {
-            handler = self,
-            handlerName = "Gems",
-            type = "GEM",
-            field = "gems",
-            unresolved = true,
-            reason = field.reason
-        }
-    end
-    return results
-end
-function Gems:Prepare(context, operation)
-    if operation.unresolved then
-        return nil, operation.reason or "Gem state is unknown", true
-    end
-    if not operation.expected or operation.expected == 0 then
-        return nil, "An installed gem cannot be removed without a replacement"
-    end
-    if context.additionalSocketMissing and
-        (not context.availableSocketCount or operation.socket > context.availableSocketCount) then
-        return nil, "Required additional socket must be applied before this gem"
-    end
-    local material, count = MaterialCatalog:ForGem(context.bags, operation.expected)
-    operation.material, operation.materialItemID, operation.available = material, operation.expected, count
-    operation.method = "GEM"
-    if not material then
-        return nil, "Not in your bags"
-    end
-    if material.locked then
-        return nil, "Gem is locked"
-    end
-    return operation
-end
-Gems.Verify = verify
 
 local ItemEnhancement = {}
 function ItemEnhancement:Check(context)
@@ -254,8 +134,6 @@ function ProfessionEnhancement:Prepare(context, operation)
 end
 ProfessionEnhancement.Verify = verify
 
-Registry.handlers.AdditionalSockets = AdditionalSockets
-Registry.handlers.Gems = Gems
 Registry.handlers.ItemEnhancement = ItemEnhancement
 Registry.handlers.ProfessionEnhancement = ProfessionEnhancement
 

@@ -16,38 +16,8 @@ local tinkerReagents = {
     [90146] = 1 -- Tinker's Kit.
 }
 
--- Modification data follows execution priority:
---   1. prerequisites create sockets needed by later gem actions;
---   2. inventory entries resolve finished enhancement items carried in bags;
---   3. profession entries are applied directly from an open profession window.
--- Entries within each section are clustered by profession for maintenance.
+-- Finished enhancement items and direct profession recipes.
 Materials.actions = {
-    prerequisites = {
-        -- Blacksmithing-created item; usable by any character from bags.
-        beltBuckle = {
-            itemID = 90046, -- Living Steel Belt Buckle.
-            slot = 6 -- Waist inventory slot.
-        },
-
-        -- Blacksmithing: direct recipes that create an additional socket.
-        professionSockets = {
-            [9] = { -- Wrist: adds SpellItemEnchantment 3717.
-                profession = 164, -- Blacksmithing skill line.
-                spellIDs = {113263, 55628}, -- Socket Bracer recipes.
-                reagents = {
-                    [3466] = 4 -- Strong Flux.
-                }
-            },
-            [10] = { -- Hands: adds SpellItemEnchantment 3723.
-                profession = 164, -- Blacksmithing skill line.
-                spellIDs = {114112, 55641}, -- Socket Gloves recipes.
-                reagents = {
-                    [3466] = 4 -- Strong Flux.
-                }
-            }
-        }
-    },
-
     -- SpellItemEnchantment ID -> finished bag item or its item-use spell.
     -- A spellID locates the matching carried scroll through C_Item.GetItemSpell.
     inventory = {
@@ -430,15 +400,6 @@ function Materials:ScanBags()
     return result
 end
 
-function Materials:ForGem(bags, itemID)
-    return bags.byItem[itemID], itemID and (bags.counts[itemID] or 0) or 0
-end
-
-function Materials:ForBuckle(bags)
-    local definition = self.actions.prerequisites.beltBuckle
-    return bags.byItem[definition.itemID], bags.counts[definition.itemID] or 0, definition
-end
-
 function Materials:ForInventoryEnhancement(bags, enchantID)
     local definition = self.actions.inventory[enchantID]
     if not definition then
@@ -448,14 +409,6 @@ function Materials:ForInventoryEnhancement(bags, enchantID)
         return bags.byItem[definition.itemID], definition.itemID, nil
     end
     return bags.bySpell[definition.spellID], nil, definition.spellID
-end
-
-function Materials:SocketAvailability(bags, inventorySlot, professions)
-    local recipe = self.actions.prerequisites.professionSockets[inventorySlot]
-    if not recipe then
-        return nil, "No confirmed Blacksmithing socket recipe for this slot"
-    end
-    return professionAvailability(bags, recipe, inventorySlot, professions)
 end
 
 function Materials:ProfessionEnhancementAvailability(bags, enchantID, inventorySlot, professions)

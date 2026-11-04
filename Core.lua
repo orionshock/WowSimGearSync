@@ -124,8 +124,6 @@ local playerReasons = {
     ["Equipped item instance is not available yet"] = "Equipped item information is not available yet",
     ["Equipped item identity is not available yet"] = "Equipped item information is not available yet",
     ["Equipped item identity unknown"] = "Equipped item information is not available yet",
-    ["Upgrade tooltip unavailable, unreadable, or inconsistent"] = "Upgrade information is not available yet",
-    ["Upgrade eligibility and maximum are not established"] = "Upgrade information is not available yet",
     ["Target item is not confirmed in this slot"] = "Equip the target item first",
     ["Modification representations have no verified conversion"] = "This enhancement could not be identified",
     ["Required modification could not be observed"] = "Enhancement information is not available yet",
@@ -147,9 +145,6 @@ local playerReasons = {
     ["Resolved profession entry is not an executable recipe"] = "The required profession recipe cannot be used",
     ["DoTradeSkill did not begin item targeting"] = "The recipe did not let you select an item",
     ["The equipped target item or instance changed before application"] = "The equipped item changed; select it again",
-    ["ReforgeLite is loaded, but its exact-import interface is unavailable."] = "ReforgeLite cannot accept this build. Check that it is up to date.",
-    ["ReforgeLite prepared the exact queue, but its Apply control is unavailable."] = "ReforgeLite's Apply button is unavailable.",
-    ["No remaining reforge can be submitted safely."] = "The remaining reforges cannot be applied right now."
 }
 
 function WSGS:FormatPlayerReason(reason)
@@ -177,14 +172,10 @@ function WSGS:FormatPlayerReason(reason)
         :gsub("target slot%(s%) unresolved", "items still need attention")
         :gsub("Equipment Manager API error:", "Equipment Manager could not save the set:")
         :gsub("instance changed; rescan required", "item changed; try again")
-        :gsub("Upgrade eligibility", "Upgrade availability")
         :gsub("combat lockdown", "combat")
         :gsub("could not stage the item", "could not select the item")
         :gsub("Item staging is unavailable", "Item selection is unavailable")
-        :gsub("DoTradeSkill failed:", "Crafting failed:")
-        :gsub("Reforge transaction failed:", "Reforging failed:")
-        :gsub("ReforgeLite import handoff failed:", "Could not send this build to ReforgeLite:")
-        :gsub("ReforgeLite could not start its queue:", "ReforgeLite could not apply the reforges:"))
+        :gsub("DoTradeSkill failed:", "Crafting failed:"))
 end
 
 function WSGS:RegisterAceConfig()

@@ -48,9 +48,7 @@ function Inventory:Scan(equipment)
                             value = item.id,
                             present = true
                         },
-                        gems = decoded.gems,
-                        enchant = decoded.enchant,
-                        reforging = decoded.reforging
+                        enchant = decoded.enchant
                     }
                 else
                     result.unreadable = result.unreadable + 1

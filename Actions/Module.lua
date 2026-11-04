@@ -32,8 +32,7 @@ end
 
 local function sameOperation(left, right)
     return left and right and left.handlerName == right.handlerName and left.type == right.type and
-               left.field == right.field and left.socket == right.socket and left.expected == right.expected and
-               left.expectedCount == right.expectedCount
+               left.field == right.field and left.expected == right.expected
 end
 
 local function configureButton(position)
@@ -43,7 +42,7 @@ local function configureButton(position)
     end
     local controller = controllers[position]
     local operation = controller and controller.state == "READY" and controller.prepared
-    local actionType = not Internal.GemExecution.batch and operation and operation.type ~= "GEM" and
+    local actionType = operation and
         not operation.nativeProfession and "item" or nil
     button:SetAttribute("wsgs-type1", actionType)
     button:SetAttribute("type1", actionType)
@@ -66,10 +65,10 @@ local function synchronizeBuild()
         local operation = controller.pending or controller.submitting
         if operation then
             debug("CANCEL", string.format(
-                "build=%s nextBuild=%s slot=%d serial=%s type=%s expected=%s count=%s guid=%s reason=build-replaced verification-only",
+                "build=%s nextBuild=%s slot=%d serial=%s type=%s expected=%s guid=%s reason=build-replaced verification-only",
                 valueText(previousBuild and previousBuild.name), valueText(build and build.name),
                 controller.inventorySlot, valueText(controller.serial), operation.type,
-                valueText(operation.expected), valueText(operation.expectedCount), valueText(controller.targetGuid)))
+                valueText(operation.expected), valueText(controller.targetGuid)))
         end
     end
     -- A new table also identifies a reimport of the same specialization. Do not
@@ -211,10 +210,6 @@ function Actions:Refresh(state)
 end
 
 function Actions:GetSlotState(position)
-    local gemState = Internal.GemExecution:GetSlotState(position)
-    if gemState then
-        return gemState
-    end
     local controller = controllers[position]
     return Internal.Presentation:Build(controller, selectedOperation(controller))
 end
@@ -263,7 +258,7 @@ local function scheduleTimeout(self, controller)
     end)
 end
 
-local function markPending(self, controller, operation, waitForSocketAccept)
+local function markPending(self, controller, operation)
     serial = serial + 1
     controller.state = "PENDING"
     controller.pending = operation
@@ -272,9 +267,7 @@ local function markPending(self, controller, operation, waitForSocketAccept)
     controller.serial = serial
     debug("EXEC", string.format("slot=%d type=%s submitted serial=%d; awaiting events", controller.inventorySlot,
         operation.type, controller.serial))
-    if not waitForSocketAccept then
-        scheduleTimeout(self, controller)
-    end
+    scheduleTimeout(self, controller)
 end
 
 fail = function(self, controller, operation, reason, scope)
@@ -302,26 +295,6 @@ local function markUnknown(self, controller, operation, reason)
         operation.handlerName, reason))
     self:SendMessage("WSGS_ACTIONS_CHANGED", "UNRESOLVED")
 end
-local function submitGem(self, controller, request, button)
-    local started, problem = Internal.GemExecution:Start(controller.position)
-    -- A synchronous completion can prepare an enchant during this PreClick.
-    -- Keep this hardware click dedicated to the gem batch.
-    if not InCombatLockdown() then
-        button:SetAttribute("type1", nil)
-    end
-    if not started then
-        fail(self, controller, request.operation, problem, "OPERATION")
-    end
-    return started
-end
-
-function Actions:GemSocketingFailed(position, operation, reason)
-    local controller = controllers[position]
-    if controller and operation then
-        fail(self, controller, operation, reason, "OPERATION")
-    end
-end
-
 local function submitProfession(self, controller, request, button)
     local operation = request.operation
     controller.submitting = operation
@@ -388,9 +361,6 @@ local function submitItem(self, controller, request, button)
 end
 
 local function submitRequest(self, controller, request, button)
-    if request.method == "GEM" then
-        return submitGem(self, controller, request, button)
-    end
     if request.method == "PROFESSION" then
         return submitProfession(self, controller, request, button)
     end
@@ -401,24 +371,12 @@ local function submitRequest(self, controller, request, button)
     return false
 end
 
-local function activeModificationAtOtherPosition(position)
-    for otherPosition, other in pairs(controllers) do
-        if otherPosition ~= position and (other.pending or other.submitting) then
-            return true
-        end
-    end
-    return false
-end
-
 local function validateClick(controller, operation, position)
     if InCombatLockdown() then
         return "Action unavailable during combat lockdown"
     end
     if CursorHasItem() then
         return "Place the held cursor item first"
-    end
-    if operation.type == "GEM" and activeModificationAtOtherPosition(position) then
-        return "Finish the active modification first"
     end
     if SpellIsTargeting() then
         return "Finish or cancel the active item-targeting cursor first"
@@ -434,9 +392,6 @@ local function validateClick(controller, operation, position)
 end
 
 function Actions.IsModificationPending()
-    if Internal.GemExecution.batch then
-        return true
-    end
     for _, controller in pairs(controllers) do
         if controller.pending or controller.submitting then
             return true
@@ -447,12 +402,6 @@ end
 
 function Actions:ActivateSlot(position, button)
     button.wsgsSubmission = nil
-    if Internal.GemExecution.batch then
-        if not InCombatLockdown() then
-            button:SetAttribute("type1", nil)
-        end
-        return
-    end
     if synchronizeBuild() then
         return
     end
@@ -490,8 +439,8 @@ function Actions:ActivateSlot(position, button)
         "slot=%d type=%s material=%s materialGuid=%s spell=%s spellName=%s guid=%s phase=%s",
         controller.inventorySlot, operation.type, valueText(operation.materialItemID),
         valueText(operation.material and operation.material.guid), valueText(operation.spellID),
-        valueText(operation.spellName), valueText(controller.targetGuid), operation.type == "GEM" and "socket" or
-            operation.nativeProfession and "native" or "secure"))
+        valueText(operation.spellName), valueText(controller.targetGuid),
+        operation.nativeProfession and "native" or "secure"))
     debug("EXEC", string.format("slot=%d handler=%s check=READY method=%s", controller.inventorySlot,
         operation.handlerName, operation.method))
     local request = {
@@ -679,7 +628,7 @@ local function confirmApplication(self, event, api, ...)
     local controller, operation
     for _, candidate in pairs(controllers) do
         local candidateOperation = candidate.submitting
-        if candidateOperation and candidateOperation.type ~= "GEM" then
+        if candidateOperation then
             controller, operation = candidate, candidateOperation
             break
         end

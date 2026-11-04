@@ -69,15 +69,9 @@ end
 local function cost(target, candidate, position)
     local fields = WSGS.EquipmentComparator:CompareSlot(target, candidate, position, position).fields
     local result = 0
-    for _, name in ipairs({"gems", "enchant", "reforging"}) do
+    for _, name in ipairs({"enchant"}) do
         local field = fields[name]
-        if name == "gems" and field.sockets then
-            for _, socket in ipairs(field.sockets) do
-                result = result + (socket.state == "MISMATCH" and 100 or socket.state == "UNKNOWN" and 1 or 0)
-            end
-        else
-            result = result + (field.state == "MISMATCH" and 100 or field.state == "UNKNOWN" and 1 or 0)
-        end
+        result = result + (field.state == "MISMATCH" and 100 or field.state == "UNKNOWN" and 1 or 0)
     end
     return result
 end

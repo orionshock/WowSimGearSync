@@ -1,12 +1,11 @@
 ## Interface: 50504
 ## Title: WowSimGearSync
-## Notes: Match your gear, gems, enhancements, and reforges to a WoW Sims configuration.
+## Notes: Match your gear and enhancements to a WoW Sims configuration.
 ## Author: Orionshock <Orionshock@gmail.com> with Codex/OpenAI
 ## X-License: MIT
 ## X-Category: Inventory
 ## X-Credits: Codex/OpenAI
 ## IconTexture: Interface\Icons\INV_Chest_Plate04
-## OptionalDeps: ReforgeLiteMopClassic
 ## Version: @project-version@
 ## SavedVariables: WSGSDB
 
@@ -48,14 +47,10 @@ EquipmentExecution.lua
 EquipmentSetSync.lua
 EquipmentActions.lua
 EquipmentSlotActions.lua
-NPC\Panel.lua
-NPC\Reforging.lua
-NPC\ItemUpgrades.lua
 Actions\Presentation.lua
 Actions\Handlers.lua
 Actions\Planner.lua
 Actions\ProfessionExecution.lua
-Actions\GemExecution.lua
 Actions\Module.lua
 UI\Module.lua
 UI\SlotPresentation.lua
